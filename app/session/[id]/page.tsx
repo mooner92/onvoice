@@ -33,7 +33,6 @@ export default function SessionPage() {
   const [showTimestamps, setShowTimestamps] = useState(false)
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [showAppPrompt, setShowAppPrompt] = useState(false)
-  const [isConnected, setIsConnected] = useState(true)
   const [activeTab, setActiveTab] = useState("original")
   const [showSettings, setShowSettings] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
@@ -254,7 +253,7 @@ export default function SessionPage() {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
+              <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
               <div>
                 <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   {session?.title || `Session ${sessionId}`}

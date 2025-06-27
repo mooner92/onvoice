@@ -109,12 +109,12 @@ export default function DemoPage() {
                 </div>
                 <CardTitle>Ready to Experience the Demo?</CardTitle>
                 <CardDescription>
-                  You'll join as an attendee and see real-time transcription and translation in action
+                  You&apos;ll join as an attendee and see real-time transcription and translation in action
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-white p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">What you'll experience:</h4>
+                  <h4 className="font-medium mb-2">What you&apos;ll experience:</h4>
                   <ul className="text-sm text-gray-600 space-y-1">
                     <li>• Real-time speech-to-text transcription</li>
                     <li>• Live translation to your selected language</li>

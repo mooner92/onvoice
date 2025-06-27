@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mic, Globe, QrCode, Zap, Download, User, LogOut } from "lucide-react"
+import { Mic, Globe, QrCode, Zap, Download, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { LoginButton } from "@/components/auth/LoginButton"
+import Image from "next/image"
 
 export default function HomePage() {
   const { user, signOut } = useAuth()
@@ -35,10 +36,12 @@ export default function HomePage() {
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center space-x-2">
                       {user.user_metadata?.avatar_url && (
-                        <img 
+                        <Image 
                           src={user.user_metadata.avatar_url} 
                           alt="Profile" 
                           className="w-8 h-8 rounded-full"
+                          width={32}
+                          height={32}
                         />
                       )}
                       <span className="text-sm text-gray-700">{user.user_metadata?.full_name || user.email}</span>

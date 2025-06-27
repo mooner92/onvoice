@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,10 +15,10 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 
 interface TranscriptLine {
-  id: string
-  timestamp: string
-  text: string
-  confidence: number
+  id: string;
+  timestamp: string;
+  text: string;
+  confidence: number;
 }
 
 export default function HostDashboard() {
@@ -37,10 +37,6 @@ export default function HostDashboard() {
   const [participantCount, setParticipantCount] = useState(0)
   const [sessionDuration, setSessionDuration] = useState(0)
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const recognitionRef = useRef<any>(null)
-  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
   const languages = [
     { code: "en", name: "English" },
     { code: "es", name: "Spanish" },
@@ -60,69 +56,6 @@ export default function HostDashboard() {
       router.push('/')
     }
   }, [user, router])
-
-  // Initialize speech recognition
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = true
-      recognitionRef.current.interimResults = true
-      recognitionRef.current.lang = primaryLanguage
-
-      recognitionRef.current.onresult = (event: any) => {
-        let finalTranscript = ''
-        let interimTranscript = ''
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript
-          } else {
-            interimTranscript += transcript
-          }
-        }
-
-        if (finalTranscript) {
-          const newLine: TranscriptLine = {
-            id: Date.now().toString(),
-            timestamp: new Date().toLocaleTimeString(),
-            text: finalTranscript,
-            confidence: 0.9
-          }
-          setTranscript(prev => [...prev, newLine])
-          
-          // Save to database
-          saveTranscriptToDatabase(newLine)
-        }
-      }
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error)
-      }
-    }
-  }, [primaryLanguage])
-
-  const saveTranscriptToDatabase = async (line: TranscriptLine) => {
-    if (!sessionId) return
-
-    try {
-      const { error } = await supabase
-        .from('transcripts')
-        .insert({
-          session_id: sessionId,
-          timestamp: line.timestamp,
-          original_text: line.text,
-          created_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error saving transcript:', error)
-      }
-    } catch (error) {
-      console.error('Error saving transcript:', error)
-    }
-  }
 
   const handleStartSession = async () => {
     if (!user) return
@@ -150,12 +83,43 @@ export default function HostDashboard() {
       setIsRecording(true)
 
       // Start speech recognition
-      if (recognitionRef.current) {
-        recognitionRef.current.start()
+      const recognition = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = primaryLanguage
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = ''
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript
+          }
+        }
+
+        if (finalTranscript) {
+          const newLine: TranscriptLine = {
+            id: Date.now().toString(),
+            timestamp: new Date().toLocaleTimeString(),
+            text: finalTranscript,
+            confidence: 0.9
+          }
+          setTranscript(prev => [...prev, newLine])
+          
+          // Save to database
+          saveTranscriptToDatabase(newLine)
+        }
       }
 
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
+      }
+
+      recognition.start()
+
       // Start duration timer
-      durationIntervalRef.current = setInterval(() => {
+      const durationInterval = setInterval(() => {
         setSessionDuration(prev => prev + 1)
       }, 1000)
 
@@ -169,19 +133,39 @@ export default function HostDashboard() {
     }
   }
 
+  const saveTranscriptToDatabase = useCallback(async (line: TranscriptLine) => {
+    if (!sessionId) return
+
+    try {
+      const { error } = await supabase
+        .from('transcripts')
+        .insert({
+          session_id: sessionId,
+          timestamp: line.timestamp,
+          original_text: line.text,
+          created_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error('Error saving transcript:', error)
+      }
+    } catch (error) {
+      console.error('Error saving transcript:', error)
+    }
+  }, [sessionId, supabase])
+
   const handleStopSession = async () => {
     if (!sessionId) return
 
     try {
       // Stop speech recognition
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
-      }
+      const recognition = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)()
+      recognition.stop()
 
       // Stop duration timer
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current)
-      }
+      const durationInterval = setInterval(() => {
+        setSessionDuration(prev => prev + 1)
+      }, 1000)
 
       // Update session status in database
       await supabase
@@ -291,7 +275,7 @@ export default function HostDashboard() {
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-gray-500">
-                    Select the language you'll be speaking in. Attendees will choose their own translation languages.
+                    Select the language you&apos;ll be speaking in. Attendees will choose their own translation languages.
                   </p>
                 </div>
 

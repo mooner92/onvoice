@@ -10,7 +10,7 @@ import { Calendar, Clock, Search, Download, Play, Crown, Lock, Mic, Users, Zap, 
 import Link from "next/link"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
-import { Session, UserSession } from "@/lib/types"
+import { Session } from "@/lib/types"
 
 interface SavedSession extends Session {
   role: 'speaker' | 'audience'
@@ -27,10 +27,9 @@ export default function MySessionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterRole, setFilterRole] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
-  const [sortBy, setSortBy] = useState("date")
   const [sessions, setSessions] = useState<SavedSession[]>([])
   const [loading, setLoading] = useState(true)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(null)
 
   // Load user sessions
   useEffect(() => {
