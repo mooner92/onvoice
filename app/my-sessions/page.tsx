@@ -162,16 +162,7 @@ export default function MySessionsPage() {
   })
 
   const sortedSessions = [...filteredSessions].sort((a, b) => {
-    switch (sortBy) {
-      case "date":
-        return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime()
-      case "title":
-        return a.title.localeCompare(b.title)
-      case "duration":
-        return (b.transcript_count || 0) - (a.transcript_count || 0)
-      default:
-        return 0
-    }
+    return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime();
   })
 
   const deleteSession = async (sessionId: string) => {
