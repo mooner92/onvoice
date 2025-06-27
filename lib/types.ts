@@ -1,0 +1,54 @@
+export interface Session {
+  id: string
+  title: string
+  description?: string
+  host_id: string
+  host_name: string
+  primary_language: string
+  status: 'active' | 'ended'
+  created_at: string
+  ended_at?: string
+  qr_code_url?: string
+  session_url?: string
+}
+
+export interface SessionParticipant {
+  id: string
+  session_id: string
+  user_id: string
+  user_name: string
+  role: 'speaker' | 'audience'
+  joined_at: string
+  left_at?: string
+}
+
+export interface Transcript {
+  id: string
+  session_id: string
+  timestamp: string
+  original_text: string
+  translated_text?: string
+  target_language?: string
+  speaker_id?: string
+  created_at: string
+}
+
+export interface UserSession {
+  id: string
+  user_id: string
+  session_id: string
+  role: 'speaker' | 'audience'
+  saved_at: string
+  expires_at?: string
+  is_premium: boolean
+}
+
+export interface UserProfile {
+  id: string
+  email: string
+  name: string
+  avatar_url?: string
+  subscription_status: 'free' | 'premium'
+  subscription_expires_at?: string
+  created_at: string
+} 
