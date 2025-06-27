@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -83,11 +83,13 @@ export default function HostDashboard() {
       setIsRecording(true)
 
       // Start speech recognition
-      const recognition = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const recognition = new (((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition))()
       recognition.continuous = true
       recognition.interimResults = true
       recognition.lang = primaryLanguage
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onresult = (event: any) => {
         let finalTranscript = ''
 
@@ -112,21 +114,12 @@ export default function HostDashboard() {
         }
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error)
       }
 
       recognition.start()
-
-      // Start duration timer
-      const durationInterval = setInterval(() => {
-        setSessionDuration(prev => prev + 1)
-      }, 1000)
-
-      // Start participant count simulation
-      setInterval(() => {
-        setParticipantCount(prev => Math.max(0, prev + Math.floor(Math.random() * 3) - 1))
-      }, 5000)
 
     } catch (error) {
       console.error('Error starting session:', error)
@@ -159,13 +152,9 @@ export default function HostDashboard() {
 
     try {
       // Stop speech recognition
-      const recognition = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const recognition = new (((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition))()
       recognition.stop()
-
-      // Stop duration timer
-      const durationInterval = setInterval(() => {
-        setSessionDuration(prev => prev + 1)
-      }, 1000)
 
       // Update session status in database
       await supabase

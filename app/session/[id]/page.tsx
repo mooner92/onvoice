@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
@@ -132,6 +132,21 @@ export default function SessionPage() {
     }
   }, [sessionId, selectedLanguage, session?.host_name, supabase])
 
+  // Update participant count function
+  const updateParticipantCount = useCallback(async () => {
+    try {
+      const { count } = await supabase
+        .from('session_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .is('left_at', null)
+
+      setParticipantCount(count || 0)
+    } catch (error) {
+      console.error('Error updating participant count:', error)
+    }
+  }, [sessionId, supabase])
+
   // Subscribe to participant count updates
   useEffect(() => {
     if (!sessionId) return
@@ -155,21 +170,7 @@ export default function SessionPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [sessionId, supabase])
-
-  const updateParticipantCount = async () => {
-    try {
-      const { count } = await supabase
-        .from('session_participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', sessionId)
-        .is('left_at', null)
-
-      setParticipantCount(count || 0)
-    } catch (error) {
-      console.error('Error updating participant count:', error)
-    }
-  }
+  }, [sessionId, supabase, updateParticipantCount])
 
   // Simple translation function (in production, use a real translation API)
   const translateText = (text: string, targetLang: string): string => {
