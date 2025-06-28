@@ -30,7 +30,12 @@ export async function POST(req: NextRequest) {
         const googleTranslateUrl = `https://translation.googleapis.com/language/translate/v2?key=${process.env.GOOGLE_TRANSLATE_API_KEY}`
         
         // Prepare request body - don't send source if it's "auto" or undefined
-        const requestBody: any = {
+        const requestBody: {
+          q: string;
+          target: string;
+          format: string;
+          source?: string;
+        } = {
           q: text,
           target: targetLanguage,
           format: 'text'

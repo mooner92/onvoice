@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -740,7 +740,7 @@ export default function HostDashboard() {
                   <CheckCircle className="h-5 w-5" />
                   <div>
                     <p className="font-medium">Active session found</p>
-                    <p className="text-sm text-green-700">"{session?.title}"</p>
+                    <p className="text-sm text-green-700">&quot;{session?.title}&quot;</p>
                   </div>
                 </div>
                 <div className="flex space-x-2">

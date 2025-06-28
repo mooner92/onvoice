@@ -10,6 +10,7 @@ import { ArrowLeft, FileText, Languages, X, ChevronRight, Settings, Loader2 } fr
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
+import { Session, Transcript } from "@/lib/types"
 import Link from "next/link"
 
 export default function SessionTranscriptPage() {
@@ -19,8 +20,8 @@ export default function SessionTranscriptPage() {
   const supabase = createClient()
   const sessionId = params.id as string
 
-  const [transcript, setTranscript] = useState<any[]>([])
-  const [session, setSession] = useState<any>(null)
+  const [transcript, setTranscript] = useState<Transcript[]>([])
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTranslation, setShowTranslation] = useState(false)

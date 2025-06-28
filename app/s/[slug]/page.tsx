@@ -10,12 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { 
   Users, 
   Clock, 
-  Menu, 
   Globe, 
   Mic, 
   Settings,
   User,
-  LogIn,
   Loader2,
   AlertCircle,
   X
@@ -61,7 +59,7 @@ export default function PublicSessionPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('ko')
   const [fontSize, setFontSize] = useState([18])
   const [darkMode, setDarkMode] = useState(false)
-  const [autoScroll, setAutoScroll] = useState(true)
+  const [, ] = useState(true)
   const [showTimestamps, setShowTimestamps] = useState(true)
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [isTranslating, setIsTranslating] = useState(false)
