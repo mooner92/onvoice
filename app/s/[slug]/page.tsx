@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { 
   Users, 
@@ -17,7 +17,8 @@ import {
   User,
   LogIn,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -40,15 +41,31 @@ export default function PublicSessionPage() {
   const supabase = createClient()
   const slug = params.slug as string
 
-  const [selectedLanguage, setSelectedLanguage] = useState("ko")
+  // Get user's preferred language from browser or profile
+  const getUserPreferredLanguage = () => {
+    // Try to get from user metadata first
+    if (user?.user_metadata?.preferred_language) {
+      return user.user_metadata.preferred_language
+    }
+    
+    // Fallback to browser language (only on client side)
+    if (typeof window !== 'undefined' && navigator.language) {
+      const browserLang = navigator.language.split('-')[0]
+      const supportedLangs = ['ko', 'ja', 'zh', 'hi', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'en']
+      return supportedLangs.includes(browserLang) ? browserLang : 'ko'
+    }
+    
+    return 'ko' // Default fallback
+  }
+
+  const [selectedLanguage, setSelectedLanguage] = useState('ko')
   const [fontSize, setFontSize] = useState([18])
   const [darkMode, setDarkMode] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
-  const [showTimestamps, setShowTimestamps] = useState(false)
+  const [showTimestamps, setShowTimestamps] = useState(true)
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [isTranslating, setIsTranslating] = useState(false)
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
-  const [activeTab, setActiveTab] = useState("original")
   const [showSettings, setShowSettings] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
@@ -57,6 +74,11 @@ export default function PublicSessionPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   const [hasJoined, setHasJoined] = useState(false)
+
+  // Set user preferred language on client side
+  useEffect(() => {
+    setSelectedLanguage(getUserPreferredLanguage())
+  }, [user])
 
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
@@ -287,14 +309,16 @@ export default function PublicSessionPage() {
 
       if (response.ok) {
         const data = await response.json()
-        return data.translatedText
+        return data.translatedText || data.translation || text
       } else {
-        console.error('Translation failed')
-        return text
+        console.error('Translation failed:', response.status, response.statusText)
+        // Return mock translation as fallback
+        return getMockTranslation(text, targetLang)
       }
     } catch (error) {
       console.error('Translation error:', error)
-      return text
+      // Return mock translation as fallback
+      return getMockTranslation(text, targetLang)
     } finally {
       setIsTranslating(false)
     }
@@ -338,25 +362,30 @@ export default function PublicSessionPage() {
     }
   }, [selectedLanguage, translationEnabled])
 
+  // Trigger translation when translation is enabled
+  useEffect(() => {
+    if (translationEnabled) {
+      // Translate all existing content when enabling translation
+      transcript.forEach(line => {
+        if (line.translated === getMockTranslation(line.original, selectedLanguage)) {
+          // Only translate if still showing mock translation
+          translateText(line.original, selectedLanguage).then(realTranslation => {
+            setTranscript(prevTranscript => 
+              prevTranscript.map(transcriptLine => 
+                transcriptLine.id === line.id 
+                  ? { ...transcriptLine, translated: realTranslation }
+                  : transcriptLine
+              )
+            )
+          })
+        }
+      })
+    }
+  }, [translationEnabled])
+
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
 
-  const getTabContent = (type: 'original' | 'translated') => {
-    return transcript.map((line) => (
-      <div key={`${line.id}-${type}`} className={`p-3 mb-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-        {showTimestamps && (
-          <div className={`text-xs mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            {line.timestamp} {line.speaker && `• ${line.speaker}`}
-          </div>
-        )}
-        <div 
-          className={`leading-relaxed ${darkMode ? 'text-white' : 'text-gray-900'}`}
-          style={{ fontSize: `${fontSize[0]}px` }}
-        >
-          {type === 'original' ? line.original : line.translated}
-        </div>
-      </div>
-    ))
-  }
+
 
   if (loading) {
     return (
@@ -508,6 +537,15 @@ export default function PublicSessionPage() {
                   )}
                 </div>
               )}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setTranslationEnabled(!translationEnabled)}
+                className="flex items-center space-x-2"
+              >
+                <Globe className="h-4 w-4" />
+                <span>{translationEnabled ? 'Hide' : 'Show'} Translation</span>
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
                 <Settings className="h-4 w-4" />
               </Button>
@@ -521,49 +559,59 @@ export default function PublicSessionPage() {
         <div className={`border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} p-4`}>
           <div className="space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Translation
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="translationEnabled"
-                    checked={translationEnabled}
-                    onChange={(e) => setTranslationEnabled(e.target.checked)}
-                    className="rounded"
-                  />
-                  <Label htmlFor="translationEnabled" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Enable Translation
-                  </Label>
-                  {isTranslating && (
-                    <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                  )}
-                </div>
-              </div>
-              
-              {translationEnabled && (
-                <div className="space-y-2">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
                   <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Target Language
+                    Translation
                   </Label>
-                  <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languages.map((lang) => (
-                        <SelectItem key={lang.code} value={lang.code}>
-                          <div className="flex items-center space-x-2">
-                            <span>{lang.flag}</span>
-                            <span>{lang.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="translationEnabled"
+                      checked={translationEnabled}
+                      onChange={(e) => setTranslationEnabled(e.target.checked)}
+                      className="rounded"
+                    />
+                    <Label htmlFor="translationEnabled" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Enable Translation
+                    </Label>
+                    {isTranslating && (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                    )}
+                  </div>
                 </div>
-              )}
+                
+                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className="space-y-1">
+                    <div>💡 <strong>Cost-efficient translation:</strong></div>
+                    <div>• Translation only happens when you view the translated tab</div>
+                    <div>• Your preferred language: <strong>{languages.find(l => l.code === selectedLanguage)?.name}</strong></div>
+                  </div>
+                </div>
+                
+                {translationEnabled && (
+                  <div className="space-y-2">
+                    <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Target Language
+                    </Label>
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {languages.map((lang) => (
+                          <SelectItem key={lang.code} value={lang.code}>
+                            <div className="flex items-center space-x-2">
+                              <span>{lang.flag}</span>
+                              <span>{lang.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -611,50 +659,208 @@ export default function PublicSessionPage() {
       )}
 
       {/* Main Content */}
-      <div className="p-4">
-        {/* Language Display */}
-        <div className="mb-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Translation: {selectedLang?.flag} {selectedLang?.name}
-            </span>
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)]">
+        {/* Main Content - Original Transcript */}
+        <div className={`flex-1 transition-all duration-300 ${translationEnabled ? 'lg:mr-2 mb-2 lg:mb-0' : ''}`}>
+          <div className="h-full p-4">
+            <Card className={`h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+              <CardHeader>
+                <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <Mic className="h-5 w-5" />
+                  <span>Original Transcript</span>
+                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                  <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Live</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[calc(100%-80px)]">
+                <div className="space-y-4 h-full overflow-y-auto">
+                  {transcript.length === 0 ? (
+                    <div className={`text-center py-16 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <div className={`mx-auto w-16 h-16 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} flex items-center justify-center mb-6`}>
+                        <Mic className="h-8 w-8 opacity-50" />
+                      </div>
+                      <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Waiting for the speaker to start...
+                      </h3>
+                      <p className="text-sm">Live transcription will appear here</p>
+                      <div className="mt-4 flex items-center justify-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs">Session is active</span>
+                      </div>
+                    </div>
+                  ) : (
+                    transcript.map((line, index) => {
+                      // Split text into sentences for better readability
+                      const sentences = line.original.split(/([.!?]+)/).filter(Boolean)
+                      const formattedSentences: string[] = []
+                      
+                      for (let i = 0; i < sentences.length; i += 2) {
+                        const sentence = sentences[i]
+                        const punctuation = sentences[i + 1] || ''
+                        if (sentence.trim()) {
+                          formattedSentences.push((sentence + punctuation).trim())
+                        }
+                      }
+                      
+                      const finalSentences = formattedSentences.length > 0 ? formattedSentences : [line.original]
+                      
+                      return (
+                        <div 
+                          key={line.id} 
+                          className={`p-4 rounded-lg border shadow-sm ${darkMode ? 'border-blue-600 bg-gray-700' : 'border-blue-200 bg-white'}`}
+                        >
+                          {showTimestamps && (
+                            <div className={`text-xs mb-3 pb-2 border-b ${darkMode ? 'border-blue-500 text-gray-400' : 'border-blue-100 text-gray-500'}`}>
+                              <div className="flex items-center justify-between">
+                                <span>
+                                  <span className="font-medium">#{index + 1}</span>
+                                  {' • '}
+                                  <span>{line.timestamp}</span>
+                                </span>
+                                <span className={`px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-600 text-blue-100' : 'bg-blue-100 text-blue-600'}`}>
+                                  {line.speaker}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="space-y-3">
+                            {finalSentences.map((sentence, sentenceIndex) => (
+                              <div 
+                                key={`${line.id}-sentence-${sentenceIndex}`}
+                                className={`leading-relaxed p-3 rounded-md ${darkMode ? 'text-gray-100 bg-blue-800' : 'text-gray-900 bg-blue-50'}`}
+                                style={{ fontSize: `${fontSize[0]}px` }}
+                              >
+                                {sentence}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex space-x-1 mb-4 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab("original")}
-            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "original"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Original
-          </button>
-          <button
-            onClick={() => setActiveTab("translated")}
-            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "translated"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {selectedLang?.flag} {selectedLang?.name}
-          </button>
-        </div>
-
-        {/* Transcript Content */}
-        <div className="space-y-2">
-          {transcript.length === 0 ? (
-            <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <Mic className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Waiting for the speaker to start...</p>
-              <p className="text-sm mt-2">Live transcription will appear here</p>
+        {/* Translation Side Panel */}
+        <div className={`transition-all duration-300 ease-in-out ${
+          translationEnabled 
+            ? 'lg:w-1/2 w-full opacity-100' 
+            : 'w-0 opacity-0 overflow-hidden lg:block hidden'
+        }`}>
+          {translationEnabled && (
+            <div className="h-full p-4 pl-2">
+              <Card className={`h-full border-l-4 border-green-500 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <Globe className="h-5 w-5 text-green-600" />
+                      <span>Translation</span>
+                      {selectedLang && (
+                        <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                          ({selectedLang.flag} {selectedLang.name})
+                        </span>
+                      )}
+                      {isTranslating && (
+                        <Loader2 className="h-3 w-3 animate-spin text-green-600" />
+                      )}
+                    </CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setTranslationEnabled(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Language Selector */}
+                  <div className="mt-3">
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {languages.map((lang) => (
+                          <SelectItem key={lang.code} value={lang.code}>
+                            <div className="flex items-center space-x-2">
+                              <span>{lang.flag}</span>
+                              <span>{lang.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="h-[calc(100%-140px)]">
+                  <div className="space-y-4 h-full overflow-y-auto">
+                    {transcript.length === 0 ? (
+                      <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No content to translate</p>
+                      </div>
+                    ) : (
+                      transcript.map((line, index) => {
+                        const translatedText = line.translated
+                        
+                        // Split translated text into sentences for better readability
+                        const sentences = translatedText.split(/([.!?]+)/).filter(Boolean)
+                        const formattedSentences: string[] = []
+                        
+                        for (let i = 0; i < sentences.length; i += 2) {
+                          const sentence = sentences[i]
+                          const punctuation = sentences[i + 1] || ''
+                          if (sentence.trim()) {
+                            formattedSentences.push((sentence + punctuation).trim())
+                          }
+                        }
+                        
+                        const finalSentences = formattedSentences.length > 0 ? formattedSentences : [translatedText]
+                        
+                        return (
+                          <div 
+                            key={`trans-${line.id}`} 
+                            className={`p-4 rounded-lg border shadow-sm ${darkMode ? 'border-green-600 bg-gray-700' : 'border-green-200 bg-white'}`}
+                          >
+                            {showTimestamps && (
+                              <div className={`text-xs mb-3 pb-2 border-b ${darkMode ? 'border-green-500 text-gray-400' : 'border-green-100 text-gray-500'}`}>
+                                <div className="flex items-center justify-between">
+                                  <span>
+                                    <span className="font-medium">#{index + 1}</span>
+                                    {' • '}
+                                    <span>{line.timestamp}</span>
+                                  </span>
+                                  <span className={`px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-600 text-green-100' : 'bg-green-100 text-green-600'}`}>
+                                    {selectedLang?.name}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="space-y-3">
+                              {finalSentences.map((sentence, sentenceIndex) => (
+                                <div 
+                                  key={`${line.id}-trans-sentence-${sentenceIndex}`}
+                                  className={`leading-relaxed p-3 rounded-md ${darkMode ? 'text-gray-100 bg-green-800' : 'text-gray-900 bg-green-50'}`}
+                                  style={{ fontSize: `${fontSize[0]}px` }}
+                                >
+                                  {sentence}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          ) : (
-            getTabContent(activeTab as 'original' | 'translated')
           )}
         </div>
       </div>

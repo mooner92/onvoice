@@ -29,17 +29,24 @@ export async function POST(req: NextRequest) {
       try {
         const googleTranslateUrl = `https://translation.googleapis.com/language/translate/v2?key=${process.env.GOOGLE_TRANSLATE_API_KEY}`
         
+        // Prepare request body - don't send source if it's "auto" or undefined
+        const requestBody: any = {
+          q: text,
+          target: targetLanguage,
+          format: 'text'
+        }
+        
+        // Only include source if it's provided and not "auto"
+        if (sourceLanguage && sourceLanguage !== "auto") {
+          requestBody.source = sourceLanguage
+        }
+
         const response = await fetch(googleTranslateUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            q: text,
-            target: targetLanguage,
-            source: sourceLanguage || undefined, // Let Google auto-detect if not provided
-            format: 'text'
-          })
+          body: JSON.stringify(requestBody)
         })
 
         if (response.ok) {

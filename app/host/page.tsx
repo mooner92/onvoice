@@ -46,7 +46,7 @@ export default function HostDashboard() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
-  
+
   const languages = [
     { code: "en", name: "English" },
     { code: "es", name: "Spanish" },
@@ -253,20 +253,44 @@ export default function HostDashboard() {
       }
 
       mediaRecorder.onstop = async () => {
+        // Only process audio if session is still active and recording
+        if (!isRecording || !sessionId) {
+          console.log('Session not active, skipping STT processing')
+          return
+        }
+        
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        await sendAudioToSTT(blob)
+        
+        // Only send audio if it has meaningful content (size > 1KB)
+        if (blob.size > 1024) {
+          console.log('Sending audio blob with size:', blob.size)
+          await sendAudioToSTT(blob)
+        } else {
+          console.log('Skipping small audio blob:', blob.size)
+        }
+        
         chunksRef.current = []
         
-        // Restart recording for continuous capture
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive' && isRecording) {
+        // Restart recording for continuous capture only if still recording
+        if (mediaRecorderRef.current && 
+            mediaRecorderRef.current.state === 'inactive' && 
+            isRecording && 
+            sessionId) {
           setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording) {
-              mediaRecorderRef.current.start()
-              setTimeout(() => {
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                  mediaRecorderRef.current.stop()
-                }
-              }, 5000) // 5-second chunks
+            if (mediaRecorderRef.current && isRecording && sessionId) {
+              try {
+                mediaRecorderRef.current.start()
+                setTimeout(() => {
+                  if (mediaRecorderRef.current && 
+                      mediaRecorderRef.current.state === 'recording' && 
+                      isRecording && 
+                      sessionId) {
+                    mediaRecorderRef.current.stop()
+                  }
+                }, 5000) // 5-second chunks
+              } catch (error) {
+                console.error('Error restarting MediaRecorder:', error)
+              }
             }
           }, 100)
         }
@@ -286,12 +310,16 @@ export default function HostDashboard() {
   }
 
   const sendAudioToSTT = async (audioBlob: Blob) => {
-    if (!sessionId) return
+    if (!sessionId || !isRecording) {
+      console.log('Session not active or not recording, skipping STT')
+      return
+    }
 
     console.log('Sending audio to STT:', {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
-      sessionId
+      sessionId,
+      isRecording
     })
 
     try {
@@ -376,8 +404,8 @@ export default function HostDashboard() {
 
       const newSessionId = newSession.id
       setSession(newSession)
-      setSessionId(newSessionId)
-      setIsRecording(true)
+    setSessionId(newSessionId)
+    setIsRecording(true)
       setHasActiveSession(true)
 
       // Set up MediaRecorder for continuous audio capture
@@ -427,20 +455,44 @@ export default function HostDashboard() {
       }
 
       mediaRecorder.onstop = async () => {
+        // Only process audio if session is still active and recording
+        if (!isRecording || !sessionId) {
+          console.log('Session not active, skipping STT processing')
+          return
+        }
+        
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        await sendAudioToSTT(blob)
+        
+        // Only send audio if it has meaningful content (size > 1KB)
+        if (blob.size > 1024) {
+          console.log('Sending audio blob with size:', blob.size)
+          await sendAudioToSTT(blob)
+        } else {
+          console.log('Skipping small audio blob:', blob.size)
+        }
+        
         chunksRef.current = []
         
-        // Restart recording for continuous capture
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive' && isRecording) {
+        // Restart recording for continuous capture only if still recording
+        if (mediaRecorderRef.current && 
+            mediaRecorderRef.current.state === 'inactive' && 
+            isRecording && 
+            sessionId) {
           setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording) {
-              mediaRecorderRef.current.start()
-              setTimeout(() => {
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                  mediaRecorderRef.current.stop()
-                }
-              }, 5000) // 5-second chunks
+            if (mediaRecorderRef.current && isRecording && sessionId) {
+              try {
+                mediaRecorderRef.current.start()
+                setTimeout(() => {
+                  if (mediaRecorderRef.current && 
+                      mediaRecorderRef.current.state === 'recording' && 
+                      isRecording && 
+                      sessionId) {
+                    mediaRecorderRef.current.stop()
+                  }
+                }, 5000) // 5-second chunks
+              } catch (error) {
+                console.error('Error restarting MediaRecorder:', error)
+              }
             }
           }, 100)
         }
@@ -483,6 +535,9 @@ export default function HostDashboard() {
     if (!sessionId || !user) return
 
     try {
+      // First, immediately set recording to false to stop new STT calls
+      setIsRecording(false)
+      
       // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop()
@@ -493,6 +548,10 @@ export default function HostDashboard() {
         streamRef.current.getTracks().forEach(track => track.stop())
         streamRef.current = null
       }
+      
+      // Clean up MediaRecorder reference
+      mediaRecorderRef.current = null
+      chunksRef.current = []
 
       // End session via API
       const response = await fetch(`/api/session/${sessionId}/end`, {
@@ -511,7 +570,6 @@ export default function HostDashboard() {
       }
 
       // Reset state
-      setIsRecording(false)
       setSessionId(null)
       setSession(null)
       setSessionDuration(0)
@@ -521,6 +579,11 @@ export default function HostDashboard() {
       
     } catch (error) {
       console.error('Error stopping session:', error)
+      // Still reset state even if API call fails
+      setIsRecording(false)
+      setSessionId(null)
+      setSession(null)
+      setHasActiveSession(false)
     }
   }
 
@@ -837,7 +900,7 @@ export default function HostDashboard() {
                 />
                 
                 {/* Additional Options */}
-                <Card>
+              <Card>
                   <CardContent className="p-4">
                     <div className="space-y-3">
                       <h4 className="font-medium text-gray-900">Session Links</h4>
@@ -865,8 +928,8 @@ export default function HostDashboard() {
                         Perfect for online conferences and remote audiences.
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                </CardContent>
+              </Card>
               </div>
             )}
           </div>
