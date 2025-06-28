@@ -63,10 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase.auth])
 
   const signInWithGoogle = async () => {
+    // Get current URL to redirect back after login
+    const currentUrl = window.location.pathname + window.location.search
+    
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(currentUrl)}`
       }
     })
   }

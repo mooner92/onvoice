@@ -2,25 +2,29 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mic, Globe, QrCode, Zap, Download, LogOut } from "lucide-react"
+import { Mic, Globe, QrCode, Zap, Download, LogOut, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { LoginButton } from "@/components/auth/LoginButton"
 import Image from "next/image"
+import { useState } from "react"
 
 export default function HomePage() {
   const { user, signOut } = useAuth()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Mic className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">LiveTranscribe</span>
             </div>
+            
+            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
               <Link href="#features" className="text-gray-600 hover:text-blue-600">
                 Features
@@ -32,6 +36,9 @@ export default function HomePage() {
                 <>
                   <Link href="/my-sessions" className="text-gray-600 hover:text-blue-600">
                     My Sessions
+                  </Link>
+                  <Link href="/host" className="text-gray-600 hover:text-blue-600">
+                    Host Session
                   </Link>
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center space-x-2">
@@ -55,7 +62,82 @@ export default function HomePage() {
                 <LoginButton />
               )}
             </nav>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </Button>
+            </div>
           </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-4 border-t">
+              <nav className="flex flex-col space-y-4 pt-4">
+                <Link 
+                  href="#features" 
+                  className="text-gray-600 hover:text-blue-600 py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Features
+                </Link>
+                <Link 
+                  href="#how-it-works" 
+                  className="text-gray-600 hover:text-blue-600 py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  How It Works
+                </Link>
+                {user ? (
+                  <>
+                    <Link 
+                      href="/my-sessions" 
+                      className="text-gray-600 hover:text-blue-600 py-2 font-medium"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      📋 My Sessions
+                    </Link>
+                    <Link 
+                      href="/host" 
+                      className="text-gray-600 hover:text-blue-600 py-2 font-medium"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      🎤 Host Session
+                    </Link>
+                    <div className="flex items-center space-x-3 py-2 border-t pt-4">
+                      {user.user_metadata?.avatar_url && (
+                        <Image 
+                          src={user.user_metadata.avatar_url} 
+                          alt="Profile" 
+                          className="w-8 h-8 rounded-full"
+                          width={32}
+                          height={32}
+                        />
+                      )}
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">
+                          {user.user_metadata?.full_name || user.email}
+                        </div>
+                        <div className="text-xs text-gray-500">Signed in</div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={signOut}>
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-2 border-t pt-4">
+                    <LoginButton />
+                  </div>
+                )}
+              </nav>
+            </div>
+          )}
         </div>
       </header>
 
