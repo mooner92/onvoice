@@ -42,7 +42,8 @@ LiveTranscribe는 실시간 강의 음성-텍스트 변환 및 번역 서비스�
 ```bash
 git clone <repository-url>
 cd onvoice
-npm install
+pnpm install
+pnpm dev
 ```
 
 ### 2. Supabase 설정
