@@ -46,6 +46,7 @@ export default function HostDashboard() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const languages = [
     { code: "en", name: "English" },
@@ -163,7 +164,14 @@ export default function HostDashboard() {
       interval = setInterval(() => {
         const startTime = new Date(session.created_at).getTime()
         const now = new Date().getTime()
-        setSessionDuration(Math.floor((now - startTime) / 1000))
+        const duration = Math.floor((now - startTime) / 1000)
+        setSessionDuration(duration)
+        
+        // Auto-stop after 5 minutes (300 seconds)
+        if (duration >= 300) {
+          console.log('Auto-stopping session after 5 minutes')
+          handleStopSession()
+        }
       }, 1000)
     } else {
       setSessionDuration(0)
@@ -173,6 +181,24 @@ export default function HostDashboard() {
       if (interval) clearInterval(interval)
     }
   }, [isRecording, session])
+
+  // Auto-stop timer for new sessions
+  useEffect(() => {
+    if (isRecording && sessionId) {
+      // Set 5-minute auto-stop timer
+      autoStopTimerRef.current = setTimeout(() => {
+        console.log('Auto-stopping session after 5 minutes (timer)')
+        handleStopSession()
+      }, 5 * 60 * 1000) // 5 minutes
+    }
+
+    return () => {
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current)
+        autoStopTimerRef.current = null
+      }
+    }
+  }, [isRecording, sessionId])
 
   const updateParticipantCount = async () => {
     if (!sessionId) return
@@ -538,6 +564,12 @@ export default function HostDashboard() {
       // First, immediately set recording to false to stop new STT calls
       setIsRecording(false)
       
+      // Clear auto-stop timer
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current)
+        autoStopTimerRef.current = null
+      }
+      
       // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop()
@@ -736,6 +768,8 @@ export default function HostDashboard() {
                 <CardDescription>
                   Configure your lecture session. Attendees can join via QR code with or without authentication.
                   Perfect for both local and online/remote sessions.
+                  <br />
+                  <span className="text-amber-600 font-medium">⏰ Sessions auto-stop after 5 minutes to prevent unexpected charges.</span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -872,8 +906,15 @@ export default function HostDashboard() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Duration:</span>
-                        <span className="font-medium">{formatDuration(sessionDuration)}</span>
+                        <span className={`font-medium ${sessionDuration >= 240 ? 'text-red-600' : ''}`}>
+                          {formatDuration(sessionDuration)} / 5:00
+                        </span>
                       </div>
+                      {sessionDuration >= 240 && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          ⚠️ Session will auto-stop in {300 - sessionDuration} seconds
+                        </div>
+                      )}
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Words Transcribed:</span>
                         <span className="font-medium">
