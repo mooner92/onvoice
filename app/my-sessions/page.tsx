@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, Search, Download, Play, Crown, Lock, Mic, Users, Zap, Trash2 } from "lucide-react"
+import { Calendar, Clock, Search, Download, Play, Crown, Lock, Mic, Users, Zap, Trash2, FileText } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
@@ -18,6 +18,7 @@ interface SavedSession extends Session {
   expires_at?: string
   is_premium: boolean
   transcript_count: number
+  original_id?: string // For navigation with original session ID
 }
 
 export default function MySessionsPage() {
@@ -27,6 +28,7 @@ export default function MySessionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterRole, setFilterRole] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [activeTab, setActiveTab] = useState("live")
   const [sessions, setSessions] = useState<SavedSession[]>([])
   const [loading, setLoading] = useState(true)
   const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(null)
@@ -67,28 +69,32 @@ export default function MySessionsPage() {
 
         const formattedSessions: SavedSession[] = []
 
-        // Format speaker sessions
+        // Format speaker sessions with unique keys
         speakerSessions?.forEach(session => {
           formattedSessions.push({
             ...session,
+            id: `speaker-${session.id}`, // Make key unique
             role: 'speaker' as const,
             saved_at: session.created_at,
             expires_at: undefined, // Speaker sessions never expire
             is_premium: true, // Speaker sessions are always premium
-            transcript_count: session.transcripts?.[0]?.count || 0
+            transcript_count: session.transcripts?.[0]?.count || 0,
+            original_id: session.id // Keep original ID for navigation
           })
         })
 
-        // Format audience sessions
+        // Format audience sessions with unique keys
         audienceSessions?.forEach(userSession => {
           if (userSession.sessions) {
             formattedSessions.push({
               ...userSession.sessions,
+              id: `audience-${userSession.sessions.id}`, // Make key unique
               role: 'audience' as const,
               saved_at: userSession.saved_at,
               expires_at: userSession.expires_at,
               is_premium: userSession.is_premium,
-              transcript_count: 0 // Will be calculated separately
+              transcript_count: 0, // Will be calculated separately
+              original_id: userSession.sessions.id // Keep original ID for navigation
             })
           }
         })
@@ -161,9 +167,19 @@ export default function MySessionsPage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
-  const sortedSessions = [...filteredSessions].sort((a, b) => {
+  // Separate live and completed sessions
+  const liveSessions = filteredSessions.filter(session => session.status === 'active')
+  const completedSessions = filteredSessions.filter(session => session.status === 'ended')
+  
+  const sortedLiveSessions = [...liveSessions].sort((a, b) => {
     return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime();
   })
+  
+  const sortedCompletedSessions = [...completedSessions].sort((a, b) => {
+    return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime();
+  })
+  
+  const displaySessions = activeTab === 'live' ? sortedLiveSessions : sortedCompletedSessions
 
   const deleteSession = async (sessionId: string) => {
     if (!user) return
@@ -237,6 +253,30 @@ export default function MySessionsPage() {
           </CardContent>
         </Card>
 
+        {/* Live/Completed Tabs */}
+        <div className="flex space-x-1 mb-6 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab("live")}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "live"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            🔴 Live Sessions ({liveSessions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("completed")}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "completed"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            📝 Completed ({completedSessions.length})
+          </button>
+        </div>
+
         {/* Filters and Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
@@ -281,14 +321,14 @@ export default function MySessionsPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-gray-500 mt-2">Loading sessions...</p>
             </div>
-          ) : sortedSessions.length === 0 ? (
+          ) : displaySessions.length === 0 ? (
             <div className="text-center py-12">
               <Mic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No sessions found</p>
               <p className="text-sm text-gray-400 mt-1">Start a session or join one to see it here</p>
             </div>
           ) : (
-            sortedSessions.map((session) => (
+            displaySessions.map((session: SavedSession) => (
               <Card key={session.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -333,11 +373,19 @@ export default function MySessionsPage() {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/session/${session.id}`}>
-                          <Play className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      {activeTab === 'live' ? (
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/session/${session.original_id || session.id}`}>
+                            <Play className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/session/${session.original_id || session.id}/transcript`}>
+                            <FileText className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline">
                         <Download className="h-4 w-4" />
                       </Button>
@@ -345,7 +393,7 @@ export default function MySessionsPage() {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          onClick={() => deleteSession(session.id)}
+                          onClick={() => deleteSession(session.original_id || session.id)}
                           className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />

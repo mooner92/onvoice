@@ -5,17 +5,21 @@ LiveTranscribe는 실시간 강의 음성-텍스트 변환 및 번역 서비스�
 ## 주요 기능
 
 ### 🎤 스피커 (강의자)
-- **실시간 음성 인식**: Web Speech API를 사용한 실시간 STT
+- **고품질 음성 인식**: OpenAI Whisper API를 사용한 서버 기반 STT (높은 정확도)
 - **세션 관리**: 강의 제목, 설명, 언어 설정
-- **QR 코드 생성**: 참석자들이 쉽게 접속할 수 있는 QR 코드
-- **실시간 자막 표시**: 말하는 내용이 실시간으로 텍스트로 변환
+- **QR 코드 자동 생성**: 참석자들이 쉽게 접속할 수 있는 실시간 QR 코드
+- **세션 지속성**: 브라우저 종료 후 재접속 시 자동으로 기존 세션 복구
+- **실시간 자막 표시**: 5초 단위로 음성을 서버에서 처리하여 텍스트로 변환
+- **참석자 실시간 모니터링**: 현재 접속한 참석자 수 실시간 표시
 - **평생 저장**: 스피커의 세션은 무제한으로 저장
 
 ### 👥 오디언스 (참석자)
 - **QR 코드 접속**: 스마트폰으로 QR 코드 스캔하여 즉시 참여
+- **인증 없이 접속 가능**: 온라인 세션용 공개 링크 지원
 - **다국어 번역**: 50개 이상의 언어로 실시간 번역
 - **개인화 설정**: 폰트 크기, 다크모드, 자동 스크롤 등
-- **30일 무료 저장**: 참여한 세션을 30일간 무료로 저장
+- **원거리 접속**: 온라인 컨퍼런스, 웨비나 등 원격 참여 지원
+- **30일 무료 저장**: 참여한 세션을 30일간 무료로 저장 (로그인 시)
 
 ### 💰 구독 모델
 - **무료 플랜**: 30일간 세션 저장, 기본 기능
@@ -24,11 +28,13 @@ LiveTranscribe는 실시간 강의 음성-텍스트 변환 및 번역 서비스�
 ## 기술 스택
 
 - **Frontend**: Next.js 15, React 19, TypeScript
-- **UI**: Tailwind CSS, Radix UI
+- **UI**: Tailwind CSS, Radix UI, react-qr-code
 - **인증**: Supabase Auth (Google OAuth)
 - **데이터베이스**: Supabase PostgreSQL
 - **실시간 통신**: Supabase Realtime
-- **음성 인식**: Web Speech API
+- **음성 인식**: OpenAI Whisper API (서버 기반 STT)
+- **QR 코드**: react-qr-code, qrcode
+- **오디오 처리**: MediaRecorder API (WebRTC)
 
 ## 설치 및 설정
 
@@ -48,10 +54,38 @@ npm install
 ### 3. 환경 변수 설정
 `.env.local` 파일을 생성하고 다음 내용을 추가:
 ```env
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Google OAuth
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
+
+# OpenAI (Whisper API)
+OPENAI_API_KEY=your_openai_api_key
+
+# Next.js (선택사항)
+NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
 ```
+
+#### 환경 변수 획득 방법:
+
+1. **Supabase Keys**: 
+   - Supabase 대시보드 → Settings → API
+   - URL과 anon/public key 복사
+   - `SUPABASE_SERVICE_ROLE_KEY`는 service_role key 복사 (절대 노출 금지!)
+
+2. **Google Client ID**: 
+   - Google Cloud Console → APIs & Services → Credentials
+   - Web application용 OAuth 2.0 Client ID 생성
+   - 승인된 도메인에 본인 도메인 추가
+
+3. **OpenAI API Key**:
+   - OpenAI Platform → API Keys
+   - 새 secret key 생성
+   - 주의: Whisper API 사용을 위해서는 유료 OpenAI 계정 필요
 
 ### 4. 데이터베이스 스키마 설정
 Supabase SQL Editor에서 `supabase-schema.sql` 파일의 내용을 실행하여 테이블과 정책을 생성합니다.

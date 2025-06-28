@@ -12,6 +12,20 @@ export interface Session {
   session_url?: string
 }
 
+export interface QRCodeData {
+  sessionId: string
+  sessionUrl: string
+  title: string
+  hostName: string
+}
+
+export interface STTResponse {
+  transcript: string
+  confidence: number
+  duration?: number
+  error?: string
+}
+
 export interface SessionParticipant {
   id: string
   session_id: string
