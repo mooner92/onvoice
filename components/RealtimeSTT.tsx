@@ -23,6 +23,7 @@ export function RealtimeSTT({
   const [isMockMode, setIsMockMode] = useState(false)
   const cleanupRef = useRef(false)
   const mockIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isSetupRef = useRef(false) // Prevent duplicate setup
 
   // Initialize session when component mounts and recording starts
   useEffect(() => {
@@ -53,6 +54,15 @@ export function RealtimeSTT({
 
     try {
       console.log('Starting STT session for:', sessionId)
+      
+      // Debug environment variables
+      console.log('All environment variables check:', {
+        NODE_ENV: process.env.NODE_ENV,
+        NEXT_PUBLIC_DEEPGRAM_API_KEY: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
+        hasDeepgramKey: !!process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
+        keyLength: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY?.length,
+        allEnvKeys: Object.keys(process.env).filter(key => key.includes('DEEPGRAM'))
+      })
       
       // Initialize session in API
       const response = await fetch('/api/stt-stream', {
@@ -217,13 +227,17 @@ export function RealtimeSTT({
 
       socket.onerror = (error) => {
         clearTimeout(connectionTimeout)
-        console.log('Deepgram WebSocket error occurred')
-        console.error('WebSocket error details:', error)
+        console.log('Deepgram WebSocket failed, switching to Mock STT')
+        // Don't log the actual error to avoid console spam
         
         if (!cleanupRef.current) {
           // Close the failed socket
-          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-            socket.close()
+          try {
+            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+              socket.close()
+            }
+          } catch (closeError) {
+            // Ignore close errors
           }
           
           // Fall back to mock mode instead of showing error
@@ -245,7 +259,12 @@ export function RealtimeSTT({
   }
 
   const setupMockSTT = async () => {
-    if (cleanupRef.current) return
+    if (cleanupRef.current || isSetupRef.current) {
+      console.log('Mock STT already setup or cleanup in progress')
+      return
+    }
+    
+    isSetupRef.current = true
     
     try {
       console.log('Setting up Mock STT mode')
@@ -317,7 +336,7 @@ export function RealtimeSTT({
             clearInterval(wordInterval)
             onTranscriptUpdate(text, false)
             
-            // Send to API
+            // Send to API (only once per text)
             fetch('/api/stt-stream', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -342,6 +361,11 @@ export function RealtimeSTT({
       if (!cleanupRef.current) {
         onError('Failed to initialize transcription system')
       }
+    } finally {
+      // Reset the setup flag after a delay to allow re-setup if needed
+      setTimeout(() => {
+        isSetupRef.current = false
+      }, 1000)
     }
   }
 
@@ -432,6 +456,7 @@ export function RealtimeSTT({
     setIsConnected(false)
     setIsInitialized(false)
     setIsMockMode(false)
+    isSetupRef.current = false
     
     // Small delay before allowing new initialization
     setTimeout(() => {
