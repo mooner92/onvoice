@@ -20,6 +20,7 @@ export function RealtimeSTT({
   const streamRef = useRef<MediaStream | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isMockMode, setIsMockMode] = useState(false)
   const cleanupRef = useRef(false)
   const mockIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -87,9 +88,12 @@ export function RealtimeSTT({
       
       if (!deepgramApiKey || deepgramApiKey === 'demo') {
         console.log('Deepgram API key not configured, using mock mode')
+        setIsMockMode(true)
         await setupMockSTT()
         return
       }
+
+      console.log('Attempting to connect to Deepgram...')
 
       // Get microphone stream
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -114,12 +118,23 @@ export function RealtimeSTT({
       
       const socket = new WebSocket(wsUrl, ['token', deepgramApiKey])
       
+      // Set a timeout for connection
+      const connectionTimeout = setTimeout(() => {
+        if (socket.readyState === WebSocket.CONNECTING) {
+          console.log('Deepgram connection timeout, falling back to mock mode')
+          socket.close()
+          setupMockSTT()
+        }
+      }, 5000) // 5 second timeout
+      
       socket.onopen = () => {
+        clearTimeout(connectionTimeout)
+        
         if (cleanupRef.current) {
           socket.close()
           return
         }
-        console.log('Deepgram WebSocket connected')
+        console.log('Deepgram WebSocket connected successfully')
         setIsConnected(true)
         startAudioStream(socket, stream)
       }
@@ -127,51 +142,75 @@ export function RealtimeSTT({
       socket.onmessage = async (event) => {
         if (cleanupRef.current) return
         
-        const data = JSON.parse(event.data)
-        
-        if (data.channel?.alternatives?.[0]?.transcript) {
-          const transcript = data.channel.alternatives[0].transcript
-          const isPartial = data.is_final === false
+        try {
+          const data = JSON.parse(event.data)
           
-          console.log('Received transcript:', { transcript, isPartial })
-          
-          // Update UI immediately
-          onTranscriptUpdate(transcript, isPartial)
-          
-          // Send to API for accumulation (only final transcripts)
-          if (!isPartial) {
-            await fetch('/api/stt-stream', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'transcript',
-                sessionId,
-                transcript,
-                isPartial
+          if (data.channel?.alternatives?.[0]?.transcript) {
+            const transcript = data.channel.alternatives[0].transcript
+            const isPartial = data.is_final === false
+            
+            console.log('Received transcript:', { transcript, isPartial })
+            
+            // Update UI immediately
+            onTranscriptUpdate(transcript, isPartial)
+            
+            // Send to API for accumulation (only final transcripts)
+            if (!isPartial) {
+              await fetch('/api/stt-stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'transcript',
+                  sessionId,
+                  transcript,
+                  isPartial
+                })
               })
-            })
+            }
           }
+        } catch (parseError) {
+          console.error('Error parsing Deepgram message:', parseError)
         }
       }
 
-      socket.onclose = () => {
-        console.log('Deepgram WebSocket disconnected')
+      socket.onclose = (event) => {
+        clearTimeout(connectionTimeout)
+        console.log('Deepgram WebSocket disconnected:', { code: event.code, reason: event.reason })
         setIsConnected(false)
+        
+        // If connection failed and we're not in cleanup, try mock mode
+        if (!cleanupRef.current && event.code !== 1000) { // 1000 = normal closure
+          console.log('Deepgram connection failed, switching to mock mode')
+          setIsMockMode(true)
+          setupMockSTT()
+        }
       }
 
       socket.onerror = (error) => {
-        console.error('Deepgram WebSocket error:', error)
+        clearTimeout(connectionTimeout)
+        console.log('Deepgram WebSocket error occurred, falling back to mock mode')
+        console.error('WebSocket error details:', error)
+        
         if (!cleanupRef.current) {
-          onError('Real-time transcription connection failed')
+          // Close the failed socket
+          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+            socket.close()
+          }
+          
+          // Fall back to mock mode instead of showing error
+          console.log('Starting mock STT due to Deepgram connection failure')
+          setIsMockMode(true)
+          setupMockSTT()
         }
       }
 
       setDeepgramSocket(socket)
 
     } catch (error) {
-      console.error('Failed to setup Deepgram:', error)
+      console.error('Failed to setup Deepgram, falling back to mock mode:', error)
       if (!cleanupRef.current) {
-        onError('Failed to access microphone or connect to transcription service')
+        setIsMockMode(true)
+        setupMockSTT()
       }
     }
   }
@@ -180,27 +219,36 @@ export function RealtimeSTT({
     if (cleanupRef.current) return
     
     try {
-      // Get microphone stream for visual feedback
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      console.log('Setting up Mock STT mode')
       
-      if (cleanupRef.current) {
-        stream.getTracks().forEach(track => track.stop())
-        return
+      // Get microphone stream for visual feedback (but don't actually use it for STT)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        
+        if (cleanupRef.current) {
+          stream.getTracks().forEach(track => track.stop())
+          return
+        }
+        
+        streamRef.current = stream
+        console.log('Microphone access granted for mock mode')
+      } catch (micError) {
+        console.warn('Microphone access failed, using mock mode without mic:', micError)
+        // Continue without microphone - mock mode doesn't actually need it
       }
       
-      streamRef.current = stream
       setIsConnected(true)
 
       // Mock STT with realistic text
       const mockTexts = [
-        "Welcome to today's lecture",
-        "We will be covering important topics",
-        "Please take notes as we progress",
-        "This is a demonstration of real-time transcription",
-        "The system is working correctly",
-        "You can see the text appearing in real-time",
-        "This would normally use Deepgram API",
-        "Configure your API key for production use"
+        "Welcome to today's live lecture session",
+        "We are using real-time transcription technology",
+        "This is a demonstration of the speech-to-text system",
+        "The transcription appears as you speak",
+        "Multiple languages are supported by the platform",
+        "Participants can follow along in real-time",
+        "Configure your Deepgram API key for production use",
+        "This mock mode helps you test the interface"
       ]
 
       let textIndex = 0
@@ -212,37 +260,58 @@ export function RealtimeSTT({
 
         const text = mockTexts[textIndex % mockTexts.length]
         
-        // Send partial text first
-        onTranscriptUpdate(text.substring(0, text.length / 2), true)
+        // Simulate progressive typing for partial results
+        const words = text.split(' ')
+        let partialText = ''
         
-        // Then send complete text after delay
-        setTimeout(() => {
-          if (cleanupRef.current || !isRecording) return
+        // Send partial updates word by word
+        const wordInterval = setInterval(() => {
+          if (cleanupRef.current || !isRecording) {
+            clearInterval(wordInterval)
+            return
+          }
           
-          onTranscriptUpdate(text, false)
+          if (partialText === '') {
+            partialText = words[0] || ''
+          } else if (partialText !== text) {
+            const currentWords = partialText.split(' ').length
+            if (currentWords < words.length) {
+              partialText = words.slice(0, currentWords + 1).join(' ')
+            }
+          }
           
-          // Send to API
-          fetch('/api/stt-stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'transcript',
-              sessionId,
-              transcript: text,
-              isPartial: false
-            })
-          }).catch(err => console.error('Failed to send mock transcript:', err))
-        }, 1000)
+          // Send partial update
+          if (partialText && partialText !== text) {
+            onTranscriptUpdate(partialText, true)
+          } else {
+            // Send final update
+            clearInterval(wordInterval)
+            onTranscriptUpdate(text, false)
+            
+            // Send to API
+            fetch('/api/stt-stream', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'transcript',
+                sessionId,
+                transcript: text,
+                isPartial: false
+              })
+            }).catch(err => console.error('Failed to send mock transcript:', err))
+          }
+        }, 300) // Update every 300ms for realistic typing effect
 
         textIndex++
-      }, 3000) // New text every 3 seconds
+      }, 4000) // New sentence every 4 seconds
       
       mockIntervalRef.current = mockInterval
+      console.log('Mock STT started successfully')
 
     } catch (error) {
       console.error('Failed to setup mock STT:', error)
       if (!cleanupRef.current) {
-        onError('Failed to access microphone')
+        onError('Failed to initialize transcription system')
       }
     }
   }
@@ -333,6 +402,7 @@ export function RealtimeSTT({
     setMediaRecorder(null)
     setIsConnected(false)
     setIsInitialized(false)
+    setIsMockMode(false)
     
     // Small delay before allowing new initialization
     setTimeout(() => {
@@ -344,8 +414,16 @@ export function RealtimeSTT({
     <div className="flex items-center space-x-2 text-sm">
       <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
       <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
-        {isConnected ? 'Real-time STT Active' : 'STT Disconnected'}
+        {isConnected 
+          ? (isMockMode ? 'Demo STT Active' : 'Real-time STT Active') 
+          : 'STT Disconnected'
+        }
       </span>
+      {isMockMode && (
+        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+          DEMO MODE
+        </span>
+      )}
       {process.env.NODE_ENV === 'development' && (
         <span className="text-xs text-gray-400">
           ({isInitialized ? 'Init' : 'NotInit'})
