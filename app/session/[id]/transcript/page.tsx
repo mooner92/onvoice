@@ -233,7 +233,7 @@ export default function SessionTranscriptPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="pl-0">
                 <Link href="/my-sessions">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back

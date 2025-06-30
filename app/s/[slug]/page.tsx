@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
@@ -194,12 +194,55 @@ export default function PublicSessionPage() {
     }
   }
 
+  // Handle new transcript updates with smart translation
+  const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
+    const now = new Date()
+    const timestamp = now.toLocaleTimeString()
+    const newId = `${now.getTime()}-${Math.random()}`
+    
+    const newLine: TranscriptLine = {
+      id: newId,
+      timestamp,
+      original: newText,
+      translated: translationEnabled ? getMockTranslation(newText, selectedLanguage) : newText,
+      speaker: session?.host_name || 'Speaker'
+    }
+
+    if (isPartial) {
+      // For partial updates, replace the last line if it exists
+      setTranscript(prev => {
+        const newTranscript = [...prev]
+        if (newTranscript.length > 0 && newTranscript[newTranscript.length - 1].id.includes('partial')) {
+          newTranscript[newTranscript.length - 1] = { ...newLine, id: `${newId}-partial` }
+        } else {
+          newTranscript.push({ ...newLine, id: `${newId}-partial` })
+        }
+        return newTranscript
+      })
+    } else {
+      // For final updates, add as new line and translate if needed
+      setTranscript(prev => {
+        // Remove any partial line and add the final line
+        const withoutPartial = prev.filter(line => !line.id.includes('partial'))
+        const finalTranscript = [...withoutPartial, newLine]
+        
+        // Trigger translation for the new line if translation is enabled
+        if (translationEnabled && selectedLanguage !== 'en') {
+          translateTextEfficient(newText, selectedLanguage, newId)
+        }
+        
+        return finalTranscript
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translationEnabled, selectedLanguage, session?.host_name])
+
   // Subscribe to real-time transcript updates
   useEffect(() => {
     if (!sessionId || !hasJoined) return
 
     const channel = supabase
-      .channel(`public-transcript-${sessionId}`)
+      .channel(`public:transcripts-${sessionId}`)
       .on(
         'postgres_changes',
         {
@@ -209,31 +252,11 @@ export default function PublicSessionPage() {
           filter: `session_id=eq.${sessionId}`
         },
         (payload) => {
-          const newTranscript = payload.new as Transcript
-          const translatedText = getMockTranslation(newTranscript.original_text, selectedLanguage)
+          console.log('New transcript received:', payload.new)
+          const newTranscript = payload.new as any
           
-          const newLine: TranscriptLine = {
-            id: newTranscript.id,
-            timestamp: newTranscript.timestamp,
-            original: newTranscript.original_text,
-            translated: translatedText,
-            speaker: session?.host_name
-          }
-
-          setTranscript(prev => [...prev, newLine])
-          
-          // Asynchronously get real translation if enabled
-          if (translationEnabled) {
-            translateText(newTranscript.original_text, selectedLanguage).then(realTranslation => {
-              setTranscript(prevTranscript => 
-                prevTranscript.map(line => 
-                  line.id === newTranscript.id 
-                    ? { ...line, translated: realTranslation }
-                    : line
-                )
-              )
-            })
-          }
+          // Use the new efficient update function
+          handleTranscriptUpdate(newTranscript.original_text, false)
         }
       )
       .subscribe()
@@ -241,7 +264,7 @@ export default function PublicSessionPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [sessionId, selectedLanguage, session?.host_name, supabase, hasJoined])
+  }, [sessionId, hasJoined, supabase, handleTranscriptUpdate])
 
   // Update participant count
   const updateParticipantCount = useCallback(async () => {
@@ -337,53 +360,108 @@ export default function PublicSessionPage() {
     return mockTranslations[targetLang] || text
   }
 
+  // Debounced translation cache
+  const translationCache = useRef<Map<string, string>>(new Map())
+  const pendingTranslations = useRef<Set<string>>(new Set())
+
+  // Efficient translation function that avoids duplicate API calls
+  const translateTextEfficient = useCallback(async (text: string, targetLang: string, lineId: string): Promise<string> => {
+    if (!translationEnabled || targetLang === 'en') return text
+    
+    const cacheKey = `${text}-${targetLang}`
+    
+    // Check cache first
+    if (translationCache.current.has(cacheKey)) {
+      return translationCache.current.get(cacheKey)!
+    }
+    
+    // Avoid duplicate API calls for same text
+    if (pendingTranslations.current.has(cacheKey)) {
+      return getMockTranslation(text, targetLang)
+    }
+    
+    pendingTranslations.current.add(cacheKey)
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          targetLanguage: targetLang,
+          sourceLanguage: session?.primary_language || 'auto'
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const translation = data.translatedText || data.translation || text
+        
+        // Cache the result
+        translationCache.current.set(cacheKey, translation)
+        
+        // Update the specific line in state
+        setTranscript(prev => prev.map(line => 
+          line.id === lineId 
+            ? { ...line, translated: translation }
+            : line
+        ))
+        
+        return translation
+      } else {
+        console.error('Translation failed:', response.status, response.statusText)
+        return getMockTranslation(text, targetLang)
+      }
+    } catch (error) {
+      console.error('Translation error:', error)
+      return getMockTranslation(text, targetLang)
+    } finally {
+      pendingTranslations.current.delete(cacheKey)
+    }
+  }, [translationEnabled, session?.primary_language])
+
   // Update translations when language changes
   useEffect(() => {
+    if (!translationEnabled) {
+      // Reset translations when disabled
+      setTranscript(prev => prev.map(line => ({
+        ...line,
+        translated: line.original
+      })))
+      return
+    }
+
+    // Show mock translations immediately, then get real ones
     setTranscript(prev => prev.map(line => ({
       ...line,
       translated: getMockTranslation(line.original, selectedLanguage)
     })))
     
-    // Asynchronously get real translations if enabled
-    if (translationEnabled) {
-      transcript.forEach(line => {
-        translateText(line.original, selectedLanguage).then(realTranslation => {
-          setTranscript(prevTranscript => 
-            prevTranscript.map(transcriptLine => 
-              transcriptLine.id === line.id 
-                ? { ...transcriptLine, translated: realTranslation }
-                : transcriptLine
-            )
-          )
-        })
-      })
+    // Get real translations asynchronously (batch processing)
+    const translateBatch = async () => {
+      for (const line of transcript) {
+        await translateTextEfficient(line.original, selectedLanguage, line.id)
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
     }
-  }, [selectedLanguage, translationEnabled])
+    
+    if (transcript.length > 0) {
+      translateBatch()
+    }
+  }, [selectedLanguage, translationEnabled, translateTextEfficient])
 
-  // Trigger translation when translation is enabled
+  // Clear cache when translation is disabled
   useEffect(() => {
-    if (translationEnabled) {
-      // Translate all existing content when enabling translation
-      transcript.forEach(line => {
-        if (line.translated === getMockTranslation(line.original, selectedLanguage)) {
-          // Only translate if still showing mock translation
-          translateText(line.original, selectedLanguage).then(realTranslation => {
-            setTranscript(prevTranscript => 
-              prevTranscript.map(transcriptLine => 
-                transcriptLine.id === line.id 
-                  ? { ...transcriptLine, translated: realTranslation }
-                  : transcriptLine
-              )
-            )
-          })
-        }
-      })
+    if (!translationEnabled) {
+      translationCache.current.clear()
+      pendingTranslations.current.clear()
     }
   }, [translationEnabled])
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
-
-
 
   if (loading) {
     return (
