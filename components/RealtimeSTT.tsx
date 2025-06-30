@@ -311,6 +311,10 @@ export function RealtimeSTT({
       formData.append('audio', audioBlob, 'audio.webm')
       formData.append('sessionId', sessionId)
       
+      // Add language hint if available from session settings
+      const sessionLanguage = 'en' // Default to English for now
+      formData.append('language', sessionLanguage)
+      
       const response = await fetch('/api/stt', {
         method: 'POST',
         body: formData
@@ -383,7 +387,7 @@ export function RealtimeSTT({
         audioChunks = []
         
         // Only process if audio is substantial enough
-        if (audioBlob.size > 1000) { // At least 1KB
+        if (audioBlob.size > 500) { // Reduced from 1KB to 500 bytes for faster processing
           console.log(`🎤 Processing audio blob: ${audioBlob.size} bytes`)
           await processAudioWithOpenAI(audioBlob)
         } else {
@@ -398,7 +402,7 @@ export function RealtimeSTT({
               if (!cleanupRef.current && mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop()
               }
-            }, 3000) // 3 second chunks
+            }, 1500) // Reduced from 3000ms to 1500ms for faster response
           } catch (err) {
             console.error('Error restarting recording:', err)
           }
@@ -411,14 +415,14 @@ export function RealtimeSTT({
       
       // Start recording
       mediaRecorder.start()
-      console.log('🎤 OpenAI Whisper recording started')
+      console.log('🎤 OpenAI Whisper recording started with 1.5s chunks')
       
-      // Set up the 3-second interval
+      // Set up the 1.5-second interval for faster response
       setTimeout(() => {
         if (!cleanupRef.current && mediaRecorder && mediaRecorder.state === 'recording') {
           mediaRecorder.stop()
         }
-      }, 3000)
+      }, 1500)
       
     } catch (error) {
       console.error('❌ Error setting up OpenAI Whisper:', error)

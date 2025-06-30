@@ -6,11 +6,13 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const audio = formData.get("audio") as File
     const sessionId = formData.get("sessionId") as string
+    const language = formData.get("language") as string || "auto"
 
     console.log('STT API called with:', {
       audioSize: audio?.size,
       audioType: audio?.type,
       sessionId,
+      language,
       timestamp: new Date().toLocaleTimeString()
     })
 
@@ -34,7 +36,8 @@ export async function POST(req: NextRequest) {
     console.log('Processing audio file:', {
       size: audio.size,
       type: audio.type,
-      name: audio.name
+      name: audio.name,
+      targetLanguage: language
     })
 
     // Check if OpenAI API key is available
@@ -75,9 +78,18 @@ export async function POST(req: NextRequest) {
       const whisperFormData = new FormData()
       whisperFormData.append("file", audio, "audio.webm")
       whisperFormData.append("model", "whisper-1")
-      // Remove language parameter for auto-detection (better accuracy)
+      
+      // Add language parameter if specified (helps with accuracy for known languages)
+      if (language && language !== "auto") {
+        whisperFormData.append("language", language)
+        console.log(`🌍 Using language hint: ${language}`)
+      } else {
+        console.log('🔍 Using auto language detection')
+      }
+      
       whisperFormData.append("response_format", "verbose_json")
-      whisperFormData.append("temperature", "0") // For more consistent results
+      whisperFormData.append("temperature", "0.1") // Lower temperature for more consistent results
+      whisperFormData.append("prompt", "") // Add context if needed
 
       const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",

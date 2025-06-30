@@ -794,15 +794,15 @@ export default function PublicSessionPage() {
 
       {/* Main Content */}
       <div className="flex flex-col h-[calc(100vh-80px)]">
-        {/* Mobile Tab Navigation */}
-        <div className="lg:hidden border-b border-gray-200 dark:border-gray-700">
+        {/* Mobile Tab Navigation - Show only on mobile */}
+        <div className="lg:hidden border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <div className="flex">
             <button
               onClick={() => setTranslationEnabled(false)}
               className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
                 !translationEnabled
-                  ? `border-blue-500 ${darkMode ? 'text-blue-400 bg-blue-950' : 'text-blue-600 bg-blue-50'}`
-                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+                  ? `border-blue-500 ${darkMode ? 'text-blue-400 bg-blue-950/30' : 'text-blue-600 bg-blue-50'}`
+                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`
               }`}
             >
               📝 Original
@@ -811,8 +811,8 @@ export default function PublicSessionPage() {
               onClick={() => setTranslationEnabled(true)}
               className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
                 translationEnabled
-                  ? `border-green-500 ${darkMode ? 'text-green-400 bg-green-950' : 'text-green-600 bg-green-50'}`
-                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+                  ? `border-green-500 ${darkMode ? 'text-green-400 bg-green-950/30' : 'text-green-600 bg-green-50'}`
+                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`
               }`}
             >
               🌍 Translation
@@ -825,7 +825,7 @@ export default function PublicSessionPage() {
           </div>
         </div>
 
-        {/* Desktop Layout */}
+        {/* Desktop Layout - Show only on desktop */}
         <div className="hidden lg:flex lg:flex-row flex-1">
           {/* Original Transcript - Desktop */}
           <div className={`flex-1 transition-all duration-300 ${translationEnabled ? 'lg:mr-2' : ''}`}>
@@ -904,9 +904,9 @@ export default function PublicSessionPage() {
           )}
         </div>
 
-        {/* Mobile Layout */}
-        <div className="lg:hidden flex-1">
-          <div className="h-full p-4">
+        {/* Mobile Layout - Show only on mobile */}
+        <div className="lg:hidden flex-1 flex flex-col">
+          <div className="flex-1 p-4">
             <Card className={`h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -954,7 +954,7 @@ export default function PublicSessionPage() {
                 )}
               </CardHeader>
               
-              <CardContent className="h-[calc(100%-80px)]">
+              <CardContent className="h-[calc(100%-100px)] overflow-hidden">
                 <div className="space-y-4 h-full overflow-y-auto">
                   {translationEnabled ? renderTranscriptContent('translation') : renderTranscriptContent('original')}
                 </div>
