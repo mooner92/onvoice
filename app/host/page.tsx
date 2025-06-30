@@ -273,15 +273,27 @@ export default function HostDashboard() {
       chunksRef.current = []
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('MediaRecorder data available:', {
+          dataSize: event.data.size,
+          dataType: event.data.type,
+          timestamp: new Date().toLocaleTimeString()
+        })
         if (event.data.size > 0) {
           chunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = async () => {
+        // Use the current sessionId from state, not the closure variable
+        const currentSessionId = sessionId || session?.id
+        
         // Only process audio if session is still active and recording
-        if (!isRecording || !sessionId) {
-          console.log('Session not active, skipping STT processing')
+        if (!isRecording || !currentSessionId) {
+          console.log('Session not active, skipping STT processing', {
+            isRecording,
+            currentSessionId,
+            sessionId
+          })
           return
         }
         
@@ -289,8 +301,8 @@ export default function HostDashboard() {
         
         // Only send audio if it has meaningful content (size > 1KB)
         if (blob.size > 1024) {
-          console.log('Sending audio blob with size:', blob.size)
-          await sendAudioToSTT(blob)
+          console.log('Sending audio blob with size:', blob.size, 'to session:', currentSessionId)
+          await sendAudioToSTT(blob, currentSessionId)
         } else {
           console.log('Skipping small audio blob:', blob.size)
         }
@@ -301,16 +313,16 @@ export default function HostDashboard() {
         if (mediaRecorderRef.current && 
             mediaRecorderRef.current.state === 'inactive' && 
             isRecording && 
-            sessionId) {
+            currentSessionId) {
           setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording && sessionId) {
+            if (mediaRecorderRef.current && isRecording && currentSessionId) {
               try {
                 mediaRecorderRef.current.start()
                 setTimeout(() => {
                   if (mediaRecorderRef.current && 
                       mediaRecorderRef.current.state === 'recording' && 
                       isRecording && 
-                      sessionId) {
+                      currentSessionId) {
                     mediaRecorderRef.current.stop()
                   }
                 }, 5000) // 5-second chunks
@@ -335,23 +347,26 @@ export default function HostDashboard() {
     }
   }
 
-  const sendAudioToSTT = async (audioBlob: Blob) => {
-    if (!sessionId || !isRecording) {
-      console.log('Session not active or not recording, skipping STT')
+  const sendAudioToSTT = async (audioBlob: Blob, currentSessionId: string) => {
+    if (!currentSessionId || !isRecording) {
+      console.log('Session not active or not recording, skipping STT', {
+        currentSessionId,
+        isRecording
+      })
       return
     }
 
     console.log('Sending audio to STT:', {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
-      sessionId,
+      currentSessionId,
       isRecording
     })
 
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'audio.webm')
-      formData.append('sessionId', sessionId)
+      formData.append('sessionId', currentSessionId)
 
       const response = await fetch('/api/stt', {
         method: 'POST',
@@ -430,8 +445,8 @@ export default function HostDashboard() {
 
       const newSessionId = newSession.id
       setSession(newSession)
-    setSessionId(newSessionId)
-    setIsRecording(true)
+      setSessionId(newSessionId)
+      setIsRecording(true)
       setHasActiveSession(true)
 
       // Set up MediaRecorder for continuous audio capture
@@ -475,15 +490,27 @@ export default function HostDashboard() {
       chunksRef.current = []
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('MediaRecorder data available:', {
+          dataSize: event.data.size,
+          dataType: event.data.type,
+          timestamp: new Date().toLocaleTimeString()
+        })
         if (event.data.size > 0) {
           chunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = async () => {
+        // Use the current sessionId from state, not the closure variable
+        const currentSessionId = sessionId || newSessionId
+        
         // Only process audio if session is still active and recording
-        if (!isRecording || !sessionId) {
-          console.log('Session not active, skipping STT processing')
+        if (!isRecording || !currentSessionId) {
+          console.log('Session not active, skipping STT processing', {
+            isRecording,
+            currentSessionId,
+            sessionId
+          })
           return
         }
         
@@ -491,8 +518,8 @@ export default function HostDashboard() {
         
         // Only send audio if it has meaningful content (size > 1KB)
         if (blob.size > 1024) {
-          console.log('Sending audio blob with size:', blob.size)
-          await sendAudioToSTT(blob)
+          console.log('Sending audio blob with size:', blob.size, 'to session:', currentSessionId)
+          await sendAudioToSTT(blob, currentSessionId)
         } else {
           console.log('Skipping small audio blob:', blob.size)
         }
@@ -503,16 +530,16 @@ export default function HostDashboard() {
         if (mediaRecorderRef.current && 
             mediaRecorderRef.current.state === 'inactive' && 
             isRecording && 
-            sessionId) {
+            currentSessionId) {
           setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording && sessionId) {
+            if (mediaRecorderRef.current && isRecording && currentSessionId) {
               try {
                 mediaRecorderRef.current.start()
                 setTimeout(() => {
                   if (mediaRecorderRef.current && 
                       mediaRecorderRef.current.state === 'recording' && 
                       isRecording && 
-                      sessionId) {
+                      currentSessionId) {
                     mediaRecorderRef.current.stop()
                   }
                 }, 5000) // 5-second chunks

@@ -7,7 +7,15 @@ export async function POST(req: NextRequest) {
     const audio = formData.get("audio") as File
     const sessionId = formData.get("sessionId") as string
 
+    console.log('STT API called with:', {
+      audioSize: audio?.size,
+      audioType: audio?.type,
+      sessionId,
+      timestamp: new Date().toLocaleTimeString()
+    })
+
     if (!audio || !sessionId) {
+      console.error('Missing required data:', { audio: !!audio, sessionId: !!sessionId })
       return NextResponse.json(
         { error: "Audio file and session ID are required" },
         { status: 400 }
@@ -16,11 +24,18 @@ export async function POST(req: NextRequest) {
 
     // Check if audio file has content
     if (audio.size === 0) {
+      console.log('Empty audio file received')
       return NextResponse.json(
         { transcript: "", confidence: 0 },
         { status: 200 }
       )
     }
+
+    console.log('Processing audio file:', {
+      size: audio.size,
+      type: audio.type,
+      name: audio.name
+    })
 
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
