@@ -86,6 +86,12 @@ export function RealtimeSTT({
       // Check if Deepgram API key is available
       const deepgramApiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
       
+      console.log('Environment check:', {
+        hasApiKey: !!deepgramApiKey,
+        keyLength: deepgramApiKey?.length,
+        keyPrefix: deepgramApiKey?.substring(0, 8)
+      })
+      
       if (!deepgramApiKey || deepgramApiKey === 'demo') {
         console.log('Deepgram API key not configured, using mock mode')
         setIsMockMode(true)
@@ -93,7 +99,7 @@ export function RealtimeSTT({
         return
       }
 
-      console.log('Attempting to connect to Deepgram...')
+      console.log('Attempting to connect to Deepgram with API key:', deepgramApiKey.substring(0, 8) + '...')
 
       // Get microphone stream
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -113,20 +119,33 @@ export function RealtimeSTT({
       
       streamRef.current = stream
 
-      // Create Deepgram WebSocket connection
-      const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=auto&smart_format=true&interim_results=true&endpointing=300`
+      // Create Deepgram WebSocket connection with token in URL (browser compatible)
+      const wsUrl = `wss://api.deepgram.com/v1/listen?` + new URLSearchParams({
+        model: 'nova-2',
+        language: 'auto',
+        smart_format: 'true',
+        interim_results: 'true',
+        endpointing: '300',
+        encoding: 'webm',
+        sample_rate: '16000',
+        channels: '1',
+        token: deepgramApiKey
+      }).toString()
       
-      const socket = new WebSocket(wsUrl, ['token', deepgramApiKey])
+      console.log('Connecting to Deepgram WebSocket')
+      
+      const socket = new WebSocket(wsUrl)
       
       // Set a timeout for connection
       const connectionTimeout = setTimeout(() => {
         if (socket.readyState === WebSocket.CONNECTING) {
           console.log('Deepgram connection timeout, falling back to mock mode')
           socket.close()
+          setIsMockMode(true)
           setupMockSTT()
         }
-      }, 5000) // 5 second timeout
-      
+      }, 10000) // 10 second timeout
+
       socket.onopen = () => {
         clearTimeout(connectionTimeout)
         
@@ -144,12 +163,14 @@ export function RealtimeSTT({
         
         try {
           const data = JSON.parse(event.data)
+          console.log('Deepgram message:', data)
           
-          if (data.channel?.alternatives?.[0]?.transcript) {
+          // Handle different message types
+          if (data.type === 'Results' && data.channel?.alternatives?.[0]?.transcript) {
             const transcript = data.channel.alternatives[0].transcript
-            const isPartial = data.is_final === false
+            const isPartial = !data.is_final
             
-            console.log('Received transcript:', { transcript, isPartial })
+            console.log('Received transcript:', { transcript, isPartial, isFinal: data.is_final })
             
             // Update UI immediately
             onTranscriptUpdate(transcript, isPartial)
@@ -167,20 +188,28 @@ export function RealtimeSTT({
                 })
               })
             }
+          } else if (data.type === 'error') {
+            console.error('Deepgram error:', data)
+            throw new Error(`Deepgram error: ${data.description || 'Unknown error'}`)
           }
         } catch (parseError) {
           console.error('Error parsing Deepgram message:', parseError)
+          console.log('Raw message:', event.data)
         }
       }
 
       socket.onclose = (event) => {
         clearTimeout(connectionTimeout)
-        console.log('Deepgram WebSocket disconnected:', { code: event.code, reason: event.reason })
+        console.log('Deepgram WebSocket disconnected:', { 
+          code: event.code, 
+          reason: event.reason,
+          wasClean: event.wasClean 
+        })
         setIsConnected(false)
         
         // If connection failed and we're not in cleanup, try mock mode
         if (!cleanupRef.current && event.code !== 1000) { // 1000 = normal closure
-          console.log('Deepgram connection failed, switching to mock mode')
+          console.log('Deepgram connection failed (code:', event.code, '), switching to mock mode')
           setIsMockMode(true)
           setupMockSTT()
         }
@@ -188,7 +217,7 @@ export function RealtimeSTT({
 
       socket.onerror = (error) => {
         clearTimeout(connectionTimeout)
-        console.log('Deepgram WebSocket error occurred, falling back to mock mode')
+        console.log('Deepgram WebSocket error occurred')
         console.error('WebSocket error details:', error)
         
         if (!cleanupRef.current) {
