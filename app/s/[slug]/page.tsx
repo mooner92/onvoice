@@ -226,7 +226,7 @@ export default function PublicSessionPage() {
         
         // Trigger translation for the new line if translation is enabled
         if (translationEnabled && selectedLanguage !== 'en') {
-          translateTextEfficient(newText, selectedLanguage, newId)
+          translateLine(newLine, selectedLanguage)
         }
         
         return finalTranscript
@@ -310,26 +310,31 @@ export default function PublicSessionPage() {
 
   // Debounced translation cache
   const translationCache = useRef<Map<string, string>>(new Map())
-  const pendingTranslations = useRef<Set<string>>(new Set())
+  const pendingTranslations = useRef<Map<string, Promise<string>>>(new Map())
 
-  // Efficient translation function that avoids duplicate API calls
-  const translateTextEfficient = useCallback(async (text: string, targetLang: string, lineId: string): Promise<string> => {
-    if (!translationEnabled || targetLang === 'en') return text
-    
-    const cacheKey = `${text}-${targetLang}`
-    
-    // Check cache first
-    if (translationCache.current.has(cacheKey)) {
-      return translationCache.current.get(cacheKey)!
+  // Translation with browser API fallback for instant translation
+  const translateWithBrowserAPI = async (text: string, targetLang: string): Promise<string> => {
+    // Try browser built-in translation first (Chrome/Edge)
+    if ('translation' in navigator) {
+      try {
+        // @ts-expect-error - experimental API
+        const translator = await navigator.translation.createTranslator({
+          sourceLanguage: 'auto',
+          targetLanguage: targetLang
+        });
+        
+        const result = await translator.translate(text);
+        return result;
+      } catch {
+        console.log('Browser translation not available, using API');
+      }
     }
     
-    // Avoid duplicate API calls for same text
-    if (pendingTranslations.current.has(cacheKey)) {
-      return getMockTranslation(text, targetLang)
-    }
-    
-    pendingTranslations.current.add(cacheKey)
-    
+    // Fallback to our API
+    return translateText(text, targetLang);
+  };
+
+  const translateText = async (text: string, targetLang: string): Promise<string> => {
     try {
       const response = await fetch('/api/translate', {
         method: 'POST',
@@ -339,36 +344,65 @@ export default function PublicSessionPage() {
         body: JSON.stringify({
           text,
           targetLanguage: targetLang,
-          sourceLanguage: session?.primary_language || 'auto'
         }),
-      })
+      });
 
-      if (response.ok) {
-        const data = await response.json()
-        const translation = data.translatedText || data.translation || text
-        
-        // Cache the result
-        translationCache.current.set(cacheKey, translation)
-        
-        // Update the specific line in state
-        setTranscript(prev => prev.map(line => 
-          line.id === lineId 
-            ? { ...line, translated: translation }
-            : line
-        ))
-        
-        return translation
-      } else {
-        console.error('Translation failed:', response.status, response.statusText)
-        return getMockTranslation(text, targetLang)
+      if (!response.ok) {
+        throw new Error('Translation failed');
       }
+
+      const data = await response.json();
+      return data.translatedText;
     } catch (error) {
-      console.error('Translation error:', error)
-      return getMockTranslation(text, targetLang)
-    } finally {
-      pendingTranslations.current.delete(cacheKey)
+      console.error('Translation error:', error);
+      return `[Translation failed] ${text}`;
     }
-  }, [translationEnabled, session?.primary_language])
+  };
+
+  // Faster translation with instant mock + real translation
+  const translateLine = async (line: TranscriptLine, targetLang: string) => {
+    const cacheKey = `${line.id}-${targetLang}`;
+    
+    // Check cache first
+    if (translationCache.current.has(cacheKey)) {
+      return translationCache.current.get(cacheKey);
+    }
+    
+    // Check if already pending
+    if (pendingTranslations.current.has(cacheKey)) {
+      return pendingTranslations.current.get(cacheKey);
+    }
+    
+    // Show instant mock translation
+    const mockResult = getMockTranslation(line.original, targetLang);
+    
+    // Set mock in cache temporarily
+    translationCache.current.set(cacheKey, mockResult);
+    
+    // Start real translation in background
+    const translationPromise = translateWithBrowserAPI(line.original, targetLang)
+      .then(result => {
+        // Replace mock with real translation
+        translationCache.current.set(cacheKey, result);
+        setTranscript(prev => prev.map(t => 
+          t.id === line.id ? { ...t, translated: result } : t
+        ));
+        return result;
+      })
+      .catch(error => {
+        console.error('Translation failed:', error);
+        const fallback = `[Translation Error] ${line.original}`;
+        translationCache.current.set(cacheKey, fallback);
+        return fallback;
+      })
+      .finally(() => {
+        pendingTranslations.current.delete(cacheKey);
+      });
+    
+    pendingTranslations.current.set(cacheKey, translationPromise);
+    
+    return mockResult;
+  };
 
   // Update translations when language changes
   useEffect(() => {
@@ -390,7 +424,7 @@ export default function PublicSessionPage() {
     // Get real translations asynchronously (batch processing)
     const translateBatch = async () => {
       for (const line of transcript) {
-        await translateTextEfficient(line.original, selectedLanguage, line.id)
+        await translateLine(line, selectedLanguage)
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100))
       }
@@ -674,15 +708,6 @@ export default function PublicSessionPage() {
                   )}
                 </div>
               )}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setTranslationEnabled(!translationEnabled)}
-                className="flex items-center space-x-2"
-              >
-                <Globe className="h-4 w-4" />
-                <span>{translationEnabled ? 'Hide' : 'Show'} Translation</span>
-              </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
                 <Settings className="h-4 w-4" />
               </Button>

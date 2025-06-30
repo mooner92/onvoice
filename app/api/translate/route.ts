@@ -1,4 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+// Language code mappings for better accuracy
+const LANGUAGE_NAMES: { [key: string]: string } = {
+  'ko': 'Korean',
+  'en': 'English', 
+  'ja': 'Japanese',
+  'zh': 'Chinese',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'ar': 'Arabic'
+}
+
+// Cache for translations to avoid duplicate API calls
+const translationCache = new Map<string, string>()
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,88 +40,76 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Skip translation if target is English and source appears to be English
-    if (targetLanguage === 'en' && /^[a-zA-Z\s.,!?'-]+$/.test(text)) {
-      return NextResponse.json({
-        translatedText: text,
-        sourceLanguage: 'en',
-        confidence: 1.0,
-        provider: 'skip'
+    // Skip translation if target is English and text is already English
+    if (targetLanguage === 'en' && /^[a-zA-Z0-9\s.,!?'"()-]+$/.test(text)) {
+      return NextResponse.json({ translatedText: text })
+    }
+
+    // Check cache first
+    const cacheKey = `${text.trim()}-${targetLanguage}`
+    if (translationCache.has(cacheKey)) {
+      return NextResponse.json({ 
+        translatedText: translationCache.get(cacheKey),
+        cached: true
       })
     }
 
-    let translatedText = text
-    let confidence = 0.9
-    let provider = 'gpt'
+    const targetLanguageName = LANGUAGE_NAMES[targetLanguage] || targetLanguage
 
-    // Try GPT-4 for translation first (faster and often better quality)
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const languageNames: { [key: string]: string } = {
-          'ko': 'Korean',
-          'ja': 'Japanese', 
-          'zh': 'Chinese',
-          'es': 'Spanish',
-          'fr': 'French',
-          'de': 'German',
-          'it': 'Italian',
-          'pt': 'Portuguese',
-          'ru': 'Russian',
-          'ar': 'Arabic',
-          'hi': 'Hindi',
-          'en': 'English'
-        }
+    // Use GPT-4o-mini for fast, cost-effective translation
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional translator. Translate the given text to ${targetLanguageName}. 
 
-        const targetLangName = languageNames[targetLanguage] || targetLanguage
-        
-        const prompt = `Translate the following text to ${targetLangName}. Only return the translation, no explanations:
-
-${text}`
-
-        console.log(`🤖 Using GPT-4 for translation to ${targetLangName}`)
-
-        const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
+RULES:
+- Provide ONLY the translated text, no explanations
+- Maintain the same tone and style  
+- Keep technical terms accurate
+- If the text is already in ${targetLanguageName}, return it as-is
+- For partial sentences or incomplete thoughts, translate what's available naturally`
           },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini', // Faster and cheaper than gpt-4
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a professional translator. Provide natural, accurate translations without explanations.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            max_tokens: text.length * 2, // Reasonable limit
-            temperature: 0.3, // Low temperature for consistent translations
-          }),
+          {
+            role: "user", 
+            content: text
+          }
+        ],
+        max_tokens: Math.min(1000, text.length * 3),
+        temperature: 0.1, // Low temperature for consistent translation
+        stream: false
+      })
+
+      const translatedText = completion.choices[0]?.message?.content?.trim() || text
+
+      // Cache the result
+      translationCache.set(cacheKey, translatedText)
+
+      // Clear cache if it gets too large (keep last 1000 entries)
+      if (translationCache.size > 1000) {
+        const entries = Array.from(translationCache.entries())
+        translationCache.clear()
+        entries.slice(-500).forEach(([key, value]) => {
+          translationCache.set(key, value)
         })
+      }
 
-        if (gptResponse.ok) {
-          const gptData = await gptResponse.json()
-          translatedText = gptData.choices?.[0]?.message?.content?.trim() || text
-          console.log(`✅ GPT translation completed: ${text.substring(0, 50)}... → ${translatedText.substring(0, 50)}...`)
-        } else {
-          console.error('GPT translation failed:', await gptResponse.text())
-          throw new Error('GPT translation failed')
-        }
+      return NextResponse.json({ 
+        translatedText,
+        model: 'gpt-4o-mini'
+      })
 
-      } catch (gptError) {
-        console.error('GPT translation error:', gptError)
-        // Fall back to Google Translate
-        provider = 'google-fallback'
-        
-        if (process.env.GOOGLE_TRANSLATE_API_KEY) {
-          try {
-            console.log('🔄 Falling back to Google Translate')
-            
-            const googleResponse = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${process.env.GOOGLE_TRANSLATE_API_KEY}`, {
+    } catch (openaiError) {
+      console.error('OpenAI translation error:', openaiError)
+      
+      // Fallback to Google Translate API if available
+      if (process.env.GOOGLE_TRANSLATE_API_KEY) {
+        try {
+          const googleResponse = await fetch(
+            `https://translation.googleapis.com/language/translate/v2?key=${process.env.GOOGLE_TRANSLATE_API_KEY}`,
+            {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -108,84 +118,38 @@ ${text}`
                 q: text,
                 target: targetLanguage,
                 format: 'text'
-              }),
-            })
-
-            if (googleResponse.ok) {
-              const googleData = await googleResponse.json()
-              translatedText = googleData.data.translations[0].translatedText
-              confidence = 0.8
-            } else {
-              throw new Error('Google Translate failed')
+              })
             }
-          } catch (googleError) {
-            console.error('Google Translate error:', googleError)
-            // Final fallback to mock translation
-            provider = 'mock'
-            translatedText = `[${targetLanguage.toUpperCase()}] ${text}`
-            confidence = 0.1
-          }
-        } else {
-          // No Google API key, use mock
-          provider = 'mock'
-          translatedText = `[${targetLanguage.toUpperCase()}] ${text}`
-          confidence = 0.1
-        }
-      }
-    } else {
-      // No OpenAI API key, try Google directly
-      if (process.env.GOOGLE_TRANSLATE_API_KEY) {
-        try {
-          console.log('🌐 Using Google Translate (no OpenAI key)')
-          
-          const googleResponse = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${process.env.GOOGLE_TRANSLATE_API_KEY}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              q: text,
-              target: targetLanguage,
-              format: 'text'
-            }),
-          })
+          )
 
           if (googleResponse.ok) {
             const googleData = await googleResponse.json()
-            translatedText = googleData.data.translations[0].translatedText
-            provider = 'google'
-            confidence = 0.8
-          } else {
-            throw new Error('Google Translate failed')
+            const translatedText = googleData.data.translations[0].translatedText
+            
+            // Cache the result
+            translationCache.set(cacheKey, translatedText)
+            
+            return NextResponse.json({ 
+              translatedText,
+              model: 'google-translate'
+            })
           }
         } catch (googleError) {
           console.error('Google Translate error:', googleError)
-          provider = 'mock'
-          translatedText = `[${targetLanguage.toUpperCase()}] ${text}`
-          confidence = 0.1
         }
-      } else {
-        // No API keys available
-        provider = 'mock'
-        translatedText = `[${targetLanguage.toUpperCase()}] ${text}`
-        confidence = 0.1
       }
+
+      // Last resort: return mock translation with error indicator
+      return NextResponse.json({ 
+        translatedText: `[Translation unavailable] ${text}`,
+        error: 'Translation service temporarily unavailable'
+      })
     }
 
-    return NextResponse.json({
-      translatedText,
-      sourceLanguage,
-      targetLanguage,
-      confidence,
-      provider,
-      originalLength: text.length,
-      translatedLength: translatedText.length
-    })
-
   } catch (error) {
-    console.error("Translation API error:", error)
+    console.error('Translation API error:', error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Translation failed' },
       { status: 500 }
     )
   }
