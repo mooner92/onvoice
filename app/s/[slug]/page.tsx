@@ -427,6 +427,103 @@ export default function PublicSessionPage() {
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
 
+  // Render transcript content function
+  const renderTranscriptContent = (type: 'original' | 'translation') => {
+    if (transcript.length === 0) {
+      return (
+        <div className={`text-center py-16 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <div className={`mx-auto w-16 h-16 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} flex items-center justify-center mb-6`}>
+            {type === 'original' ? (
+              <Mic className="h-8 w-8 opacity-50" />
+            ) : (
+              <Globe className="h-8 w-8 opacity-50" />
+            )}
+          </div>
+          <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            {type === 'original' ? 'Waiting for the speaker to start...' : 'No content to translate'}
+          </h3>
+          <p className="text-sm">
+            {type === 'original' ? 'Live transcription will appear here' : 'Original transcript will be translated here'}
+          </p>
+          {type === 'original' && (
+            <div className="mt-4 flex items-center justify-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs">Session is active</span>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return transcript.map((line, index) => {
+      const text = type === 'original' ? line.original : line.translated
+      
+      // Split text into sentences for better readability
+      const sentences = text.split(/([.!?]+)/).filter(Boolean)
+      const formattedSentences: string[] = []
+      
+      for (let i = 0; i < sentences.length; i += 2) {
+        const sentence = sentences[i]
+        const punctuation = sentences[i + 1] || ''
+        if (sentence.trim()) {
+          formattedSentences.push((sentence + punctuation).trim())
+        }
+      }
+      
+      const finalSentences = formattedSentences.length > 0 ? formattedSentences : [text]
+      
+      return (
+        <div 
+          key={`${type}-${line.id}`} 
+          className={`p-4 rounded-lg border shadow-sm ${
+            type === 'original'
+              ? (darkMode ? 'border-blue-600 bg-gray-700' : 'border-blue-200 bg-white')
+              : (darkMode ? 'border-green-600 bg-gray-700' : 'border-green-200 bg-white')
+          }`}
+        >
+          {showTimestamps && (
+            <div className={`text-xs mb-3 pb-2 border-b ${
+              type === 'original'
+                ? (darkMode ? 'border-blue-500 text-gray-400' : 'border-blue-100 text-gray-500')
+                : (darkMode ? 'border-green-500 text-gray-400' : 'border-green-100 text-gray-500')
+            }`}>
+              <div className="flex items-center justify-between">
+                <span>
+                  <span className="font-medium">#{index + 1}</span>
+                  {' • '}
+                  <span>{line.timestamp}</span>
+                </span>
+                <span className={`px-2 py-1 rounded text-xs ${
+                  type === 'original'
+                    ? (darkMode ? 'bg-blue-600 text-blue-100' : 'bg-blue-100 text-blue-600')
+                    : (darkMode ? 'bg-green-600 text-green-100' : 'bg-green-100 text-green-600')
+                }`}>
+                  {type === 'original' ? line.speaker : selectedLang?.name}
+                </span>
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-3">
+            {finalSentences.map((sentence, sentenceIndex) => (
+              <div 
+                key={`${line.id}-${type}-sentence-${sentenceIndex}`}
+                className={`leading-relaxed p-3 rounded-md ${
+                  type === 'original'
+                    ? (darkMode ? 'text-gray-100 bg-blue-800' : 'text-gray-900 bg-blue-50')
+                    : (darkMode ? 'text-gray-100 bg-green-800' : 'text-gray-900 bg-green-50')
+                }`}
+                style={{ fontSize: `${fontSize[0]}px` }}
+              >
+                {sentence}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -696,122 +793,147 @@ export default function PublicSessionPage() {
       )}
 
       {/* Main Content */}
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)]">
-        {/* Main Content - Original Transcript */}
-        <div className={`flex-1 transition-all duration-300 ${translationEnabled ? 'lg:mr-2 mb-2 lg:mb-0' : ''}`}>
-          <div className="h-full p-4">
-            <Card className={`h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-              <CardHeader>
-                <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  <Mic className="h-5 w-5" />
-                  <span>Original Transcript</span>
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                  <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Live</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[calc(100%-80px)]">
-                <div className="space-y-4 h-full overflow-y-auto">
-                  {transcript.length === 0 ? (
-                    <div className={`text-center py-16 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <div className={`mx-auto w-16 h-16 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} flex items-center justify-center mb-6`}>
-                        <Mic className="h-8 w-8 opacity-50" />
-                      </div>
-                      <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Waiting for the speaker to start...
-                      </h3>
-                      <p className="text-sm">Live transcription will appear here</p>
-                      <div className="mt-4 flex items-center justify-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs">Session is active</span>
-                      </div>
-                    </div>
-                  ) : (
-                    transcript.map((line, index) => {
-                      // Split text into sentences for better readability
-                      const sentences = line.original.split(/([.!?]+)/).filter(Boolean)
-                      const formattedSentences: string[] = []
-                      
-                      for (let i = 0; i < sentences.length; i += 2) {
-                        const sentence = sentences[i]
-                        const punctuation = sentences[i + 1] || ''
-                        if (sentence.trim()) {
-                          formattedSentences.push((sentence + punctuation).trim())
-                        }
-                      }
-                      
-                      const finalSentences = formattedSentences.length > 0 ? formattedSentences : [line.original]
-                      
-                      return (
-                        <div 
-                          key={line.id} 
-                          className={`p-4 rounded-lg border shadow-sm ${darkMode ? 'border-blue-600 bg-gray-700' : 'border-blue-200 bg-white'}`}
-                        >
-                          {showTimestamps && (
-                            <div className={`text-xs mb-3 pb-2 border-b ${darkMode ? 'border-blue-500 text-gray-400' : 'border-blue-100 text-gray-500'}`}>
-                              <div className="flex items-center justify-between">
-                                <span>
-                                  <span className="font-medium">#{index + 1}</span>
-                                  {' • '}
-                                  <span>{line.timestamp}</span>
-                                </span>
-                                <span className={`px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-600 text-blue-100' : 'bg-blue-100 text-blue-600'}`}>
-                                  {line.speaker}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="space-y-3">
-                            {finalSentences.map((sentence, sentenceIndex) => (
-                              <div 
-                                key={`${line.id}-sentence-${sentenceIndex}`}
-                                className={`leading-relaxed p-3 rounded-md ${darkMode ? 'text-gray-100 bg-blue-800' : 'text-gray-900 bg-blue-50'}`}
-                                style={{ fontSize: `${fontSize[0]}px` }}
-                              >
-                                {sentence}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+      <div className="flex flex-col h-[calc(100vh-80px)]">
+        {/* Mobile Tab Navigation */}
+        <div className="lg:hidden border-b border-gray-200 dark:border-gray-700">
+          <div className="flex">
+            <button
+              onClick={() => setTranslationEnabled(false)}
+              className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
+                !translationEnabled
+                  ? `border-blue-500 ${darkMode ? 'text-blue-400 bg-blue-950' : 'text-blue-600 bg-blue-50'}`
+                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+              }`}
+            >
+              📝 Original
+            </button>
+            <button
+              onClick={() => setTranslationEnabled(true)}
+              className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
+                translationEnabled
+                  ? `border-green-500 ${darkMode ? 'text-green-400 bg-green-950' : 'text-green-600 bg-green-50'}`
+                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+              }`}
+            >
+              🌍 Translation
+              {selectedLang && (
+                <span className="ml-1 text-xs opacity-75">
+                  {selectedLang.flag}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Translation Side Panel */}
-        <div className={`transition-all duration-300 ease-in-out ${
-          translationEnabled 
-            ? 'lg:w-1/2 w-full opacity-100' 
-            : 'w-0 opacity-0 overflow-hidden lg:block hidden'
-        }`}>
-          {translationEnabled && (
-            <div className="h-full p-4 pl-2">
-              <Card className={`h-full border-l-4 border-green-500 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      <Globe className="h-5 w-5 text-green-600" />
-                      <span>Translation</span>
-                      {selectedLang && (
-                        <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                          ({selectedLang.flag} {selectedLang.name})
-                        </span>
-                      )}
-                    </CardTitle>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setTranslationEnabled(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+        {/* Desktop Layout */}
+        <div className="hidden lg:flex lg:flex-row flex-1">
+          {/* Original Transcript - Desktop */}
+          <div className={`flex-1 transition-all duration-300 ${translationEnabled ? 'lg:mr-2' : ''}`}>
+            <div className="h-full p-4">
+              <Card className={`h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <Mic className="h-5 w-5" />
+                    <span>Original Transcript</span>
+                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Live</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="h-[calc(100%-80px)]">
+                  <div className="space-y-4 h-full overflow-y-auto">
+                    {renderTranscriptContent('original')}
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Translation Side Panel - Desktop */}
+          {translationEnabled && (
+            <div className="lg:w-1/2 w-full">
+              <div className="h-full p-4 pl-2">
+                <Card className={`h-full border-l-4 border-green-500 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <Globe className="h-5 w-5 text-green-600" />
+                        <span>Translation</span>
+                        {selectedLang && (
+                          <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                            ({selectedLang.flag} {selectedLang.name})
+                          </span>
+                        )}
+                      </CardTitle>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setTranslationEnabled(false)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Language Selector */}
+                    <div className="mt-3">
+                      <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {languages.map((lang) => (
+                            <SelectItem key={lang.code} value={lang.code}>
+                              <div className="flex items-center space-x-2">
+                                <span>{lang.flag}</span>
+                                <span>{lang.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardHeader>
                   
-                  {/* Language Selector */}
+                  <CardContent className="h-[calc(100%-140px)]">
+                    <div className="space-y-4 h-full overflow-y-auto">
+                      {renderTranscriptContent('translation')}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="lg:hidden flex-1">
+          <div className="h-full p-4">
+            <Card className={`h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {translationEnabled ? (
+                      <>
+                        <Globe className="h-5 w-5 text-green-600" />
+                        <span>Translation</span>
+                        {selectedLang && (
+                          <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                            ({selectedLang.flag} {selectedLang.name})
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-5 w-5" />
+                        <span>Original Transcript</span>
+                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Live</span>
+                      </>
+                    )}
+                  </CardTitle>
+                </div>
+                
+                {/* Language Selector - Mobile (only show when translation is enabled) */}
+                {translationEnabled && (
                   <div className="mt-3">
                     <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                       <SelectTrigger className="w-full">
@@ -829,73 +951,16 @@ export default function PublicSessionPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </CardHeader>
-                
-                <CardContent className="h-[calc(100%-140px)]">
-                  <div className="space-y-4 h-full overflow-y-auto">
-                    {transcript.length === 0 ? (
-                      <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No content to translate</p>
-                      </div>
-                    ) : (
-                      transcript.map((line, index) => {
-                        const translatedText = line.translated
-                        
-                        // Split translated text into sentences for better readability
-                        const sentences = translatedText.split(/([.!?]+)/).filter(Boolean)
-                        const formattedSentences: string[] = []
-                        
-                        for (let i = 0; i < sentences.length; i += 2) {
-                          const sentence = sentences[i]
-                          const punctuation = sentences[i + 1] || ''
-                          if (sentence.trim()) {
-                            formattedSentences.push((sentence + punctuation).trim())
-                          }
-                        }
-                        
-                        const finalSentences = formattedSentences.length > 0 ? formattedSentences : [translatedText]
-                        
-                        return (
-                          <div 
-                            key={`trans-${line.id}`} 
-                            className={`p-4 rounded-lg border shadow-sm ${darkMode ? 'border-green-600 bg-gray-700' : 'border-green-200 bg-white'}`}
-                          >
-                            {showTimestamps && (
-                              <div className={`text-xs mb-3 pb-2 border-b ${darkMode ? 'border-green-500 text-gray-400' : 'border-green-100 text-gray-500'}`}>
-                                <div className="flex items-center justify-between">
-                                  <span>
-                                    <span className="font-medium">#{index + 1}</span>
-                                    {' • '}
-                                    <span>{line.timestamp}</span>
-                                  </span>
-                                  <span className={`px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-600 text-green-100' : 'bg-green-100 text-green-600'}`}>
-                                    {selectedLang?.name}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="space-y-3">
-                              {finalSentences.map((sentence, sentenceIndex) => (
-                                <div 
-                                  key={`${line.id}-trans-sentence-${sentenceIndex}`}
-                                  className={`leading-relaxed p-3 rounded-md ${darkMode ? 'text-gray-100 bg-green-800' : 'text-gray-900 bg-green-50'}`}
-                                  style={{ fontSize: `${fontSize[0]}px` }}
-                                >
-                                  {sentence}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                )}
+              </CardHeader>
+              
+              <CardContent className="h-[calc(100%-80px)]">
+                <div className="space-y-4 h-full overflow-y-auto">
+                  {translationEnabled ? renderTranscriptContent('translation') : renderTranscriptContent('original')}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
