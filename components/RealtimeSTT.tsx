@@ -18,7 +18,6 @@ export function RealtimeSTT({
   const [deepgramSocket, setDeepgramSocket] = useState<WebSocket | null>(null)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isMockMode, setIsMockMode] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'failed'>('disconnected')
@@ -51,6 +50,7 @@ export function RealtimeSTT({
         cleanup()
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, isRecording, isInitialized])
 
   const initializeSession = async () => {
@@ -145,7 +145,6 @@ export function RealtimeSTT({
 
       // Skip Deepgram WebSocket and use OpenAI Whisper directly
       console.log('🤖 Starting OpenAI Whisper STT (Deepgram Flexible plan limitation)')
-      setIsConnected(true)
       setConnectionStatus('connected')
       setIsMockMode(false)
       
@@ -197,13 +196,12 @@ export function RealtimeSTT({
       
       if (!shouldRunMockText) {
         console.log('User declined demo mode, staying in disconnected state')
-        setIsConnected(false)
         setIsMockMode(false)
         setConnectionStatus('failed')
         return
       }
 
-      setIsConnected(true)
+      setIsMockMode(true)
       setConnectionStatus('connected')
 
       const mockTexts = [
@@ -283,33 +281,6 @@ export function RealtimeSTT({
     }
   }
 
-  const startAudioStream = (socket: WebSocket, stream: MediaStream) => {
-    if (cleanupRef.current) return
-    
-    try {
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      })
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && socket.readyState === WebSocket.OPEN && !cleanupRef.current) {
-          socket.send(event.data)
-        }
-      }
-
-      recorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event)
-      }
-
-      recorder.start(100) // Send audio chunks every 100ms for real-time
-      setMediaRecorder(recorder)
-      console.log('🎤 Audio streaming started')
-    } catch (error) {
-      console.error('❌ Failed to start audio stream:', error)
-      onError('Failed to start audio recording')
-    }
-  }
-
   const getSupportedMimeType = (): string => {
     const mimeTypes = [
       'audio/webm;codecs=opus',
@@ -381,17 +352,10 @@ export function RealtimeSTT({
   const startOpenAIWhisperSTT = (stream: MediaStream) => {
     console.log('🤖 Starting OpenAI Whisper STT...')
     
-    // Update UI state to show OpenAI Whisper is active
-    setIsConnected(true)
     setConnectionStatus('connected')
     setIsMockMode(false)
     
     try {
-      // AudioContext setup for better audio processing
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 16000
-      })
-      
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: getSupportedMimeType()
       })
@@ -533,7 +497,6 @@ export function RealtimeSTT({
     // Reset state
     setDeepgramSocket(null)
     setMediaRecorder(null)
-    setIsConnected(false)
     setIsInitialized(false)
     setIsMockMode(false)
     setConnectionStatus('disconnected')
