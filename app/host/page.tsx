@@ -307,8 +307,10 @@ export default function HostDashboard() {
   }
 
   const handleStopSession = async () => {
-    if (!sessionId || !user) return
+    if (!sessionId || !user || !isRecording) return
 
+    console.log('Stopping session:', sessionId)
+    
     try {
       // First, immediately set recording to false to stop STT
       setIsRecording(false)
@@ -318,6 +320,9 @@ export default function HostDashboard() {
         clearTimeout(autoStopTimerRef.current)
         autoStopTimerRef.current = null
       }
+
+      // Wait a moment for RealtimeSTT to cleanup
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // End session via API
       const response = await fetch(`/api/session/${sessionId}/end`, {
@@ -343,6 +348,7 @@ export default function HostDashboard() {
       setHasActiveSession(false)
       setTranscript([])
       setCurrentPartialText("")
+      setSTTError(null)
       
     } catch (error) {
       console.error('Error stopping session:', error)
@@ -351,6 +357,7 @@ export default function HostDashboard() {
       setSessionId(null)
       setSession(null)
       setHasActiveSession(false)
+      setSTTError(null)
     }
   }
 

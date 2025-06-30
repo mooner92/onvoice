@@ -29,12 +29,16 @@ export async function POST(req: NextRequest) {
 
     switch (type) {
       case 'start':
-        // Initialize session
+        // Initialize session (allow re-initialization)
+        if (activeSessions.has(sessionId)) {
+          console.log(`Session ${sessionId} already exists, reinitializing`)
+        }
+        
         activeSessions.set(sessionId, {
           fullTranscript: '',
           lastUpdate: new Date()
         })
-        console.log(`Session ${sessionId} started`)
+        console.log(`Session ${sessionId} started/reinitialized`)
         return NextResponse.json({ success: true })
 
       case 'transcript':
@@ -63,10 +67,13 @@ export async function POST(req: NextRequest) {
         // Save final transcript to database
         const finalSession = activeSessions.get(sessionId)
         if (!finalSession) {
-          return NextResponse.json(
-            { error: "Session not found" },
-            { status: 404 }
-          )
+          console.log(`Session ${sessionId} not found for ending (may have been already ended)`)
+          return NextResponse.json({ 
+            success: true, 
+            message: 'Session already ended or not found',
+            finalTranscript: '',
+            sentenceCount: 0
+          })
         }
 
         // Process and save to database

@@ -19,21 +19,42 @@ export function RealtimeSTT({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const cleanupRef = useRef(false)
+  const mockIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Initialize session when component mounts
+  // Initialize session when component mounts and recording starts
   useEffect(() => {
-    if (sessionId && isRecording) {
+    if (sessionId && isRecording && !isInitialized) {
+      console.log('Initializing RealtimeSTT for session:', sessionId)
+      setIsInitialized(true)
       initializeSession()
     }
-    return () => {
+    
+    // Cleanup when recording stops
+    if (!isRecording && isInitialized) {
+      console.log('Recording stopped, cleaning up RealtimeSTT')
       cleanup()
     }
-  }, [sessionId, isRecording])
+    
+    return () => {
+      if (isInitialized) {
+        cleanup()
+      }
+    }
+  }, [sessionId, isRecording, isInitialized])
 
   const initializeSession = async () => {
+    if (cleanupRef.current) {
+      console.log('Cleanup in progress, skipping initialization')
+      return
+    }
+
     try {
+      console.log('Starting STT session for:', sessionId)
+      
       // Initialize session in API
-      await fetch('/api/stt-stream', {
+      const response = await fetch('/api/stt-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,7 +63,13 @@ export function RealtimeSTT({
         })
       })
 
-      // Setup Deepgram connection
+      if (!response.ok) {
+        throw new Error(`Failed to start session: ${response.status}`)
+      }
+
+      console.log('Session started successfully, setting up audio')
+      
+      // Setup audio connection
       await setupDeepgram()
       
     } catch (error) {
@@ -52,6 +79,8 @@ export function RealtimeSTT({
   }
 
   const setupDeepgram = async () => {
+    if (cleanupRef.current) return
+
     try {
       // Check if Deepgram API key is available
       const deepgramApiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
@@ -72,6 +101,12 @@ export function RealtimeSTT({
           autoGainControl: true
         } 
       })
+      
+      if (cleanupRef.current) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+      
       streamRef.current = stream
 
       // Create Deepgram WebSocket connection
@@ -80,12 +115,18 @@ export function RealtimeSTT({
       const socket = new WebSocket(wsUrl, ['token', deepgramApiKey])
       
       socket.onopen = () => {
+        if (cleanupRef.current) {
+          socket.close()
+          return
+        }
         console.log('Deepgram WebSocket connected')
         setIsConnected(true)
         startAudioStream(socket, stream)
       }
 
       socket.onmessage = async (event) => {
+        if (cleanupRef.current) return
+        
         const data = JSON.parse(event.data)
         
         if (data.channel?.alternatives?.[0]?.transcript) {
@@ -120,21 +161,33 @@ export function RealtimeSTT({
 
       socket.onerror = (error) => {
         console.error('Deepgram WebSocket error:', error)
-        onError('Real-time transcription connection failed')
+        if (!cleanupRef.current) {
+          onError('Real-time transcription connection failed')
+        }
       }
 
       setDeepgramSocket(socket)
 
     } catch (error) {
       console.error('Failed to setup Deepgram:', error)
-      onError('Failed to access microphone or connect to transcription service')
+      if (!cleanupRef.current) {
+        onError('Failed to access microphone or connect to transcription service')
+      }
     }
   }
 
   const setupMockSTT = async () => {
+    if (cleanupRef.current) return
+    
     try {
       // Get microphone stream for visual feedback
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      
+      if (cleanupRef.current) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+      
       streamRef.current = stream
       setIsConnected(true)
 
@@ -152,7 +205,7 @@ export function RealtimeSTT({
 
       let textIndex = 0
       const mockInterval = setInterval(() => {
-        if (!isRecording) {
+        if (cleanupRef.current || !isRecording) {
           clearInterval(mockInterval)
           return
         }
@@ -164,6 +217,8 @@ export function RealtimeSTT({
         
         // Then send complete text after delay
         setTimeout(() => {
+          if (cleanupRef.current || !isRecording) return
+          
           onTranscriptUpdate(text, false)
           
           // Send to API
@@ -176,25 +231,31 @@ export function RealtimeSTT({
               transcript: text,
               isPartial: false
             })
-          })
+          }).catch(err => console.error('Failed to send mock transcript:', err))
         }, 1000)
 
         textIndex++
       }, 3000) // New text every 3 seconds
+      
+      mockIntervalRef.current = mockInterval
 
     } catch (error) {
       console.error('Failed to setup mock STT:', error)
-      onError('Failed to access microphone')
+      if (!cleanupRef.current) {
+        onError('Failed to access microphone')
+      }
     }
   }
 
   const startAudioStream = (socket: WebSocket, stream: MediaStream) => {
+    if (cleanupRef.current) return
+    
     const recorder = new MediaRecorder(stream, {
       mimeType: 'audio/webm;codecs=opus'
     })
 
     recorder.ondataavailable = (event) => {
-      if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+      if (event.data.size > 0 && socket.readyState === WebSocket.OPEN && !cleanupRef.current) {
         socket.send(event.data)
       }
     }
@@ -204,27 +265,51 @@ export function RealtimeSTT({
   }
 
   const cleanup = async () => {
-    console.log('Cleaning up RealtimeSTT')
+    if (cleanupRef.current) {
+      console.log('Cleanup already in progress')
+      return
+    }
+    
+    cleanupRef.current = true
+    console.log('Starting RealtimeSTT cleanup for session:', sessionId)
+    
+    // Clear mock interval
+    if (mockIntervalRef.current) {
+      clearInterval(mockIntervalRef.current)
+      mockIntervalRef.current = null
+    }
     
     // Stop media recorder
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop()
+      try {
+        mediaRecorder.stop()
+      } catch (error) {
+        console.error('Error stopping media recorder:', error)
+      }
     }
 
     // Close WebSocket
     if (deepgramSocket && deepgramSocket.readyState === WebSocket.OPEN) {
-      deepgramSocket.close()
+      try {
+        deepgramSocket.close()
+      } catch (error) {
+        console.error('Error closing WebSocket:', error)
+      }
     }
 
     // Stop media stream
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
+      try {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      } catch (error) {
+        console.error('Error stopping media stream:', error)
+      }
     }
 
-    // End session in API
-    if (sessionId) {
+    // End session in API (only if session was initialized)
+    if (sessionId && isInitialized) {
       try {
-        await fetch('/api/stt-stream', {
+        const response = await fetch('/api/stt-stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -232,6 +317,12 @@ export function RealtimeSTT({
             sessionId
           })
         })
+        
+        if (response.ok) {
+          console.log('Session ended successfully')
+        } else {
+          console.warn('Session end returned:', response.status)
+        }
       } catch (error) {
         console.error('Failed to end session:', error)
       }
@@ -241,14 +332,13 @@ export function RealtimeSTT({
     setDeepgramSocket(null)
     setMediaRecorder(null)
     setIsConnected(false)
+    setIsInitialized(false)
+    
+    // Small delay before allowing new initialization
+    setTimeout(() => {
+      cleanupRef.current = false
+    }, 500)
   }
-
-  // Cleanup when recording stops
-  useEffect(() => {
-    if (!isRecording && (deepgramSocket || mediaRecorder)) {
-      cleanup()
-    }
-  }, [isRecording])
 
   return (
     <div className="flex items-center space-x-2 text-sm">
@@ -256,6 +346,11 @@ export function RealtimeSTT({
       <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
         {isConnected ? 'Real-time STT Active' : 'STT Disconnected'}
       </span>
+      {process.env.NODE_ENV === 'development' && (
+        <span className="text-xs text-gray-400">
+          ({isInitialized ? 'Init' : 'NotInit'})
+        </span>
+      )}
     </div>
   )
 } 
