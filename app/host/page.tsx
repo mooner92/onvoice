@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { QRCodeDisplay } from "@/components/ui/qr-code"
+import { RealtimeSTT } from "@/components/RealtimeSTT"
 import type { Session } from "@/lib/types"
 
 interface TranscriptLine {
@@ -21,6 +22,7 @@ interface TranscriptLine {
   timestamp: string;
   text: string;
   confidence: number;
+  isPartial?: boolean;
 }
 
 export default function HostDashboard() {
@@ -35,17 +37,16 @@ export default function HostDashboard() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+  const [currentPartialText, setCurrentPartialText] = useState("")
   const [isMuted, setIsMuted] = useState(false)
   const [participantCount, setParticipantCount] = useState(0)
   const [sessionDuration, setSessionDuration] = useState(0)
   const [isInitializing, setIsInitializing] = useState(true)
   const [hasActiveSession, setHasActiveSession] = useState(false)
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+  const [sttError, setSTTError] = useState<string | null>(null)
   
-  // Refs for media recording
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
+  // Refs for cleanup
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const languages = [
@@ -93,9 +94,6 @@ export default function HostDashboard() {
           setPrimaryLanguage(activeSession.primary_language)
           setHasActiveSession(true)
           setIsRecording(true)
-          
-          // Resume recording if session was active
-          await resumeRecording()
           
           // Load existing transcripts
           await loadExistingTranscripts(activeSession.id)
@@ -240,188 +238,39 @@ export default function HostDashboard() {
     }
   }
 
-  const resumeRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      
-      // Try different MIME types for browser compatibility
-      const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
-      ]
-      
-      let selectedMimeType = ''
-      for (const mimeType of supportedTypes) {
-        if (MediaRecorder.isTypeSupported(mimeType)) {
-          selectedMimeType = mimeType
-          break
-        }
+  // Handle real-time transcript updates
+  const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
+    console.log('Transcript update:', { text, isPartial })
+    
+    if (isPartial) {
+      // Update partial text display
+      setCurrentPartialText(text)
+    } else {
+      // Add final transcript to list
+      const newLine: TranscriptLine = {
+        id: Date.now().toString(),
+        timestamp: new Date().toLocaleTimeString(),
+        text: text.trim(),
+        confidence: 0.9
       }
       
-      if (!selectedMimeType) {
-        throw new Error('No supported audio recording format found')
-      }
-      
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: selectedMimeType
-      })
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
-
-      mediaRecorder.ondataavailable = (event) => {
-        console.log('MediaRecorder data available:', {
-          dataSize: event.data.size,
-          dataType: event.data.type,
-          timestamp: new Date().toLocaleTimeString()
-        })
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
-        }
-      }
-
-      mediaRecorder.onstop = async () => {
-        // Use the current sessionId from state, not the closure variable
-        const currentSessionId = sessionId || session?.id
-        
-        // Only process audio if session is still active and recording
-        if (!isRecording || !currentSessionId) {
-          console.log('Session not active, skipping STT processing', {
-            isRecording,
-            currentSessionId,
-            sessionId
-          })
-          return
-        }
-        
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        
-        // Only send audio if it has meaningful content (size > 1KB)
-        if (blob.size > 1024) {
-          console.log('Sending audio blob with size:', blob.size, 'to session:', currentSessionId)
-          await sendAudioToSTT(blob, currentSessionId)
-        } else {
-          console.log('Skipping small audio blob:', blob.size)
-        }
-        
-        chunksRef.current = []
-        
-        // Restart recording for continuous capture only if still recording
-        if (mediaRecorderRef.current && 
-            mediaRecorderRef.current.state === 'inactive' && 
-            isRecording && 
-            currentSessionId) {
-          setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording && currentSessionId) {
-              try {
-                mediaRecorderRef.current.start()
-                setTimeout(() => {
-                  if (mediaRecorderRef.current && 
-                      mediaRecorderRef.current.state === 'recording' && 
-                      isRecording && 
-                      currentSessionId) {
-                    mediaRecorderRef.current.stop()
-                  }
-                }, 5000) // 5-second chunks
-              } catch (error) {
-                console.error('Error restarting MediaRecorder:', error)
-              }
-            }
-          }, 100)
-        }
-      }
-
-      mediaRecorder.start()
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop()
-        }
-      }, 5000) // First 5-second chunk
-
-    } catch (error) {
-      console.error('Error resuming recording:', error)
-      setMicPermission('denied')
+      setTranscript(prev => [...prev, newLine])
+      setCurrentPartialText("") // Clear partial text
     }
   }
 
-  const sendAudioToSTT = async (audioBlob: Blob, currentSessionId: string) => {
-    if (!currentSessionId || !isRecording) {
-      console.log('Session not active or not recording, skipping STT', {
-        currentSessionId,
-        isRecording
-      })
-      return
-    }
-
-    console.log('Sending audio to STT:', {
-      blobSize: audioBlob.size,
-      blobType: audioBlob.type,
-      currentSessionId,
-      isRecording
-    })
-
-    try {
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'audio.webm')
-      formData.append('sessionId', currentSessionId)
-
-      const response = await fetch('/api/stt', {
-        method: 'POST',
-        body: formData
-      })
-
-      console.log('STT API response status:', response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('STT API error response:', errorText)
-        throw new Error(`STT API request failed: ${response.status}`)
-      }
-
-      const result = await response.json()
-      console.log('STT result:', result)
-      
-      if (result.transcript && result.transcript.trim()) {
-        const newLine: TranscriptLine = {
-          id: Date.now().toString(),
-          timestamp: new Date().toLocaleTimeString(),
-          text: result.transcript.trim(),
-          confidence: result.confidence || 0.9
-        }
-        
-        setTranscript(prev => [...prev, newLine])
-        console.log('Added transcript line:', newLine)
-      } else {
-        console.log('Empty transcript received')
-      }
-    } catch (error) {
-      console.error('Error sending audio to STT:', error)
-      
-      // Add error message to transcript for debugging
-      const errorLine: TranscriptLine = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleTimeString(),
-        text: `[STT Error: ${error instanceof Error ? error.message : 'Unknown error'}]`,
-        confidence: 0
-      }
-      setTranscript(prev => [...prev, errorLine])
-    }
+  const handleSTTError = (error: string) => {
+    console.error('STT Error:', error)
+    setSTTError(error)
   }
 
   const handleStartSession = async () => {
     if (!user) return
 
     setIsInitializing(true)
+    setSTTError(null)
 
     try {
-      // Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      setMicPermission('granted')
-
       // Create session via API
       const response = await fetch('/api/session/create', {
         method: 'POST',
@@ -443,142 +292,15 @@ export default function HostDashboard() {
 
       const { session: newSession } = await response.json()
 
-      const newSessionId = newSession.id
       setSession(newSession)
-      setSessionId(newSessionId)
+      setSessionId(newSession.id)
       setIsRecording(true)
       setHasActiveSession(true)
-
-      // Set up MediaRecorder for continuous audio capture
-      let mediaRecorder: MediaRecorder
-      
-      // Try different MIME types for browser compatibility
-      const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
-      ]
-      
-      let selectedMimeType = ''
-      for (const mimeType of supportedTypes) {
-        if (MediaRecorder.isTypeSupported(mimeType)) {
-          selectedMimeType = mimeType
-          break
-        }
-      }
-      
-      if (!selectedMimeType) {
-        throw new Error('No supported audio recording format found')
-      }
-      
-      // Create MediaRecorder with fallback options for browser compatibility
-      try {
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: selectedMimeType,
-          audioBitsPerSecond: 128000  // Higher quality for better STT accuracy
-        })
-      } catch (optionsError) {
-        console.warn('Failed with audio options, trying without:', optionsError)
-        // Fallback without audioBitsPerSecond for Safari/older browsers
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: selectedMimeType
-        })
-      }
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
-
-      mediaRecorder.ondataavailable = (event) => {
-        console.log('MediaRecorder data available:', {
-          dataSize: event.data.size,
-          dataType: event.data.type,
-          timestamp: new Date().toLocaleTimeString()
-        })
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
-        }
-      }
-
-      mediaRecorder.onstop = async () => {
-        // Use the current sessionId from state, not the closure variable
-        const currentSessionId = sessionId || newSessionId
-        
-        // Only process audio if session is still active and recording
-        if (!isRecording || !currentSessionId) {
-          console.log('Session not active, skipping STT processing', {
-            isRecording,
-            currentSessionId,
-            sessionId
-          })
-          return
-        }
-        
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        
-        // Only send audio if it has meaningful content (size > 1KB)
-        if (blob.size > 1024) {
-          console.log('Sending audio blob with size:', blob.size, 'to session:', currentSessionId)
-          await sendAudioToSTT(blob, currentSessionId)
-        } else {
-          console.log('Skipping small audio blob:', blob.size)
-        }
-        
-        chunksRef.current = []
-        
-        // Restart recording for continuous capture only if still recording
-        if (mediaRecorderRef.current && 
-            mediaRecorderRef.current.state === 'inactive' && 
-            isRecording && 
-            currentSessionId) {
-          setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording && currentSessionId) {
-              try {
-                mediaRecorderRef.current.start()
-                setTimeout(() => {
-                  if (mediaRecorderRef.current && 
-                      mediaRecorderRef.current.state === 'recording' && 
-                      isRecording && 
-                      currentSessionId) {
-                    mediaRecorderRef.current.stop()
-                  }
-                }, 5000) // 5-second chunks
-              } catch (error) {
-                console.error('Error restarting MediaRecorder:', error)
-              }
-            }
-          }, 100)
-        }
-      }
-
-      // Start recording with error handling
-      console.log('Starting MediaRecorder with MIME type:', selectedMimeType)
-      
-      try {
-        if (mediaRecorder.state === 'inactive') {
-          mediaRecorder.start()
-          console.log('MediaRecorder started successfully')
-          
-          // Stop after 5 seconds to create first chunk
-          setTimeout(() => {
-            if (mediaRecorder.state === 'recording') {
-              console.log('Stopping first recording chunk')
-              mediaRecorder.stop()
-            }
-          }, 5000) // First 5-second chunk
-        } else {
-          console.warn('MediaRecorder is not in inactive state:', mediaRecorder.state)
-        }
-      } catch (startError) {
-        console.error('Error starting MediaRecorder:', startError)
-        throw new Error(`Failed to start audio recording: ${startError}`)
-      }
+      setMicPermission('granted')
 
     } catch (error) {
       console.error('Error starting session:', error)
-      if (error instanceof Error && error.name === 'NotAllowedError') {
-        setMicPermission('denied')
-      }
+      setSTTError('Failed to start session')
     } finally {
       setIsInitializing(false)
     }
@@ -588,7 +310,7 @@ export default function HostDashboard() {
     if (!sessionId || !user) return
 
     try {
-      // First, immediately set recording to false to stop new STT calls
+      // First, immediately set recording to false to stop STT
       setIsRecording(false)
       
       // Clear auto-stop timer
@@ -596,21 +318,6 @@ export default function HostDashboard() {
         clearTimeout(autoStopTimerRef.current)
         autoStopTimerRef.current = null
       }
-      
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
-      }
-      
-      // Stop media stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-        streamRef.current = null
-      }
-      
-      // Clean up MediaRecorder reference
-      mediaRecorderRef.current = null
-      chunksRef.current = []
 
       // End session via API
       const response = await fetch(`/api/session/${sessionId}/end`, {
@@ -635,6 +342,7 @@ export default function HostDashboard() {
       setParticipantCount(0)
       setHasActiveSession(false)
       setTranscript([])
+      setCurrentPartialText("")
       
     } catch (error) {
       console.error('Error stopping session:', error)
@@ -774,9 +482,6 @@ export default function HostDashboard() {
                   <Button onClick={handleResumeSession} variant="outline" size="sm">
                     View Session
                   </Button>
-                  <Button onClick={resumeRecording} size="sm">
-                    Resume Recording
-                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -878,18 +583,58 @@ export default function HostDashboard() {
                       {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                     </Button>
                   </CardTitle>
+                  
+                  {/* Real-time STT Status */}
+                  {sessionId && (
+                    <div className="mt-2">
+                      <RealtimeSTT
+                        sessionId={sessionId}
+                        isRecording={isRecording}
+                        onTranscriptUpdate={handleTranscriptUpdate}
+                        onError={handleSTTError}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* STT Error Display */}
+                  {sttError && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center space-x-2 text-red-800">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">STT Error</span>
+                      </div>
+                      <p className="text-red-700 text-sm mt-1">{sttError}</p>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-64 overflow-y-auto space-y-2">
+                    {/* Current partial text (real-time preview) */}
+                    {currentPartialText && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-xs text-blue-600 mb-1 flex items-center">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-2"></div>
+                          Speaking... (live preview)
+                        </div>
+                        <div className="text-gray-700 italic">{currentPartialText}</div>
+                      </div>
+                    )}
+                    
+                    {/* Final transcripts */}
                     {transcript.map((line) => (
                       <div key={line.id} className="p-3 bg-gray-50 rounded-lg">
                         <div className="text-xs text-gray-500 mb-1">{line.timestamp}</div>
                         <div className="text-gray-900">{line.text}</div>
                       </div>
                     ))}
-                    {transcript.length === 0 && (
+                    
+                    {transcript.length === 0 && !currentPartialText && (
                       <div className="text-center text-gray-500 py-8">
-                        Start speaking to see live transcript...
+                        <div className="space-y-2">
+                          <Mic className="h-8 w-8 mx-auto text-gray-400" />
+                          <p>Real-time transcription ready...</p>
+                          <p className="text-xs">Start speaking to see live transcript</p>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -49,7 +49,8 @@ CREATE TABLE transcripts (
   translated_text TEXT,
   target_language TEXT,
   speaker_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_final BOOLEAN DEFAULT false
 );
 
 -- Create user_sessions table (for saved sessions)
@@ -72,6 +73,7 @@ CREATE INDEX idx_session_participants_user_id ON session_participants(user_id);
 CREATE INDEX idx_transcripts_session_id ON transcripts(session_id);
 CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX idx_user_sessions_session_id ON user_sessions(session_id);
+CREATE INDEX idx_transcripts_final ON transcripts(session_id, is_final) WHERE is_final = true;
 
 -- Create RLS (Row Level Security) policies
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
