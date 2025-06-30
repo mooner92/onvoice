@@ -5,24 +5,24 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
-  Users, 
-  Clock, 
+  AlertCircle, 
   Globe, 
   Mic, 
+  Users, 
+  Clock, 
+  User, 
   Settings,
-  User,
   Loader2,
-  AlertCircle,
   X
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { LoginButton } from "@/components/auth/LoginButton"
 import { createClient } from "@/lib/supabase"
-import { Session, Transcript } from "@/lib/types"
+import { Session } from "@/lib/types"
 
 interface TranscriptLine {
   id: string
@@ -56,17 +56,15 @@ export default function PublicSessionPage() {
     return 'ko' // Default fallback
   }
 
-  const [selectedLanguage, setSelectedLanguage] = useState('ko')
+  const [translationEnabled, setTranslationEnabled] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState(() => getUserPreferredLanguage())
   const [fontSize, setFontSize] = useState([18])
   const [darkMode, setDarkMode] = useState(false)
-  const [, ] = useState(true)
   const [showTimestamps, setShowTimestamps] = useState(true)
-  const [translationEnabled, setTranslationEnabled] = useState(false)
-  const [isTranslating, setIsTranslating] = useState(false)
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [showSettings, setShowSettings] = useState(false)
-  const [session, setSession] = useState<Session | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -253,7 +251,7 @@ export default function PublicSessionPage() {
         },
         (payload) => {
           console.log('New transcript received:', payload.new)
-          const newTranscript = payload.new as any
+          const newTranscript = payload.new as { original_text: string }
           
           // Use the new efficient update function
           handleTranscriptUpdate(newTranscript.original_text, false)
@@ -309,56 +307,6 @@ export default function PublicSessionPage() {
       supabase.removeChannel(channel)
     }
   }, [sessionId, supabase, updateParticipantCount])
-
-  // Translation function using API
-  const translateText = async (text: string, targetLang: string): Promise<string> => {
-    if (!translationEnabled || targetLang === 'en') return text
-    
-    try {
-      setIsTranslating(true)
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          targetLanguage: targetLang,
-          sourceLanguage: session?.primary_language || 'auto'
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        return data.translatedText || data.translation || text
-      } else {
-        console.error('Translation failed:', response.status, response.statusText)
-        // Return mock translation as fallback
-        return getMockTranslation(text, targetLang)
-      }
-    } catch (error) {
-      console.error('Translation error:', error)
-      // Return mock translation as fallback
-      return getMockTranslation(text, targetLang)
-    } finally {
-      setIsTranslating(false)
-    }
-  }
-
-  // Simple mock translation for immediate display
-  const getMockTranslation = (text: string, targetLang: string): string => {
-    if (!translationEnabled || targetLang === 'en') return text
-    
-    const mockTranslations: { [key: string]: string } = {
-      'ko': `[한국어] ${text}`,
-      'ja': `[日本語] ${text}`,
-      'zh': `[中文] ${text}`,
-      'es': `[Español] ${text}`,
-      'fr': `[Français] ${text}`,
-    }
-    
-    return mockTranslations[targetLang] || text
-  }
 
   // Debounced translation cache
   const translationCache = useRef<Map<string, string>>(new Map())
@@ -451,7 +399,8 @@ export default function PublicSessionPage() {
     if (transcript.length > 0) {
       translateBatch()
     }
-  }, [selectedLanguage, translationEnabled, translateTextEfficient])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLanguage, translationEnabled])
 
   // Clear cache when translation is disabled
   useEffect(() => {
@@ -460,6 +409,21 @@ export default function PublicSessionPage() {
       pendingTranslations.current.clear()
     }
   }, [translationEnabled])
+
+  // Simple mock translation for immediate display
+  const getMockTranslation = (text: string, targetLang: string): string => {
+    if (!translationEnabled || targetLang === 'en') return text
+    
+    const mockTranslations: { [key: string]: string } = {
+      'ko': `[한국어] ${text}`,
+      'ja': `[日本語] ${text}`,
+      'zh': `[中文] ${text}`,
+      'es': `[Español] ${text}`,
+      'fr': `[Français] ${text}`,
+    }
+    
+    return mockTranslations[targetLang] || text
+  }
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
 
@@ -651,9 +615,6 @@ export default function PublicSessionPage() {
                     <Label htmlFor="translationEnabled" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       Enable Translation
                     </Label>
-                    {isTranslating && (
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                    )}
                   </div>
                 </div>
                 
@@ -839,9 +800,6 @@ export default function PublicSessionPage() {
                         <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                           ({selectedLang.flag} {selectedLang.name})
                         </span>
-                      )}
-                      {isTranslating && (
-                        <Loader2 className="h-3 w-3 animate-spin text-green-600" />
                       )}
                     </CardTitle>
                     <Button 
