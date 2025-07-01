@@ -34,9 +34,9 @@ export default function HomePage() {
               </Link>
               {user ? (
                 <>
-                  <Link href="/my-sessions" className="text-gray-600 hover:text-blue-600">
-                    My Sessions
-                  </Link>
+              <Link href="/my-sessions" className="text-gray-600 hover:text-blue-600">
+                My Sessions
+              </Link>
                   <Link href="/host" className="text-gray-600 hover:text-blue-600">
                     Host Session
                   </Link>
@@ -55,7 +55,7 @@ export default function HomePage() {
                     </div>
                     <Button variant="outline" size="sm" onClick={signOut}>
                       <LogOut className="h-4 w-4" />
-                    </Button>
+              </Button>
                   </div>
                 </>
               ) : (
@@ -155,18 +155,18 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {user ? (
               <>
-                <Button size="lg" asChild className="text-lg px-8 py-3">
-                  <Link href="/host">
-                    <Mic className="mr-2 h-5 w-5" />
-                    Start as Host
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild className="text-lg px-8 py-3 bg-transparent">
-                  <Link href="/demo">
-                    <QrCode className="mr-2 h-5 w-5" />
-                    Try Demo
-                  </Link>
-                </Button>
+            <Button size="lg" asChild className="text-lg px-8 py-3">
+              <Link href="/host">
+                <Mic className="mr-2 h-5 w-5" />
+                Start as Host
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild className="text-lg px-8 py-3 bg-transparent">
+              <Link href="/demo">
+                <QrCode className="mr-2 h-5 w-5" />
+                Try Demo
+              </Link>
+            </Button>
               </>
             ) : (
               <div className="flex flex-col items-center space-y-4">

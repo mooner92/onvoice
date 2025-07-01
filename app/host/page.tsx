@@ -49,17 +49,18 @@ export default function HostDashboard() {
   // Refs for cleanup
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const languages = [
-    { code: "en", name: "English" },
-    { code: "es", name: "Spanish" },
-    { code: "fr", name: "French" },
-    { code: "de", name: "German" },
-    { code: "it", name: "Italian" },
-    { code: "pt", name: "Portuguese" },
-    { code: "ru", name: "Russian" },
-    { code: "ja", name: "Japanese" },
-    { code: "ko", name: "Korean" },
-    { code: "zh", name: "Chinese" },
+  const sttLanguages = [
+    { code: 'auto', name: 'Auto-detect (Recommended)' },
+    { code: 'en-US', name: 'English' },
+    { code: 'es-ES', name: 'Spanish' },
+    { code: 'fr-FR', name: 'French' },
+    { code: 'de-DE', name: 'German' },
+    { code: 'it-IT', name: 'Italian' },
+    { code: 'pt-PT', name: 'Portuguese' },
+    { code: 'ru-RU', name: 'Russian' },
+    { code: 'ja-JP', name: 'Japanese' },
+    { code: 'ko-KR', name: 'Korean' },
+    { code: 'zh-CN', name: 'Chinese' },
   ]
 
   // Check if user is authenticated
@@ -315,6 +316,24 @@ export default function HostDashboard() {
       // First, immediately set recording to false to stop STT
       setIsRecording(false)
       
+      // Immediately call STT stream end API to persist transcript
+      if (sessionId) {
+        try {
+          const sttEndResp = await fetch('/api/stt-stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'end',
+              sessionId
+            })
+          })
+          const sttEndData = await sttEndResp.json()
+          console.log('STT stream end result:', sttEndData)
+        } catch (sttErr) {
+          console.error('Failed to end STT stream:', sttErr)
+        }
+      }
+
       // Clear auto-stop timer
       if (autoStopTimerRef.current) {
         clearTimeout(autoStopTimerRef.current)
@@ -536,16 +555,13 @@ export default function HostDashboard() {
 
                 <div className="space-y-2">
                   <Label>Primary Language (Optional)</Label>
-                  <Select value={primaryLanguage} onValueChange={setPrimaryLanguage} disabled={isRecording}>
+                  <Select value={primaryLanguage} onValueChange={setPrimaryLanguage}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="auto">Auto-detect (Recommended)</SelectItem>
-                      {languages.map((lang) => (
-                        <SelectItem key={lang.code} value={lang.code}>
-                          {lang.name}
-                        </SelectItem>
+                      {sttLanguages.map(lang => (
+                        <SelectItem key={lang.code} value={lang.code}>{lang.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -599,6 +615,7 @@ export default function HostDashboard() {
                         isRecording={isRecording}
                         onTranscriptUpdate={handleTranscriptUpdate}
                         onError={handleSTTError}
+                        lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
                       />
                     </div>
                   )}

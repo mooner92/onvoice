@@ -38,13 +38,14 @@ export async function POST(req: NextRequest) {
           fullTranscript: '',
           lastUpdate: new Date()
         })
-        console.log(`Session ${sessionId} started/reinitialized`)
+        console.log(`✅ Session ${sessionId} started/reinitialized`)
         return NextResponse.json({ success: true })
 
       case 'transcript':
         // Update session transcript
         const session = activeSessions.get(sessionId)
         if (!session) {
+          console.error(`❌ Session ${sessionId} not found for transcript update`)
           return NextResponse.json(
             { error: "Session not found" },
             { status: 404 }
@@ -55,7 +56,33 @@ export async function POST(req: NextRequest) {
           // Only append final transcripts (not partial)
           session.fullTranscript += transcript + ' '
           session.lastUpdate = new Date()
-          console.log(`Transcript updated for session ${sessionId}:`, transcript)
+          console.log(`📝 Transcript added to session ${sessionId}:`, transcript)
+          console.log(`📊 Current full transcript length:`, session.fullTranscript.length)
+
+          // Save EACH final sentence immediately to Supabase
+          const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
+
+          const { data, error: insertError } = await supabase
+            .from("transcripts")
+            .insert([
+              {
+                session_id: sessionId,
+                timestamp: new Date().toLocaleTimeString(),
+                original_text: transcript.trim(),
+                created_at: new Date().toISOString(),
+                is_final: true
+              }
+            ])
+            .select()
+
+          if (insertError) {
+            console.error("❌ DB insert error (per sentence):", insertError)
+          } else {
+            console.log("✅ Sentence saved (id):", data?.[0]?.id)
+          }
         }
 
         return NextResponse.json({ 
@@ -64,67 +91,10 @@ export async function POST(req: NextRequest) {
         })
 
       case 'end':
-        // Save final transcript to database
-        const finalSession = activeSessions.get(sessionId)
-        if (!finalSession) {
-          console.log(`Session ${sessionId} not found for ending (may have been already ended)`)
-          return NextResponse.json({ 
-            success: true, 
-            message: 'Session already ended or not found',
-            finalTranscript: '',
-            sentenceCount: 0
-          })
-        }
-
-        // Process and save to database
-        const finalTranscript = finalSession.fullTranscript.trim()
-        
-        if (finalTranscript) {
-          // Split into sentences and clean up
-          const sentences = finalTranscript
-            .split(/[.!?]+/)
-            .map(s => s.trim())
-            .filter(s => s.length > 0)
-            .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-            .join('.\n') + '.'
-
-          console.log(`Saving final transcript for session ${sessionId}:`, {
-            originalLength: finalTranscript.length,
-            sentenceCount: sentences.split('\n').length
-          })
-
-          // Save to Supabase
-          const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          )
-
-          const { error: dbError } = await supabase
-            .from("transcripts")
-            .insert([
-              {
-                session_id: sessionId,
-                timestamp: new Date().toLocaleTimeString(),
-                original_text: sentences,
-                created_at: new Date().toISOString(),
-                is_final: true
-              },
-            ])
-
-          if (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
-
-        // Clean up memory
-        activeSessions.delete(sessionId)
-        console.log(`Session ${sessionId} ended and cleaned up`)
-
-        return NextResponse.json({ 
-          success: true,
-          finalTranscript,
-          sentenceCount: finalTranscript ? finalTranscript.split('\n').length : 0
-        })
+        // End session and clean up memory
+        const ended = activeSessions.delete(sessionId)
+        console.log(`🧹 Session ${sessionId} memory cleanup (${ended ? 'removed' : 'not found'})`)
+        return NextResponse.json({ success: true, cleaned: ended })
 
       default:
         return NextResponse.json(
@@ -134,9 +104,9 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error) {
-    console.error("STT Stream API error:", error)
+    console.error("❌ STT Stream API error:", error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
@@ -165,7 +135,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       transcript: session.fullTranscript,
-      lastUpdate: session.lastUpdate
+      lastUpdate: session.lastUpdate,
+      length: session.fullTranscript.length
     })
 
   } catch (error) {

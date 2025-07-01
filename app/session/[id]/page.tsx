@@ -219,7 +219,7 @@ export default function SessionPage() {
           is_premium: false
         })
 
-      setIsSaved(true)
+    setIsSaved(true)
     } catch (error) {
       console.error('Error saving session:', error)
     }
@@ -258,7 +258,7 @@ export default function SessionPage() {
               <div>
                 <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   {session?.title || `Session ${sessionId}`}
-                </span>
+              </span>
                 <div className="flex items-center space-x-2 text-xs text-gray-500">
                   <Users className="h-3 w-3" />
                   <span>{participantCount}</span>
@@ -311,18 +311,18 @@ export default function SessionPage() {
             </div>
 
             {/* Font Size */}
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Font Size: {fontSize[0]}px
-              </Label>
-              <Slider
-                value={fontSize}
-                onValueChange={setFontSize}
+                </Label>
+                <Slider
+                  value={fontSize}
+                  onValueChange={setFontSize}
                 max={32}
                 min={12}
                 step={2}
-                className="w-full"
-              />
+                  className="w-full"
+                />
             </div>
 
             {/* Display Options */}
@@ -338,7 +338,7 @@ export default function SessionPage() {
                 <Label htmlFor="darkMode" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Dark Mode
                 </Label>
-              </div>
+                </div>
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -350,7 +350,7 @@ export default function SessionPage() {
                 <Label htmlFor="autoScroll" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Auto Scroll
                 </Label>
-              </div>
+                </div>
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -389,7 +389,7 @@ export default function SessionPage() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Original
+              Original
           </button>
           <button
             onClick={() => setActiveTab("translated")}
@@ -399,22 +399,22 @@ export default function SessionPage() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            {selectedLang?.flag} {selectedLang?.name}
+              {selectedLang?.flag} {selectedLang?.name}
           </button>
-        </div>
+                </div>
 
         {/* Transcript Content */}
         <div className="space-y-2">
-          {transcript.length === 0 ? (
+              {transcript.length === 0 ? (
             <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               <Mic className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Waiting for the speaker to start...</p>
               <p className="text-sm mt-2">The transcript will appear here in real-time</p>
-            </div>
-          ) : (
+                </div>
+              ) : (
             getTabContent(activeTab as 'original' | 'translated')
           )}
-        </div>
+                </div>
       </div>
 
       {/* App Installation Prompt */}
@@ -427,11 +427,11 @@ export default function SessionPage() {
             <div className="flex space-x-2">
               <Button size="sm" className="flex-1">
                 Download App
-              </Button>
+                </Button>
               <Button size="sm" variant="outline" onClick={() => setShowAppPrompt(false)}>
                 Dismiss
-              </Button>
-            </div>
+                </Button>
+              </div>
           </div>
         </div>
       )}

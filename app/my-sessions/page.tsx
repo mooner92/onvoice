@@ -123,7 +123,7 @@ export default function MySessionsPage() {
       return "bg-blue-100 text-blue-800"
     }
     
-    return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800"
   }
 
   const getStatusText = (session: SavedSession) => {
@@ -152,7 +152,7 @@ export default function MySessionsPage() {
     }
     
     if (session.is_premium) {
-      return <Crown className="h-3 w-3" />
+        return <Crown className="h-3 w-3" />
     }
     
     return null
@@ -246,8 +246,8 @@ export default function MySessionsPage() {
               {userProfile?.subscription_status !== 'premium' && (
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={upgradeToPremium}>
                   <Crown className="mr-2 h-4 w-4" />
-                  Upgrade to Premium
-                </Button>
+                Upgrade to Premium
+              </Button>
               )}
             </div>
           </CardContent>
@@ -329,34 +329,34 @@ export default function MySessionsPage() {
             </div>
           ) : (
             displaySessions.map((session: SavedSession) => (
-              <Card key={session.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{session.title}</h3>
+            <Card key={session.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{session.title}</h3>
                         <Badge className={`text-xs ${getStatusColor(session)}`}>
-                          <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1">
                             {getStatusIcon(session)}
                             <span>{getStatusText(session)}</span>
-                          </div>
-                        </Badge>
-                      </div>
+                        </div>
+                      </Badge>
+                    </div>
 
                       <p className="text-gray-600 mb-3">
                         {session.role === 'speaker' ? 'You hosted this session' : `by ${session.host_name}`}
                       </p>
 
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="h-4 w-4" />
                           <span>{new Date(session.created_at).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Clock className="h-4 w-4" />
                           <span>{session.transcript_count} words</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
+                      </div>
+                      <div className="flex items-center space-x-1">
                           <span>{session.primary_language}</span>
                         </div>
                         {session.role === 'audience' && session.expires_at && (
@@ -367,10 +367,10 @@ export default function MySessionsPage() {
                                 : 'Expired'
                               }
                             </span>
-                          </div>
-                        )}
                       </div>
+                        )}
                     </div>
+                  </div>
 
                     <div className="flex items-center space-x-2">
                       {activeTab === 'live' ? (
@@ -378,16 +378,16 @@ export default function MySessionsPage() {
                           <Link href={`/session/${session.original_id || session.id}`}>
                             <Play className="h-4 w-4" />
                           </Link>
-                        </Button>
-                      ) : (
+                      </Button>
+                    ) : (
                         <Button size="sm" variant="outline" asChild>
                           <Link href={`/session/${session.original_id || session.id}/transcript`}>
                             <FileText className="h-4 w-4" />
                           </Link>
                         </Button>
                       )}
-                      <Button size="sm" variant="outline">
-                        <Download className="h-4 w-4" />
+                        <Button size="sm" variant="outline">
+                          <Download className="h-4 w-4" />
                       </Button>
                       {session.role === 'audience' && (
                         <Button 
@@ -398,11 +398,11 @@ export default function MySessionsPage() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
             ))
           )}
         </div>
@@ -410,16 +410,16 @@ export default function MySessionsPage() {
         {/* Premium Features */}
         {userProfile?.subscription_status !== 'premium' && (
           <Card className="mt-8 border-purple-200 bg-purple-50">
-            <CardHeader>
+          <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Crown className="h-5 w-5 text-purple-600" />
-                <span>Upgrade to Premium</span>
-              </CardTitle>
+              <span>Upgrade to Premium</span>
+            </CardTitle>
               <CardDescription>
                 Get unlimited access to all your sessions and premium features
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div className="flex items-center space-x-2">
                   <Zap className="h-4 w-4 text-purple-600" />
@@ -428,7 +428,7 @@ export default function MySessionsPage() {
                 <div className="flex items-center space-x-2">
                   <Users className="h-4 w-4 text-purple-600" />
                   <span className="text-sm">AI-powered summaries</span>
-                </div>
+              </div>
                 <div className="flex items-center space-x-2">
                   <Download className="h-4 w-4 text-purple-600" />
                   <span className="text-sm">Export in multiple formats</span>
@@ -438,8 +438,8 @@ export default function MySessionsPage() {
                 <Crown className="mr-2 h-4 w-4" />
                 Upgrade Now - £5.99/month
               </Button>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         )}
       </div>
     </div>

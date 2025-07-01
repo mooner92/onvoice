@@ -7,568 +7,408 @@ interface RealtimeSTTProps {
   isRecording: boolean
   onTranscriptUpdate: (transcript: string, isPartial: boolean) => void
   onError: (error: string) => void
+  lang?: string
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: any
+    webkitSpeechRecognition: any
+  }
 }
 
 export function RealtimeSTT({ 
   sessionId, 
   isRecording, 
   onTranscriptUpdate, 
-  onError 
+  onError,
+  lang = 'en-US'
 }: RealtimeSTTProps) {
-  const [deepgramSocket, setDeepgramSocket] = useState<WebSocket | null>(null)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [isMockMode, setIsMockMode] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'failed'>('disconnected')
-  const cleanupRef = useRef(false)
-  const mockIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const initializationRef = useRef(false) // Prevent duplicate initialization
-  const sessionInitializedRef = useRef<string | null>(null) // Track which session was initialized
+  const [isListening, setIsListening] = useState(false)
+  const [isSupported, setIsSupported] = useState(false)
+  const [hasPermission, setHasPermission] = useState(false)
+  const [status, setStatus] = useState('Initializing...')
+  
+  const recognitionRef = useRef<any>(null)
+  const currentSessionRef = useRef<string | null>(null)
+  const isActiveRef = useRef(false)
+  const mountedRef = useRef(true)
+  const finalizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const accumulatedTextRef = useRef<string>('')
 
-  // Initialize session when component mounts and recording starts
+  // Track props changes for debugging
   useEffect(() => {
-    if (sessionId && isRecording && !isInitialized && !initializationRef.current) {
-      // Check if this is a different session
-      if (sessionInitializedRef.current !== sessionId) {
-        console.log('Initializing RealtimeSTT for session:', sessionId)
-        initializationRef.current = true
-        sessionInitializedRef.current = sessionId
-        setIsInitialized(true)
-        initializeSession()
+    console.log('🎯 RealtimeSTT Props Update:', {
+      sessionId,
+      isRecording,
+      timestamp: new Date().toLocaleTimeString()
+    })
+  }, [sessionId, isRecording])
+
+  // Cleanup function
+  const cleanup = () => {
+    console.log('🧹 Cleaning up recognition...')
+    isActiveRef.current = false
+    setIsListening(false)
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch (e) {
+        // Silent cleanup
       }
+      recognitionRef.current = null
     }
     
-    // Cleanup when recording stops or session changes
-    if ((!isRecording && isInitialized) || (sessionInitializedRef.current && sessionInitializedRef.current !== sessionId)) {
-      console.log('Recording stopped or session changed, cleaning up RealtimeSTT')
+    if (finalizeTimeoutRef.current) {
+      clearTimeout(finalizeTimeoutRef.current)
+      finalizeTimeoutRef.current = null
+    }
+    
+    accumulatedTextRef.current = ''
+  }
+
+  // Component cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
       cleanup()
     }
-    
-    return () => {
-      if (isInitialized) {
-        cleanup()
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, isRecording, isInitialized])
+  }, [])
 
-  const initializeSession = async () => {
-    if (cleanupRef.current) {
-      console.log('Cleanup in progress, skipping initialization')
+  // Check browser support
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    
+    if (SpeechRecognition) {
+      setIsSupported(true)
+      setStatus('Ready to start')
+      console.log('✅ Speech Recognition supported')
+    } else {
+      setIsSupported(false)
+      setStatus('Not supported')
+      onError('Speech recognition not supported. Please use Chrome or Edge.')
+      console.log('❌ Speech Recognition not supported')
+    }
+  }, [onError])
+
+  // Request microphone permission
+  const requestMicrophonePermission = async () => {
+    try {
+      console.log('🎤 Requesting microphone permission...')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach(track => track.stop())
+      setHasPermission(true)
+      setStatus('Permission granted')
+      console.log('✅ Microphone permission granted')
+      return true
+    } catch (error) {
+      console.error('❌ Microphone permission denied:', error)
+      setHasPermission(false)
+      setStatus('Permission denied')
+      onError('Microphone permission denied. Please allow microphone access.')
+      return false
+    }
+  }
+
+  // Start speech recognition
+  const startSpeechRecognition = async () => {
+    if (!mountedRef.current || !isSupported) {
+      console.log('❌ Cannot start: component unmounted or not supported')
+      return
+    }
+
+    if (!hasPermission) {
+      const granted = await requestMicrophonePermission()
+      if (!granted) return
+    }
+
+    // Prevent duplicate starts
+    if (recognitionRef.current || isListening) {
+      console.log('⚠️ Recognition already running')
       return
     }
 
     try {
-      console.log('Starting STT session for:', sessionId)
+      console.log('🚀 Starting new recognition instance...')
       
-      // Initialize session in API
-      const response = await fetch('/api/stt-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'start',
-          sessionId
-        })
-      })
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+      
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = lang
 
-      if (!response.ok) {
-        throw new Error(`Failed to start session: ${response.status}`)
+      recognition.onstart = () => {
+        if (!mountedRef.current) return
+        console.log('🎤 Recognition started')
+        setIsListening(true)
+        setStatus('Listening...')
       }
 
-      console.log('Session started successfully, setting up audio')
-      
-      // Setup audio connection
-      await setupDeepgram()
-      
-    } catch (error) {
-      console.error('Failed to initialize session:', error)
-      onError('Failed to start real-time transcription')
-    } finally {
-      // Reset initialization flag after setup
-      setTimeout(() => {
-        initializationRef.current = false
-      }, 1000)
-    }
-  }
-
-  const setupDeepgram = async () => {
-    if (cleanupRef.current) return
-
-    try {
-      setConnectionStatus('connecting')
-      
-      // Check if Deepgram API key is available
-      const deepgramApiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
-      
-      console.log('🔍 CRITICAL DEBUG - Environment check:', {
-        hasApiKey: !!deepgramApiKey,
-        keyLength: deepgramApiKey?.length,
-        keyPrefix: deepgramApiKey?.substring(0, 12),
-        keySuffix: deepgramApiKey?.substring(-8),
-        fullKey: deepgramApiKey, // Show full key in development for debugging
-        allEnvVars: Object.keys(process.env).filter(key => key.includes('DEEPGRAM')),
-        processEnv: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
-        nodeEnv: process.env.NODE_ENV
-      })
-      
-      // More lenient API key validation - Deepgram keys can vary in length
-      if (!deepgramApiKey || deepgramApiKey === 'demo' || deepgramApiKey.trim().length < 10) {
-        console.log('❌ Deepgram API key not properly configured, using mock mode')
-        setConnectionStatus('failed')
-        setIsMockMode(true)
-        await setupMockSTT()
-        return
-      }
-
-      console.log('✅ Deepgram API key looks valid, attempting connection...')
-      console.log('🔗 But using OpenAI Whisper instead due to Deepgram Flexible plan limitations')
-
-      // Get microphone stream first
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      })
-      
-      if (cleanupRef.current) {
-        stream.getTracks().forEach(track => track.stop())
-        return
-      }
-      
-      streamRef.current = stream
-      console.log('🎤 Microphone access granted')
-
-      // Skip Deepgram WebSocket and use OpenAI Whisper directly
-      console.log('🤖 Starting OpenAI Whisper STT (Deepgram Flexible plan limitation)')
-      setConnectionStatus('connected')
-      setIsMockMode(false)
-      
-      startOpenAIWhisperSTT(stream)
-    } catch (error) {
-      console.error('❌ Failed to setup Deepgram:', error)
-      console.error('🔍 Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      })
-      if (!cleanupRef.current) {
-        setConnectionStatus('failed')
-        setIsMockMode(true)
-        setupMockSTT()
-      }
-    }
-  }
-
-  const setupMockSTT = async () => {
-    if (cleanupRef.current || mockIntervalRef.current) {
-      console.log('Mock STT already running or cleanup in progress')
-      return
-    }
-    
-    try {
-      console.log('🎭 Setting up Mock STT mode')
-      
-      // Get microphone stream for visual feedback (but don't actually use it for STT)
-      try {
-        if (!streamRef.current) {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-          
-          if (cleanupRef.current) {
-            stream.getTracks().forEach(track => track.stop())
-            return
-          }
-          
-          streamRef.current = stream
-          console.log('🎤 Microphone access granted for mock mode')
-        }
-      } catch (micError) {
-        console.warn('⚠️ Microphone access failed, using mock mode without mic:', micError)
-        // Continue without microphone - mock mode doesn't actually need it
-      }
-      
-      // Mock STT with realistic text - but only if user wants demo
-      const shouldRunMockText = confirm('Deepgram STT failed to connect. Would you like to see a demo with sample text instead?')
-      
-      if (!shouldRunMockText) {
-        console.log('User declined demo mode, staying in disconnected state')
-        setIsMockMode(false)
-        setConnectionStatus('failed')
-        return
-      }
-
-      setIsMockMode(true)
-      setConnectionStatus('connected')
-
-      const mockTexts = [
-        "Welcome to today's live lecture session",
-        "We are using real-time transcription technology", 
-        "This is a demonstration of the speech-to-text system",
-        "The transcription appears as you speak",
-        "Multiple languages are supported by the platform",
-        "Participants can follow along in real-time",
-        "Configure your Deepgram API key for production use",
-        "This mock mode helps you test the interface"
-      ]
-
-      let textIndex = 0
-      const mockInterval = setInterval(() => {
-        if (cleanupRef.current || !isRecording) {
-          clearInterval(mockInterval)
-          mockIntervalRef.current = null
-          return
-        }
-
-        const text = mockTexts[textIndex % mockTexts.length]
+      recognition.onend = () => {
+        if (!mountedRef.current) return
+        console.log('🛑 Recognition ended')
+        setIsListening(false)
+        recognitionRef.current = null
         
-        // Simulate progressive typing for partial results
-        const words = text.split(' ')
-        let partialText = ''
-        
-        // Send partial updates word by word
-        const wordInterval = setInterval(() => {
-          if (cleanupRef.current || !isRecording) {
-            clearInterval(wordInterval)
-            return
-          }
-          
-          if (partialText === '') {
-            partialText = words[0] || ''
-          } else if (partialText !== text) {
-            const currentWords = partialText.split(' ').length
-            if (currentWords < words.length) {
-              partialText = words.slice(0, currentWords + 1).join(' ')
+        // Auto-restart only if still active
+        if (isActiveRef.current && currentSessionRef.current) {
+          setStatus('Restarting...')
+          setTimeout(() => {
+            if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+              startSpeechRecognition()
             }
+          }, 500)
+        } else {
+          setStatus('Ready to start')
+        }
+      }
+
+      recognition.onerror = (event: any) => {
+        if (!mountedRef.current) return
+        console.log('⚠️ Recognition event:', event.error)
+        setIsListening(false)
+        recognitionRef.current = null
+        
+        if (event.error === 'not-allowed') {
+          setHasPermission(false)
+          setStatus('Permission denied')
+          isActiveRef.current = false
+        } else {
+          // For other errors, try to restart
+          if (isActiveRef.current && currentSessionRef.current) {
+            setStatus('Restarting...')
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                startSpeechRecognition()
+              }
+            }, 1000)
           }
+        }
+      }
+
+      recognition.onresult = (event: any) => {
+        if (!mountedRef.current) return
+        
+        let currentTranscript = ''
+        let isFinalResult = false
+
+        // Process all results from the current recognition
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i]
+          const transcript = result[0].transcript
+
+          if (result.isFinal) {
+            isFinalResult = true
+          }
+          currentTranscript += transcript + ' '
+        }
+
+        currentTranscript = currentTranscript.trim()
+        
+        if (currentTranscript) {
+          // Clear any existing timeout
+          if (finalizeTimeoutRef.current) {
+            clearTimeout(finalizeTimeoutRef.current)
+            finalizeTimeoutRef.current = null
+          }
+
+          // Accumulate text
+          if (isFinalResult) {
+            accumulatedTextRef.current += ' ' + currentTranscript
+            accumulatedTextRef.current = accumulatedTextRef.current.trim()
+          }
+
+          // Show interim results (accumulated + current)
+          const displayText = isFinalResult 
+            ? accumulatedTextRef.current 
+            : (accumulatedTextRef.current + ' ' + currentTranscript).trim()
           
-          // Send partial update
-          if (partialText && partialText !== text) {
-            onTranscriptUpdate(partialText, true)
-          } else {
-            // Send final update
-            clearInterval(wordInterval)
-            onTranscriptUpdate(text, false)
-            
-            // Send to API (only once per text)
-            fetch('/api/stt-stream', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'transcript',
-                sessionId,
-                transcript: text,
-                isPartial: false
-              })
-            }).catch(err => console.error('Failed to send mock transcript:', err))
+          onTranscriptUpdate(displayText, true) // Always show as partial first
+
+          if (isFinalResult) {
+            // Wait 1.5 seconds of silence before finalizing
+            finalizeTimeoutRef.current = setTimeout(() => {
+              if (accumulatedTextRef.current) {
+                console.log('📝 Finalizing transcript:', accumulatedTextRef.current)
+                onTranscriptUpdate(accumulatedTextRef.current, false)
+                
+                // Save to database
+                if (currentSessionRef.current) {
+                  fetch('/api/stt-stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'transcript',
+                      sessionId: currentSessionRef.current,
+                      transcript: accumulatedTextRef.current,
+                      isPartial: false
+                    })
+                  }).then(() => {
+                    console.log('💾 Transcript saved to DB')
+                  }).catch(error => {
+                    console.error('❌ Failed to save transcript:', error)
+                  })
+                }
+                
+                // Reset accumulated text
+                accumulatedTextRef.current = ''
+              }
+            }, 1500) // 1.5 second delay for better sentence completion
           }
-        }, 300) // Update every 300ms for realistic typing effect
+        }
+      }
 
-        textIndex++
-      }, 4000) // New sentence every 4 seconds
+      recognitionRef.current = recognition
+      recognition.start()
       
-      mockIntervalRef.current = mockInterval
-      console.log('🎭 Mock STT started successfully')
-
     } catch (error) {
-      console.error('❌ Failed to setup mock STT:', error)
-      if (!cleanupRef.current) {
-        onError('Failed to initialize transcription system')
-      }
+      console.error('❌ Failed to start speech recognition:', error)
+      setStatus('Failed to start')
+      recognitionRef.current = null
     }
   }
 
-  const getSupportedMimeType = (): string => {
-    const mimeTypes = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-      'audio/wav'
-    ]
+  // Handle recording state changes
+  useEffect(() => {
+    console.log('🔄 Recording state changed:', { 
+      isRecording, 
+      sessionId, 
+      currentSession: currentSessionRef.current,
+      isActive: isActiveRef.current,
+      mounted: mountedRef.current 
+    })
     
-    for (const mimeType of mimeTypes) {
-      if (MediaRecorder.isTypeSupported(mimeType)) {
-        console.log('Using MIME type:', mimeType)
-        return mimeType
-      }
-    }
-    
-    console.warn('No supported MIME type found, using default')
-    return 'audio/webm'
-  }
-
-  const processAudioWithOpenAI = async (audioBlob: Blob) => {
-    if (cleanupRef.current) return
-    
-    try {
-      console.log(`🎤 Processing audio with OpenAI: ${audioBlob.size} bytes`)
-      
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'audio.webm')
-      formData.append('sessionId', sessionId)
-      
-      // Add language hint if available from session settings
-      const sessionLanguage = 'en' // Default to English for now
-      formData.append('language', sessionLanguage)
-      
-      const response = await fetch('/api/stt', {
-        method: 'POST',
-        body: formData
-      })
-      
-      if (!response.ok) {
-        throw new Error(`STT API error: ${response.status}`)
-      }
-      
-      const result = await response.json()
-      
-      if (result.transcript && result.transcript.trim()) {
-        console.log('📝 OpenAI transcript received:', result.transcript)
+    if (isRecording && sessionId) {
+      // Starting new session
+      if (currentSessionRef.current !== sessionId) {
+        currentSessionRef.current = sessionId
+        isActiveRef.current = true
         
-        // Update UI immediately
-        onTranscriptUpdate(result.transcript, false)
+        console.log('🚀 Initializing NEW session:', sessionId)
         
-        // Send to API for storage
-        await fetch('/api/stt-stream', {
+        // Initialize session in database
+        fetch('/api/stt-stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            type: 'transcript',
-            sessionId,
-            transcript: result.transcript,
-            isPartial: false
+            type: 'start',
+            sessionId
           })
+        }).then(() => {
+          console.log('✅ Session initialized in DB')
+          if (mountedRef.current && isActiveRef.current) {
+            startSpeechRecognition()
+          }
+        }).catch(error => {
+          console.error('❌ Failed to initialize session:', error)
+          onError('Failed to initialize session')
         })
       } else {
-        console.log('⚠️ Empty transcript from OpenAI')
+        console.log('⚠️ Session already active:', sessionId)
       }
       
-    } catch (error) {
-      console.error('❌ Error processing audio with OpenAI:', error)
-      // Don't throw error to avoid breaking the recording loop
-    }
-  }
-
-  const startOpenAIWhisperSTT = (stream: MediaStream) => {
-    console.log('🤖 Starting OpenAI Whisper STT...')
-    
-    setConnectionStatus('connected')
-    setIsMockMode(false)
-    
-    try {
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: getSupportedMimeType()
-      })
+    } else if (!isRecording) {
+      // Stopping session - this should ALWAYS run when isRecording becomes false
+      console.log('🛑 isRecording is now FALSE')
       
-      setMediaRecorder(mediaRecorder)
-      
-      let audioChunks: Blob[] = []
-      
-      mediaRecorder.ondataavailable = async (event) => {
-        if (cleanupRef.current) return
+      if (currentSessionRef.current) {
+        const sessionToEnd = currentSessionRef.current
+        console.log('🛑 Stopping session:', sessionToEnd)
+        console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
         
-        if (event.data.size > 0) {
-          audioChunks.push(event.data)
-          console.log('🎵 Audio chunk collected:', event.data.size, 'bytes')
-        }
-      }
-      
-      mediaRecorder.onstop = async () => {
-        if (cleanupRef.current || audioChunks.length === 0) {
-          audioChunks = []
-          return
-        }
+        // Immediately call STT stream end
+        console.log('🛑 IMMEDIATELY calling STT stream end')
         
-        const audioBlob = new Blob(audioChunks, { type: getSupportedMimeType() })
-        audioChunks = []
-        
-        // Only process if audio is substantial enough
-        if (audioBlob.size > 500) { // Reduced from 1KB to 500 bytes for faster processing
-          console.log(`🎤 Processing audio blob: ${audioBlob.size} bytes`)
-          await processAudioWithOpenAI(audioBlob)
-        } else {
-          console.log('⚠️ Skipping tiny audio chunk:', audioBlob.size, 'bytes')
-        }
-        
-        // Continue recording if still active
-        if (!cleanupRef.current && mediaRecorder && mediaRecorder.state === 'inactive') {
-          try {
-            mediaRecorder.start()
-            setTimeout(() => {
-              if (!cleanupRef.current && mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop()
-              }
-            }, 1500) // Reduced from 3000ms to 1500ms for faster response
-          } catch (err) {
-            console.error('Error restarting recording:', err)
-          }
-        }
-      }
-      
-      mediaRecorder.onerror = (event) => {
-        console.error('❌ MediaRecorder error:', event)
-      }
-      
-      // Start recording
-      mediaRecorder.start()
-      console.log('🎤 OpenAI Whisper recording started with 1.5s chunks')
-      
-      // Set up the 1.5-second interval for faster response
-      setTimeout(() => {
-        if (!cleanupRef.current && mediaRecorder && mediaRecorder.state === 'recording') {
-          mediaRecorder.stop()
-        }
-      }, 1500)
-      
-    } catch (error) {
-      console.error('❌ Error setting up OpenAI Whisper:', error)
-      // Fallback to mock mode if OpenAI setup fails
-      setConnectionStatus('failed')
-      setIsMockMode(true)
-      setupMockSTT()
-    }
-  }
-
-  const cleanup = async () => {
-    if (cleanupRef.current) {
-      console.log('Cleanup already in progress')
-      return
-    }
-    
-    cleanupRef.current = true
-    console.log('🧹 Starting RealtimeSTT cleanup for session:', sessionId)
-    
-    // Clear mock interval
-    if (mockIntervalRef.current) {
-      clearInterval(mockIntervalRef.current)
-      mockIntervalRef.current = null
-    }
-    
-    // Stop media recorder
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      try {
-        mediaRecorder.stop()
-      } catch (error) {
-        console.error('Error stopping media recorder:', error)
-      }
-    }
-
-    // Close WebSocket
-    if (deepgramSocket && deepgramSocket.readyState === WebSocket.OPEN) {
-      try {
-        deepgramSocket.close(1000, 'Session ended') // Normal closure
-      } catch (error) {
-        console.error('Error closing WebSocket:', error)
-      }
-    }
-
-    // Stop media stream
-    if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach(track => track.stop())
-        streamRef.current = null
-      } catch (error) {
-        console.error('Error stopping media stream:', error)
-      }
-    }
-
-    // End session in API (only if session was initialized)
-    if (sessionId && isInitialized && sessionInitializedRef.current === sessionId) {
-      try {
-        const response = await fetch('/api/stt-stream', {
+        fetch('/api/stt-stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'end',
-            sessionId
+            sessionId: sessionToEnd
           })
+        }).then(response => {
+          console.log('🛑 STT stream end response status:', response.status)
+          return response.json()
         })
+          .then(data => {
+            console.log('✅ STT stream ended successfully:', data)
+            if (data.saved) {
+              console.log(`📝 Transcript saved with record ID: ${data.recordId}`)
+            } else {
+              console.log(`⚠️ No transcript content was saved: ${data.message || 'No message'}`)
+            }
+          })
+          .catch(error => {
+            console.error('❌ Failed to end STT stream:', error)
+          })
         
-        if (response.ok) {
-          console.log('✅ Session ended successfully')
-        } else {
-          console.warn('⚠️ Session end returned:', response.status)
-        }
-      } catch (error) {
-        console.error('❌ Failed to end session:', error)
+        // Then cleanup
+        cleanup()
+        currentSessionRef.current = null
+        setStatus('Ready to start')
+        
+      } else {
+        console.log('⚠️ No active session to stop')
       }
     }
+  }, [isRecording, sessionId])
 
-    // Reset state
-    setDeepgramSocket(null)
-    setMediaRecorder(null)
-    setIsInitialized(false)
-    setIsMockMode(false)
-    setConnectionStatus('disconnected')
-    initializationRef.current = false
-    sessionInitializedRef.current = null
-    
-    // Small delay before allowing new initialization
-    setTimeout(() => {
-      cleanupRef.current = false
-    }, 500)
+  if (!isSupported) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <h4 className="text-sm font-medium text-red-800">Speech Recognition Not Supported</h4>
+        <p className="text-xs text-red-700 mt-1">Please use Chrome, Edge, or Safari browser.</p>
+      </div>
+    )
   }
-
-  const getStatusDisplay = () => {
-    switch (connectionStatus) {
-      case 'connecting':
-        return {
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-500',
-          text: '🔄 Connecting to STT...',
-          showSpinner: true
-        }
-      case 'connected':
-        return {
-          color: 'text-green-600',
-          bgColor: 'bg-green-500',
-          text: isMockMode ? '🎭 Demo STT Active' : '🤖 OpenAI Whisper STT Active',
-          showSpinner: false
-        }
-      case 'failed':
-        return {
-          color: 'text-orange-600',
-          bgColor: 'bg-orange-500',
-          text: '⚠️ STT Connection Failed',
-          showSpinner: false
-        }
-      default:
-        return {
-          color: 'text-red-600',
-          bgColor: 'bg-red-500',
-          text: '❌ STT Disconnected',
-          showSpinner: false
-        }
-    }
-  }
-
-  const statusDisplay = getStatusDisplay()
 
   return (
-    <div className="flex items-center space-x-2 text-sm">
-      <div className={`w-2 h-2 rounded-full ${statusDisplay.bgColor} ${statusDisplay.showSpinner ? 'animate-pulse' : ''}`} />
-      <span className={statusDisplay.color}>
-        {statusDisplay.text}
-      </span>
-      {isMockMode && (
-        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-          DEMO MODE
+    <div className="space-y-3">
+      {/* Status Display */}
+      <div className="flex items-center space-x-2 text-sm">
+        <div className={`w-3 h-3 rounded-full ${
+          isListening ? 'bg-green-500 animate-pulse' : 
+          hasPermission ? 'bg-yellow-500' : 'bg-gray-500'
+        }`} />
+        <span className={
+          isListening ? 'text-green-600 font-medium' : 
+          hasPermission ? 'text-yellow-600' : 'text-gray-600'
+        }>
+          {isListening ? '🎤 Listening' : status}
         </span>
-      )}
-      {connectionStatus === 'failed' && !isMockMode && (
-        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-          Check Network
+        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
+          Web Speech API
         </span>
+      </div>
+
+      {/* Controls */}
+      {!hasPermission && (
+        <button
+          onClick={requestMicrophonePermission}
+          className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg w-full"
+        >
+          🎤 Grant Microphone Permission
+        </button>
       )}
-      {process.env.NODE_ENV === 'development' && (
-        <span className="text-xs text-gray-400">
-          ({isInitialized ? 'Init' : 'NotInit'})
-        </span>
+      
+      {hasPermission && !isListening && isRecording && (
+        <button
+          onClick={startSpeechRecognition}
+          className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
+        >
+          ▶️ Start Recognition
+        </button>
       )}
+
+      {/* Debug Info (simplified) */}
+      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+        <div>Session: {currentSessionRef.current ? 'Active' : 'None'}</div>
+        <div>Status: {status}</div>
+        <div>Listening: {isListening ? 'Yes' : 'No'}</div>
+      </div>
     </div>
   )
 } 

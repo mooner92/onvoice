@@ -7,12 +7,20 @@ export async function POST(req: NextRequest) {
     const audio = formData.get("audio") as File
     const sessionId = formData.get("sessionId") as string
     const language = formData.get("language") as string || "auto"
+    const model = formData.get("model") as string || "whisper-1"
+    const responseFormat = formData.get("response_format") as string || "verbose_json"
+    const temperature = formData.get("temperature") as string || "0"
+    const prompt = formData.get("prompt") as string || ""
 
-    console.log('STT API called with:', {
+    console.log('🎯 Enhanced STT API called with:', {
       audioSize: audio?.size,
       audioType: audio?.type,
       sessionId,
       language,
+      model,
+      responseFormat,
+      temperature,
+      hasPrompt: !!prompt,
       timestamp: new Date().toLocaleTimeString()
     })
 
@@ -74,22 +82,27 @@ export async function POST(req: NextRequest) {
     let confidence = 0
 
     try {
-      // Call Whisper API with optimized settings
+      // Call Whisper API with enhanced settings for maximum accuracy
       const whisperFormData = new FormData()
       whisperFormData.append("file", audio, "audio.webm")
-      whisperFormData.append("model", "whisper-1")
+      whisperFormData.append("model", model) // Use specified model
       
       // Add language parameter if specified (helps with accuracy for known languages)
       if (language && language !== "auto") {
         whisperFormData.append("language", language)
         console.log(`🌍 Using language hint: ${language}`)
       } else {
-        console.log('🔍 Using auto language detection')
+        console.log('🔍 Using auto language detection for best results')
       }
       
-      whisperFormData.append("response_format", "verbose_json")
-      whisperFormData.append("temperature", "0.1") // Lower temperature for more consistent results
-      whisperFormData.append("prompt", "") // Add context if needed
+      whisperFormData.append("response_format", responseFormat)
+      whisperFormData.append("temperature", temperature) // Use specified temperature
+      
+      // Add context prompt for better transcription quality
+      if (prompt) {
+        whisperFormData.append("prompt", prompt)
+        console.log('📝 Using context prompt for better accuracy')
+      }
 
       const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
