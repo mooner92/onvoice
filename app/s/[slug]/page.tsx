@@ -171,6 +171,8 @@ export default function PublicSessionPage() {
     if (!sessionId || !user) return
 
     try {
+      console.log('🚀 Joining session:', { sessionId, userId: user.id })
+      
       // Check if user is the host of this session
       const isHost = session?.host_id === user.id
       
@@ -182,15 +184,29 @@ export default function PublicSessionPage() {
         joined_at: new Date().toISOString()
       }
 
-      await supabase
+      const { error } = await supabase
         .from('session_participants')
         .insert(participantData)
 
+      if (error && !error.message.includes('duplicate')) {
+        console.error('Error joining session:', error)
+        throw error
+      }
+
+      console.log('✅ Successfully joined session')
       setHasJoined(true)
     } catch (error) {
-      console.error('Error joining session:', error)
+      console.error('❌ Error joining session:', error)
     }
   }
+
+  // Auto-join session when user and session are loaded
+  useEffect(() => {
+    if (sessionId && user && session && !hasJoined) {
+      console.log('🔄 Auto-joining session...')
+      joinSession()
+    }
+  }, [sessionId, user, session, hasJoined])
 
   // Handle new transcript updates with smart translation
   const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
@@ -237,7 +253,13 @@ export default function PublicSessionPage() {
 
   // Subscribe to real-time transcript updates
   useEffect(() => {
-    if (!sessionId || !hasJoined) return
+    if (!sessionId) return
+
+    console.log('🔄 Setting up real-time transcript subscription:', {
+      sessionId,
+      hasJoined,
+      timestamp: new Date().toLocaleTimeString()
+    })
 
     const channel = supabase
       .channel(`public:transcripts-${sessionId}`)
@@ -250,19 +272,22 @@ export default function PublicSessionPage() {
           filter: `session_id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('New transcript received:', payload.new)
+          console.log('📨 New transcript received:', payload.new)
           const newTranscript = payload.new as { original_text: string }
           
           // Use the new efficient update function
           handleTranscriptUpdate(newTranscript.original_text, false)
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status)
+      })
 
     return () => {
+      console.log('🧹 Cleaning up real-time subscription')
       supabase.removeChannel(channel)
     }
-  }, [sessionId, hasJoined, supabase, handleTranscriptUpdate])
+  }, [sessionId, supabase, handleTranscriptUpdate])
 
   // Update participant count
   const updateParticipantCount = useCallback(async () => {
@@ -990,4 +1015,4 @@ export default function PublicSessionPage() {
       </div>
     </div>
   )
-} 
+}
