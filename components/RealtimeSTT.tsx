@@ -273,6 +273,7 @@ export function RealtimeSTT({
   }
 
   // Handle recording state changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     console.log('🔄 Recording state changed:', { 
       isRecording, 

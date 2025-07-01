@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, FileText, Languages, ChevronRight, Settings, Loader2 } from "lucide-react"
+import { ArrowLeft, FileText, Languages, ChevronRight, Settings } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
@@ -55,20 +55,7 @@ export default function SessionTranscriptPage() {
     }
   }, [])
 
-  const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "ja", name: "Japanese", flag: "🇯🇵" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "es", name: "Spanish", flag: "🇪🇸" },
-    { code: "fr", name: "French", flag: "🇫🇷" },
-    { code: "de", name: "German", flag: "🇩🇪" },
-    { code: "it", name: "Italian", flag: "🇮🇹" },
-    { code: "pt", name: "Portuguese", flag: "🇵🇹" },
-    { code: "ru", name: "Russian", flag: "🇷🇺" },
-    { code: "ar", name: "Arabic", flag: "🇸🇦" },
-    { code: "en", name: "English", flag: "🇺🇸" },
-  ]
+  // Remove unused languages array
 
   // Load session and transcript data
   useEffect(() => {
