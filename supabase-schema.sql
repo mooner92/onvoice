@@ -134,11 +134,6 @@ CREATE POLICY "Hosts can view transcripts for their sessions" ON transcripts
     )
   );
 
--- Allow service role to insert transcripts (for STT API)
-CREATE POLICY "Service role can insert transcripts" ON transcripts
-  FOR INSERT WITH CHECK (true);
-
--- Allow hosts to insert transcripts for their sessions (for manual entries)
 CREATE POLICY "Hosts can insert transcripts for their sessions" ON transcripts
   FOR INSERT WITH CHECK (
     EXISTS (

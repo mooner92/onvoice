@@ -69,8 +69,6 @@ export default function PublicSessionPage() {
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  const [hasJoined, setHasJoined] = useState(false)
-
   // Set user preferred language on client side
   useEffect(() => {
     setSelectedLanguage(getUserPreferredLanguage())
@@ -166,13 +164,21 @@ export default function PublicSessionPage() {
     }
   }, [slug, supabase, selectedLanguage])
 
-  // Join session as participant
+  // Join session as participant (optional for logged-in users)
   const joinSession = async () => {
     if (!sessionId || !user) return
 
     try {
-      console.log('🚀 Joining session:', { sessionId, userId: user.id })
-      
+      // Check if already joined
+      const { data: existing } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (existing) return // Already joined
+
       // Check if user is the host of this session
       const isHost = session?.host_id === user.id
       
@@ -184,82 +190,23 @@ export default function PublicSessionPage() {
         joined_at: new Date().toISOString()
       }
 
-      const { error } = await supabase
+      await supabase
         .from('session_participants')
         .insert(participantData)
 
-      if (error && !error.message.includes('duplicate')) {
-        console.error('Error joining session:', error)
-        throw error
-      }
-
-      console.log('✅ Successfully joined session')
-      setHasJoined(true)
+      console.log('✅ User joined session as participant')
     } catch (error) {
-      console.error('❌ Error joining session:', error)
+      console.error('Error joining session:', error)
     }
   }
 
-  // Auto-join session when user and session are loaded
-  useEffect(() => {
-    if (sessionId && user && session && !hasJoined) {
-      console.log('🔄 Auto-joining session...')
-      joinSession()
-    }
-  }, [sessionId, user, session, hasJoined])
+  // Removed handleTranscriptUpdate - now handled directly in subscription
 
-  // Handle new transcript updates with smart translation
-  const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
-    const now = new Date()
-    const timestamp = now.toLocaleTimeString()
-    const newId = `${now.getTime()}-${Math.random()}`
-    
-    const newLine: TranscriptLine = {
-      id: newId,
-      timestamp,
-      original: newText,
-      translated: translationEnabled ? getMockTranslation(newText, selectedLanguage) : newText,
-      speaker: session?.host_name || 'Speaker'
-    }
-
-    if (isPartial) {
-      // For partial updates, replace the last line if it exists
-      setTranscript(prev => {
-        const newTranscript = [...prev]
-        if (newTranscript.length > 0 && newTranscript[newTranscript.length - 1].id.includes('partial')) {
-          newTranscript[newTranscript.length - 1] = { ...newLine, id: `${newId}-partial` }
-        } else {
-          newTranscript.push({ ...newLine, id: `${newId}-partial` })
-        }
-        return newTranscript
-      })
-    } else {
-      // For final updates, add as new line and translate if needed
-      setTranscript(prev => {
-        // Remove any partial line and add the final line
-        const withoutPartial = prev.filter(line => !line.id.includes('partial'))
-        const finalTranscript = [...withoutPartial, newLine]
-        
-        // Trigger translation for the new line if translation is enabled
-        if (translationEnabled && selectedLanguage !== 'en') {
-          translateLine(newLine, selectedLanguage)
-        }
-        
-        return finalTranscript
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [translationEnabled, selectedLanguage, session?.host_name])
-
-  // Subscribe to real-time transcript updates
+  // Subscribe to real-time transcript updates (no login required)
   useEffect(() => {
     if (!sessionId) return
 
-    console.log('🔄 Setting up real-time transcript subscription:', {
-      sessionId,
-      hasJoined,
-      timestamp: new Date().toLocaleTimeString()
-    })
+    console.log('🔔 Subscribing to real-time transcripts for session:', sessionId)
 
     const channel = supabase
       .channel(`public:transcripts-${sessionId}`)
@@ -272,22 +219,47 @@ export default function PublicSessionPage() {
           filter: `session_id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('📨 New transcript received:', payload.new)
-          const newTranscript = payload.new as { original_text: string }
+          console.log('📝 New transcript received:', payload.new)
+          const newTranscript = payload.new as { original_text: string, created_at: string }
           
-          // Use the new efficient update function
-          handleTranscriptUpdate(newTranscript.original_text, false)
+          // Add the new transcript to the UI
+          const now = new Date(newTranscript.created_at)
+          const timestamp = now.toLocaleTimeString()
+          const newId = `${now.getTime()}-${Math.random()}`
+          
+          const newLine: TranscriptLine = {
+            id: newId,
+            timestamp,
+            original: newTranscript.original_text,
+            translated: translationEnabled ? getMockTranslation(newTranscript.original_text, selectedLanguage) : newTranscript.original_text,
+            speaker: session?.host_name || 'Speaker'
+          }
+          
+          setTranscript(prev => [...prev, newLine])
+          
+          // Trigger translation if enabled
+          if (translationEnabled && selectedLanguage !== 'en') {
+            translateLine(newLine, selectedLanguage)
+          }
         }
       )
       .subscribe((status) => {
-        console.log('📡 Real-time subscription status:', status)
+        console.log('📡 Subscription status:', status)
       })
 
     return () => {
-      console.log('🧹 Cleaning up real-time subscription')
+      console.log('🔌 Unsubscribing from transcripts')
       supabase.removeChannel(channel)
     }
-  }, [sessionId, supabase, handleTranscriptUpdate])
+  }, [sessionId, supabase, translationEnabled, selectedLanguage, session?.host_name])
+
+  // Auto-join session for logged-in users (optional enhancement)
+  useEffect(() => {
+    if (sessionId && user && session) {
+      // Silently join to track participant count
+      joinSession()
+    }
+  }, [sessionId, user, session])
 
   // Update participant count
   const updateParticipantCount = useCallback(async () => {
@@ -583,6 +555,7 @@ export default function PublicSessionPage() {
     })
   }
 
+  // Show loading or error state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -598,7 +571,7 @@ export default function PublicSessionPage() {
     )
   }
 
-  if (error) {
+  if (error || !session) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card>
@@ -606,7 +579,7 @@ export default function PublicSessionPage() {
             <div className="flex flex-col items-center space-y-4">
               <AlertCircle className="h-8 w-8 text-red-600" />
               <p className="text-gray-900 font-medium">Session Not Found</p>
-              <p className="text-gray-600 text-sm text-center">{error}</p>
+              <p className="text-gray-600 text-sm text-center">{error || 'The session may have ended or the link may be invalid.'}</p>
               <Button onClick={() => router.push('/')} variant="outline">
                 Go Home
               </Button>
@@ -617,92 +590,7 @@ export default function PublicSessionPage() {
     )
   }
 
-  // Require Google login - no guest access
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8">
-            <div className="text-center space-y-6">
-              <div>
-                <Mic className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {session?.title || 'Live Session'}
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  {session?.host_name ? `by ${session.host_name}` : 'Real-time transcription'}
-                </p>
-                <Badge className="mt-2 bg-green-100 text-green-800">
-                  Live Session
-                </Badge>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                  <strong>Account Required</strong>
-                  <br />
-                  Sign in with Google to join this session and access your session history.
-                </div>
-                
-                <LoginButton />
-              </div>
-
-              <div className="text-xs text-gray-400">
-                Real-time transcription and translation
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!hasJoined && session) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8">
-            <div className="text-center space-y-6">
-              <div>
-                <Mic className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                <h1 className="text-2xl font-bold text-gray-900">{session.title}</h1>
-                <p className="text-gray-600 mt-2">by {session.host_name}</p>
-                <Badge className="mt-2 bg-green-100 text-green-800">
-                  Live Session
-                </Badge>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-sm text-gray-600">
-                  Welcome, <strong>{user.user_metadata?.full_name || user.email}</strong>!
-                </div>
-                
-                {session?.host_id === user.id && (
-                  <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
-                    <strong>👑 You are the host</strong>
-                    <br />
-                    Join as audience to see how your session appears to attendees.
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <Button onClick={joinSession} className="w-full">
-                  <Globe className="mr-2 h-4 w-4" />
-                  {session?.host_id === user.id ? 'View as Audience' : 'Join Session'}
-                </Button>
-              </div>
-
-              <div className="text-xs text-gray-400">
-                Real-time transcription and translation
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
+  // Show main content immediately (no login/join required)
   return (
     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
       {/* Mobile Header */}
@@ -1015,4 +903,4 @@ export default function PublicSessionPage() {
       </div>
     </div>
   )
-}
+} 

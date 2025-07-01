@@ -94,7 +94,7 @@ export default function HostDashboard() {
           setSessionDescription(activeSession.description || "")
           setPrimaryLanguage(activeSession.primary_language)
           setHasActiveSession(true)
-          setIsRecording(true)
+    setIsRecording(true)
           
           // Load existing transcripts
           await loadExistingTranscripts(activeSession.id)
@@ -317,7 +317,7 @@ export default function HostDashboard() {
       setIsRecording(false)
       
       // Immediately call STT stream end API to persist transcript
-      if (sessionId) {
+    if (sessionId) {
         try {
           const sttEndResp = await fetch('/api/stt-stream', {
             method: 'POST',

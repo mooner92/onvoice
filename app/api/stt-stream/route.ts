@@ -60,75 +60,28 @@ export async function POST(req: NextRequest) {
           console.log(`📊 Current full transcript length:`, session.fullTranscript.length)
 
           // Save EACH final sentence immediately to Supabase
-          console.log('🔑 Supabase credentials check:', {
-            hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-            hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-            serviceKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20) + '...'
-          })
-
           const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
           )
 
-          try {
-            console.log('💾 Attempting to save transcript to DB:', {
-              sessionId,
-              transcriptLength: transcript.trim().length,
-              timestamp: new Date().toISOString()
-            })
-
-            const { data, error: insertError } = await supabase
-              .from("transcripts")
-              .insert([
-                {
-                  session_id: sessionId,
-                  timestamp: new Date().toLocaleTimeString(),
-                  original_text: transcript.trim(),
-                  created_at: new Date().toISOString(),
-                  is_final: true
-                }
-              ])
-              .select()
-
-            if (insertError) {
-              console.error("❌ DB insert error details:", {
-                message: insertError.message,
-                details: insertError.details,
-                hint: insertError.hint,
-                code: insertError.code
-              })
-              
-              // Try without RLS bypass for debugging
-              console.log('🔄 Retrying with regular client...')
-              const regularClient = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-              )
-              
-              const { data: retryData, error: retryError } = await regularClient
-                .from("transcripts")
-                .insert([
-                  {
-                    session_id: sessionId,
-                    timestamp: new Date().toLocaleTimeString(),
-                    original_text: transcript.trim(),
-                    created_at: new Date().toISOString(),
-                    is_final: true
-                  }
-                ])
-                .select()
-              
-              if (retryError) {
-                console.error("❌ Regular client also failed:", retryError)
-              } else {
-                console.log("✅ Regular client succeeded:", retryData?.[0]?.id)
+          const { data, error: insertError } = await supabase
+            .from("transcripts")
+            .insert([
+              {
+                session_id: sessionId,
+                timestamp: new Date().toLocaleTimeString(),
+                original_text: transcript.trim(),
+                created_at: new Date().toISOString(),
+                is_final: true
               }
-            } else {
-              console.log("✅ Sentence saved successfully (id):", data?.[0]?.id)
-            }
-          } catch (dbError) {
-            console.error("❌ Database operation failed:", dbError)
+            ])
+            .select()
+
+          if (insertError) {
+            console.error("❌ DB insert error (per sentence):", insertError)
+          } else {
+            console.log("✅ Sentence saved (id):", data?.[0]?.id)
           }
         }
 
