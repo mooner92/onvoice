@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, FileText, Languages, X, ChevronRight, Settings, Loader2 } from "lucide-react"
+import { ArrowLeft, FileText, Languages, ChevronRight, Settings, Loader2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
@@ -40,14 +39,10 @@ export default function SessionTranscriptPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTranslation, setShowTranslation] = useState(false)
-  const [selectedLanguage, setSelectedLanguage] = useState('ko') // 기본값
-  const [translatedTexts, setTranslatedTexts] = useState<{[key: string]: string}>({})
-  const [translationEngines, setTranslationEngines] = useState<{[key: string]: {engine: string, quality: string}}>({})
   const [fontSize, setFontSize] = useState([18])
   const [darkMode, setDarkMode] = useState(false)
   const [showTimestamps, setShowTimestamps] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
-  const [isTranslating, setIsTranslating] = useState(false)
   const [guideLang, setGuideLang] = useState('en')
 
   // 시스템/브라우저 언어 감지
@@ -120,7 +115,7 @@ export default function SessionTranscriptPage() {
     // 아무 동작도 하지 않음 (가이드만 표시)
   }, [showTranslation])
 
-  const selectedLang = languages.find(lang => lang.code === selectedLanguage)
+  // Remove selectedLang as it's not used anymore
 
   if (!user) {
     return <div>Loading...</div>
@@ -248,19 +243,13 @@ export default function SessionTranscriptPage() {
               </div>
 
               <div className="space-y-2">
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                  <div className="space-y-1">
-                    <div>📝 <strong>Completed Session</strong></div>
-                    <div>• {transcript.length} transcript lines</div>
-                    <div>• Translation: {showTranslation ? 'Enabled' : 'Disabled'}</div>
-                    {isTranslating && (
-                      <div className="flex items-center space-x-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        <span>Translating...</span>
-                      </div>
-                    )}
+                                  <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <div className="space-y-1">
+                      <div>📝 <strong>Completed Session</strong></div>
+                      <div>• {transcript.length} transcript lines</div>
+                      <div>• Translation: {showTranslation ? 'Enabled' : 'Disabled'}</div>
+                    </div>
                   </div>
-                </div>
               </div>
             </div>
           </div>
@@ -353,11 +342,9 @@ export default function SessionTranscriptPage() {
                       <Languages className="h-5 w-5" />
                       <span>Translation</span>
                     </div>
-                    {selectedLang && (
-                      <span className="text-sm font-normal">
-                        {selectedLang.flag} {selectedLang.name}
-                      </span>
-                    )}
+                    <span className="text-sm font-normal">
+                      Browser Translation
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-[calc(100%-80px)]">

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useEffect, useRef, useState } from 'react'
@@ -54,7 +55,7 @@ export function RealtimeSTT({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
-      } catch (e) {
+      } catch {
         // Silent cleanup
       }
       recognitionRef.current = null
