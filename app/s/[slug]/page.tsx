@@ -20,7 +20,6 @@ import {
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { LoginButton } from "@/components/auth/LoginButton"
 import { createClient } from "@/lib/supabase"
 import { Session } from "@/lib/types"
 
@@ -626,15 +625,12 @@ export default function PublicSessionPage() {
     )
   }
 
-  // Remove login requirement - allow guest viewing
-  if (!user && session) {
-    // Auto-join as guest when session is loaded
-    useEffect(() => {
-      if (!hasJoined) {
-        setHasJoined(true)
-      }
-    }, [])
-  }
+  // Auto-join as guest for non-logged in users
+  useEffect(() => {
+    if (!user && session && !hasJoined) {
+      setHasJoined(true)
+    }
+  }, [user, session, hasJoined])
 
   if (!hasJoined && session) {
     return (
