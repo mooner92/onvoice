@@ -166,7 +166,7 @@ export default function PublicSessionPage() {
   }, [slug, supabase, selectedLanguage])
 
   // Join session as participant or guest
-  const joinSession = async () => {
+  const joinSession = useCallback(async () => {
     if (!sessionId) return
 
     try {
@@ -206,7 +206,7 @@ export default function PublicSessionPage() {
       // Even if error, allow viewing
       setHasJoined(true)
     }
-  }
+  }, [sessionId, user, session?.host_id, supabase])
 
   // Auto-join session when session is loaded (for both logged-in and guest users)
   useEffect(() => {
@@ -214,7 +214,7 @@ export default function PublicSessionPage() {
       console.log('🔄 Auto-joining session...')
       joinSession()
     }
-  }, [sessionId, session, hasJoined])
+  }, [sessionId, session, hasJoined, joinSession])
 
   // Handle new transcript updates with smart translation
   const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
@@ -478,7 +478,7 @@ export default function PublicSessionPage() {
   }, [translationEnabled])
 
   // Simple mock translation for immediate display
-  const getMockTranslation = (text: string, targetLang: string): string => {
+  const getMockTranslation = useCallback((text: string, targetLang: string): string => {
     if (!translationEnabled || targetLang === 'en') return text
     
     const mockTranslations: { [key: string]: string } = {
@@ -490,7 +490,7 @@ export default function PublicSessionPage() {
     }
     
     return mockTranslations[targetLang] || text
-  }
+  }, [translationEnabled])
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
 
@@ -624,13 +624,6 @@ export default function PublicSessionPage() {
       </div>
     )
   }
-
-  // Auto-join as guest for non-logged in users
-  useEffect(() => {
-    if (!user && session && !hasJoined) {
-      setHasJoined(true)
-    }
-  }, [user, session, hasJoined])
 
   if (!hasJoined && session) {
     return (

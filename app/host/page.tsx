@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -179,6 +179,7 @@ export default function HostDashboard() {
     return () => {
       if (interval) clearInterval(interval)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, session])
 
   // Auto-stop timer for new sessions
@@ -197,9 +198,10 @@ export default function HostDashboard() {
         autoStopTimerRef.current = null
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, sessionId])
 
-  const updateParticipantCount = async () => {
+  const updateParticipantCount = useCallback(async () => {
     if (!sessionId) return
 
     try {
@@ -214,9 +216,9 @@ export default function HostDashboard() {
     } catch (error) {
       console.error('Error updating participant count:', error)
     }
-  }
+  }, [sessionId, supabase])
 
-  const loadExistingTranscripts = async (sessionId: string) => {
+  const loadExistingTranscripts = useCallback(async (sessionId: string) => {
     try {
       const { data: transcripts, error } = await supabase
         .from('transcripts')
@@ -237,7 +239,7 @@ export default function HostDashboard() {
     } catch (error) {
       console.error('Error loading existing transcripts:', error)
     }
-  }
+  }, [supabase])
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
@@ -307,7 +309,7 @@ export default function HostDashboard() {
     }
   }
 
-  const handleStopSession = async () => {
+  const handleStopSession = useCallback(async () => {
     if (!sessionId || !user || !isRecording) return
 
     console.log('Stopping session:', sessionId)
@@ -378,7 +380,7 @@ export default function HostDashboard() {
       setHasActiveSession(false)
       setSTTError(null)
     }
-  }
+  }, [sessionId, user, isRecording])
 
   const handleResumeSession = () => {
     if (sessionId) {

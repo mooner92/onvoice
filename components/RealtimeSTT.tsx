@@ -273,7 +273,6 @@ export function RealtimeSTT({
   }
 
   // Handle recording state changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     console.log('🔄 Recording state changed:', { 
       isRecording, 
@@ -356,6 +355,7 @@ export function RealtimeSTT({
         console.log('⚠️ No active session to stop')
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, sessionId])
 
   if (!isSupported) {
