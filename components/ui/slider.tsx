@@ -13,15 +13,27 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+  // Stabilize values to prevent infinite renders
+  const _values = React.useMemo(() => {
+    if (Array.isArray(value)) {
+      return value
+    }
+    if (Array.isArray(defaultValue)) {
+      return defaultValue
+    }
+    return [min]  // Single value slider by default
+  }, [value, defaultValue, min]) // Remove max from dependencies
+
+  // Memoize thumbs to prevent recreating on every render
+  const thumbs = React.useMemo(() => {
+    return Array.from({ length: _values.length }, (_, index) => (
+      <SliderPrimitive.Thumb
+        data-slot="slider-thumb"
+        key={`thumb-${index}`}
+        className="border-primary bg-background ring-ring/50 block size-4 shrink-0 rounded-full border shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+      />
+    ))
+  }, [_values.length])
 
   return (
     <SliderPrimitive.Root
@@ -49,13 +61,7 @@ function Slider({
           )}
         />
       </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          key={index}
-          className="border-primary bg-background ring-ring/50 block size-4 shrink-0 rounded-full border shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-        />
-      ))}
+      {thumbs}
     </SliderPrimitive.Root>
   )
 }

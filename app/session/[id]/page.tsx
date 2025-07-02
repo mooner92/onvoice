@@ -10,14 +10,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
-
-interface TranscriptLine {
-  id: string
-  timestamp: string
-  original: string
-  translated: string
-  speaker?: string
-}
+import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 
 export default function SessionPage() {
   const params = useParams()
@@ -96,6 +89,33 @@ export default function SessionPage() {
     }
   }, [user, sessionId, supabase, router])
 
+  // 개선된 번역 함수
+  const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          targetLanguage: targetLang,
+          sessionId: sessionId // 세션 ID 포함
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Translation failed')
+      }
+
+      const result: TranslationResponse = await response.json()
+      return result.translatedText
+    } catch (error) {
+      console.error('Translation error:', error)
+      return `[번역 실패] ${text}`
+    }
+  }, [sessionId])
+
   // Subscribe to real-time transcript updates
   useEffect(() => {
     if (!sessionId) return
@@ -110,16 +130,19 @@ export default function SessionPage() {
           table: 'transcripts',
           filter: `session_id=eq.${sessionId}`
         },
-        (payload) => {
+        async (payload) => {
           const newTranscript = payload.new as Transcript
-          const translatedText = translateText(newTranscript.original_text, selectedLanguage)
+          
+          // 번역된 텍스트 가져오기 (개선된 캐싱 시스템 활용)
+          const translatedText = await translateText(newTranscript.original_text, selectedLanguage)
           
           const newLine: TranscriptLine = {
             id: newTranscript.id,
             timestamp: newTranscript.timestamp,
             original: newTranscript.original_text,
             translated: translatedText,
-            speaker: session?.host_name
+            speaker: session?.host_name,
+            isTranslating: false
           }
 
           setTranscript(prev => [...prev, newLine])
@@ -130,7 +153,7 @@ export default function SessionPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [sessionId, selectedLanguage, session?.host_name, supabase])
+  }, [sessionId, selectedLanguage, session?.host_name, supabase, translateText])
 
   // Update participant count function
   const updateParticipantCount = useCallback(async () => {
@@ -172,35 +195,22 @@ export default function SessionPage() {
     }
   }, [sessionId, supabase, updateParticipantCount])
 
-  // Simple translation function (in production, use a real translation API)
-  const translateText = (text: string, targetLang: string): string => {
-    // This is a mock translation - in production, use Google Translate API or similar
-    const translations: { [key: string]: { [key: string]: string } } = {
-      "Welcome everyone to today's lecture on artificial intelligence and machine learning.": {
-        ko: "인공지능과 머신러닝에 관한 오늘의 강의에 오신 것을 환영합니다.",
-        ja: "人工知能と機械学習に関する今日の講義へようこそ。",
-        zh: "欢迎大家参加今天关于人工智能和机器学习的讲座。",
-        hi: "आर्टिफिशियल इंटेलिजेंस और मशीन लर्निंग पर आज के व्याख्यान में आप सभी का स्वागत है।",
-        es: "Bienvenidos a todos a la conferencia de hoy sobre inteligencia artificial y aprendizaje automático.",
-        fr: "Bienvenue à tous à la conférence d'aujourd'hui sur l'intelligence artificielle et l'apprentissage automatique.",
-        de: "Willkommen alle zur heutigen Vorlesung über künstliche Intelligenz und maschinelles Lernen.",
-        it: "Benvenuti tutti alla lezione di oggi sull'intelligenza artificiale e l'apprendimento automatico.",
-        pt: "Bem-vindos todos à palestra de hoje sobre inteligência artificial e aprendizado de máquina.",
-        ru: "Добро пожаловать всем на сегодняшнюю лекцию по искусственному интеллекту и машинному обучению.",
-        ar: "مرحباً بكم جميعاً في محاضرة اليوم حول الذكاء الاصطناعي والتعلم الآلي.",
-      }
-    }
-
-    return translations[text]?.[targetLang] || text
-  }
-
   // Update translations when language changes
   useEffect(() => {
-    setTranscript(prev => prev.map(line => ({
-      ...line,
-      translated: translateText(line.original, selectedLanguage)
-    })))
-  }, [selectedLanguage])
+    const updateTranslations = async () => {
+      const updatedTranscript = await Promise.all(
+        transcript.map(async (line) => ({
+          ...line,
+          translated: await translateText(line.original, selectedLanguage)
+        }))
+      )
+      setTranscript(updatedTranscript)
+    }
+
+    if (transcript.length > 0) {
+      updateTranslations()
+    }
+  }, [selectedLanguage, translateText])
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
 
@@ -362,6 +372,15 @@ export default function SessionPage() {
                 <Label htmlFor="showTimestamps" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Show Timestamps
                 </Label>
+              </div>
+            </div>
+
+            {/* 번역 시스템 정보 */}
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+              <div className="space-y-1">
+                <div>🚀 <strong>Enhanced translation system active</strong></div>
+                <div>• Smart caching for faster translations</div>
+                <div>• Background processing for better performance</div>
               </div>
             </div>
           </div>

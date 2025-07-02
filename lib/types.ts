@@ -45,6 +45,7 @@ export interface Transcript {
   target_language?: string
   speaker_id?: string
   created_at: string
+  translation_cache_ids?: Record<string, string> // { "ko": "uuid1", "ja": "uuid2" }
 }
 
 export interface UserSession {
@@ -65,4 +66,48 @@ export interface UserProfile {
   subscription_status: 'free' | 'premium'
   subscription_expires_at?: string
   created_at: string
+}
+
+// 새로운 번역 관련 타입들
+export interface TranslationCache {
+  id: string
+  content_hash: string
+  original_text: string
+  target_language: string
+  translated_text: string
+  translation_engine: 'gpt' | 'google' | 'local' | 'mock'
+  quality_score: number
+  usage_count: number
+  created_at: string
+  expires_at: string
+}
+
+export interface TranslationJob {
+  id: string
+  text: string
+  targetLanguage: string
+  sessionId?: string
+  priority: number
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  createdAt: number
+}
+
+export interface TranslationResponse {
+  translatedText: string
+  engine: string
+  fromCache?: boolean
+  isProcessing?: boolean
+  jobId?: string
+  quality?: number
+}
+
+export interface TranscriptLine {
+  id: string
+  timestamp: string
+  original: string
+  translated: string
+  speaker?: string
+  isTranslating?: boolean
+  translationQuality?: number
+  translatedLanguage?: string // 번역된 언어 추적
 } 

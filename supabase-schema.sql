@@ -195,3 +195,29 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_updated
   AFTER UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_user_update(); 
+
+
+
+
+  -- 번역 캐시 테이블
+CREATE TABLE translation_cache (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  content_hash TEXT UNIQUE,        -- 원문의 해시값
+  original_text TEXT,
+  target_language TEXT,
+  translated_text TEXT,
+  translation_engine TEXT,         -- 'gpt', 'google', 'local'
+  quality_score FLOAT,            -- 번역 품질 점수
+  usage_count INTEGER DEFAULT 0,  -- 사용 횟수
+  created_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP            -- 캐시 만료시간
+);
+
+-- 번역 캐시 인덱스 추가
+CREATE INDEX idx_translation_cache_hash ON translation_cache(content_hash);
+CREATE INDEX idx_translation_cache_lang ON translation_cache(target_language);
+CREATE INDEX idx_translation_cache_expires ON translation_cache(expires_at);
+
+-- 트랜스크립트에 번역 참조 추가
+ALTER TABLE transcripts ADD COLUMN translation_cache_ids JSONB;
+-- { "ko": "uuid1", "ja": "uuid2", "zh": "uuid3" }

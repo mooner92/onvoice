@@ -16,20 +16,16 @@ import {
   User, 
   Settings,
   Loader2,
-  X
+  X,
+  CheckCircle,
+  RefreshCw
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
+import { useToast, ToastContainer } from "@/components/ui/toast"
 import { Session } from "@/lib/types"
-
-interface TranscriptLine {
-  id: string
-  timestamp: string
-  original: string
-  translated: string
-  speaker?: string
-}
+import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 
 export default function PublicSessionPage() {
   const params = useParams()
@@ -37,6 +33,7 @@ export default function PublicSessionPage() {
   const { user } = useAuth()
   const supabase = createClient()
   const slug = params.slug as string
+  const { toasts, addToast, removeToast } = useToast()
 
   // Get user's preferred language from browser or profile
   const getUserPreferredLanguage = () => {
@@ -49,10 +46,235 @@ export default function PublicSessionPage() {
     if (typeof window !== 'undefined' && navigator.language) {
       const browserLang = navigator.language.split('-')[0]
       const supportedLangs = ['ko', 'ja', 'zh', 'hi', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'en']
-      return supportedLangs.includes(browserLang) ? browserLang : 'ko'
+      return supportedLangs.includes(browserLang) ? browserLang : 'en' // Changed default to English
     }
     
-    return 'ko' // Default fallback
+    return 'en' // Default fallback to English for global usage
+  }
+
+  // Simple i18n for UI text based on browser language
+  const getBrowserLanguage = () => {
+    if (typeof window === 'undefined') return 'en'
+    const browserLang = navigator.language.split('-')[0]
+    return ['ko', 'ja', 'zh', 'es', 'fr', 'de'].includes(browserLang) ? browserLang : 'en'
+  }
+
+  const t = (key: string) => {
+    const lang = getBrowserLanguage()
+    const translations: Record<string, Record<string, string>> = {
+      en: {
+        'copySuccess': 'Text copied to clipboard',
+        'copyFail': 'Copy failed',
+        'noContent': 'No content to copy',
+        'translation': 'Translation',
+        'enableTranslation': 'Enable Translation',
+        'targetLanguage': 'Target Language',
+        'fontSize': 'Font Size',
+        'darkMode': 'Dark Mode',
+        'showTimestamps': 'Show Timestamps',
+        'textOnlyMode': 'Text Only Mode (Copy Friendly)',
+        'textCopy': 'Text Copy',
+        'copyOriginal': '📋 Copy Original',
+        'copyTranslation': '🌍 Copy Translation',
+        'textOnlyModeHint': '💡 Text Only Mode: Copy pure text without numbers and timestamps.',
+        'original': 'Original',
+        'waitingSpeaker': 'Waiting for the speaker to start...',
+        'noContentTranslate': 'No content to translate',
+        'liveTranscription': 'Live transcription will appear here',
+        'originalTranslated': 'Original transcript will be translated here',
+        'sessionActive': 'Session is active',
+        'joinSession': 'Join Session',
+        'viewAsAudience': 'View as Audience',
+        'realtimeTranscription': 'Real-time transcription and translation',
+                 'liveSession': 'Live Session',
+         'translationFailed': 'Translation Failed',
+         'translating': 'Translating...',
+         'aiTranslating': 'AI Translating...',
+         'completed': 'Completed'
+      },
+      ko: {
+        'copySuccess': '텍스트가 복사되었습니다',
+        'copyFail': '복사 실패',
+        'noContent': '복사할 내용이 없습니다',
+        'translation': '번역',
+        'enableTranslation': '번역 사용',
+        'targetLanguage': '대상 언어',
+        'fontSize': '글자 크기',
+        'darkMode': '다크 모드',
+        'showTimestamps': '타임스탬프 표시',
+        'textOnlyMode': '텍스트만 보기 (복사 편의)',
+        'textCopy': '텍스트 복사',
+        'copyOriginal': '📋 원문 복사',
+        'copyTranslation': '🌍 번역문 복사',
+        'textOnlyModeHint': '💡 텍스트만 보기 모드: 번호와 타임스탬프 없이 순수 텍스트만 복사됩니다.',
+        'original': '원문',
+        'waitingSpeaker': '발표자가 말하기를 기다리고 있습니다...',
+        'noContentTranslate': '번역할 내용이 없습니다',
+        'liveTranscription': '실시간 전사가 여기에 표시됩니다',
+        'originalTranslated': '원문 트랜스크립트가 여기에 번역됩니다',
+        'sessionActive': '세션이 활성화되어 있습니다',
+        'joinSession': '세션 참가',
+        'viewAsAudience': '관객으로 보기',
+        'realtimeTranscription': '실시간 전사 및 번역',
+                 'liveSession': '라이브 세션',
+         'translationFailed': '번역 실패',
+         'translating': '번역 중...',
+         'aiTranslating': 'AI 번역 중...',
+         'completed': '완료'
+      },
+      ja: {
+        'copySuccess': 'テキストがコピーされました',
+        'copyFail': 'コピーに失敗しました',
+        'noContent': 'コピーする内容がありません',
+        'translation': '翻訳',
+        'enableTranslation': '翻訳を有効にする',
+        'targetLanguage': '対象言語',
+        'fontSize': 'フォントサイズ',
+        'darkMode': 'ダークモード',
+        'showTimestamps': 'タイムスタンプを表示',
+        'textOnlyMode': 'テキストのみモード（コピー向け）',
+        'textCopy': 'テキストコピー',
+        'copyOriginal': '📋 原文をコピー',
+        'copyTranslation': '🌍 翻訳をコピー',
+        'textOnlyModeHint': '💡 テキストのみモード：番号とタイムスタンプなしで純粋なテキストのみをコピーします。',
+        'original': '原文',
+        'waitingSpeaker': '話者の開始を待っています...',
+        'noContentTranslate': '翻訳する内容がありません',
+        'liveTranscription': 'ライブ転写がここに表示されます',
+        'originalTranslated': '原文転写がここに翻訳されます',
+        'sessionActive': 'セッションがアクティブです',
+        'joinSession': 'セッションに参加',
+        'viewAsAudience': '視聴者として表示',
+        'realtimeTranscription': 'リアルタイム転写と翻訳',
+                 'liveSession': 'ライブセッション',
+         'translationFailed': '翻訳に失敗しました',
+         'translating': '翻訳中...',
+         'aiTranslating': 'AI翻訳中...',
+         'completed': '完了'
+      },
+      es: {
+        'copySuccess': 'Texto copiado al portapapeles',
+        'copyFail': 'Error al copiar',
+        'noContent': 'No hay contenido para copiar',
+        'translation': 'Traducción',
+        'enableTranslation': 'Habilitar traducción',
+        'targetLanguage': 'Idioma destino',
+        'fontSize': 'Tamaño de fuente',
+        'darkMode': 'Modo oscuro',
+        'showTimestamps': 'Mostrar marcas de tiempo',
+        'textOnlyMode': 'Modo solo texto (fácil copia)',
+        'textCopy': 'Copiar texto',
+        'copyOriginal': '📋 Copiar original',
+        'copyTranslation': '🌍 Copiar traducción',
+        'textOnlyModeHint': '💡 Modo solo texto: Copia texto puro sin números ni marcas de tiempo.',
+        'original': 'Original',
+        'waitingSpeaker': 'Esperando que el orador comience...',
+        'noContentTranslate': 'No hay contenido para traducir',
+        'liveTranscription': 'La transcripción en vivo aparecerá aquí',
+        'originalTranslated': 'La transcripción original se traducirá aquí',
+        'sessionActive': 'La sesión está activa',
+        'joinSession': 'Unirse a la sesión',
+        'viewAsAudience': 'Ver como audiencia',
+        'realtimeTranscription': 'Transcripción y traducción en tiempo real',
+                 'liveSession': 'Sesión en vivo',
+         'translationFailed': 'Error de traducción',
+         'translating': 'Traduciendo...',
+         'aiTranslating': 'IA traduciendo...',
+         'completed': 'Completado'
+       },
+       fr: {
+        'copySuccess': 'Texte copié dans le presse-papiers',
+        'copyFail': 'Échec de la copie',
+        'noContent': 'Aucun contenu à copier',
+        'translation': 'Traduction',
+        'enableTranslation': 'Activer la traduction',
+        'targetLanguage': 'Langue cible',
+        'fontSize': 'Taille de police',
+        'darkMode': 'Mode sombre',
+        'showTimestamps': 'Afficher les horodatages',
+        'textOnlyMode': 'Mode texte seul (copie facile)',
+        'textCopy': 'Copier le texte',
+        'copyOriginal': '📋 Copier l\'original',
+        'copyTranslation': '🌍 Copier la traduction',
+        'textOnlyModeHint': '💡 Mode texte seul: Copie le texte pur sans numéros ni horodatages.',
+        'original': 'Original',
+        'waitingSpeaker': 'En attente du début de l\'orateur...',
+        'noContentTranslate': 'Aucun contenu à traduire',
+        'liveTranscription': 'La transcription en direct apparaîtra ici',
+        'originalTranslated': 'La transcription originale sera traduite ici',
+        'sessionActive': 'La session est active',
+        'joinSession': 'Rejoindre la session',
+        'viewAsAudience': 'Voir en tant qu\'audience',
+        'realtimeTranscription': 'Transcription et traduction en temps réel',
+                 'liveSession': 'Session en direct',
+         'translationFailed': 'Échec de la traduction',
+         'translating': 'Traduction...',
+         'aiTranslating': 'IA en traduction...',
+         'completed': 'Terminé'
+       },
+       de: {
+        'copySuccess': 'Text in die Zwischenablage kopiert',
+        'copyFail': 'Kopieren fehlgeschlagen',
+        'noContent': 'Kein Inhalt zum Kopieren',
+        'translation': 'Übersetzung',
+        'enableTranslation': 'Übersetzung aktivieren',
+        'targetLanguage': 'Zielsprache',
+        'fontSize': 'Schriftgröße',
+        'darkMode': 'Dunkler Modus',
+        'showTimestamps': 'Zeitstempel anzeigen',
+        'textOnlyMode': 'Nur-Text-Modus (kopierfreundlich)',
+        'textCopy': 'Text kopieren',
+        'copyOriginal': '📋 Original kopieren',
+        'copyTranslation': '🌍 Übersetzung kopieren',
+        'textOnlyModeHint': '💡 Nur-Text-Modus: Kopiert reinen Text ohne Nummern und Zeitstempel.',
+        'original': 'Original',
+        'waitingSpeaker': 'Warten auf den Beginn des Sprechers...',
+        'noContentTranslate': 'Kein Inhalt zum Übersetzen',
+        'liveTranscription': 'Live-Transkription wird hier angezeigt',
+        'originalTranslated': 'Original-Transkript wird hier übersetzt',
+        'sessionActive': 'Sitzung ist aktiv',
+        'joinSession': 'Sitzung beitreten',
+        'viewAsAudience': 'Als Zuschauer anzeigen',
+        'realtimeTranscription': 'Echtzeit-Transkription und -Übersetzung',
+                 'liveSession': 'Live-Sitzung',
+         'translationFailed': 'Übersetzung fehlgeschlagen',
+         'translating': 'Übersetzen...',
+         'aiTranslating': 'KI übersetzt...',
+         'completed': 'Abgeschlossen'
+       },
+       zh: {
+        'copySuccess': '文本已复制到剪贴板',
+        'copyFail': '复制失败',
+        'noContent': '没有内容可复制',
+        'translation': '翻译',
+        'enableTranslation': '启用翻译',
+        'targetLanguage': '目标语言',
+        'fontSize': '字体大小',
+        'darkMode': '深色模式',
+        'showTimestamps': '显示时间戳',
+        'textOnlyMode': '纯文本模式（便于复制）',
+        'textCopy': '复制文本',
+        'copyOriginal': '📋 复制原文',
+        'copyTranslation': '🌍 复制翻译',
+        'textOnlyModeHint': '💡 纯文本模式：复制不带编号和时间戳的纯文本。',
+        'original': '原文',
+        'waitingSpeaker': '等待发言者开始...',
+        'noContentTranslate': '没有内容可翻译',
+        'liveTranscription': '实时转录将在这里显示',
+        'originalTranslated': '原始转录将在这里翻译',
+        'sessionActive': '会话处于活动状态',
+        'joinSession': '加入会话',
+        'viewAsAudience': '以观众身份查看',
+        'realtimeTranscription': '实时转录和翻译',
+                 'liveSession': '直播会话',
+         'translationFailed': '翻译失败',
+         'translating': '翻译中...',
+         'aiTranslating': 'AI翻译中...',
+         'completed': '已完成'
+      }
+    }
+    
+    return translations[lang]?.[key] || translations['en'][key] || key
   }
 
   const [translationEnabled, setTranslationEnabled] = useState(false)
@@ -67,8 +289,17 @@ export default function PublicSessionPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
-
   const [hasJoined, setHasJoined] = useState(false)
+
+  // 번역 관련 상태
+  const [translationStats, setTranslationStats] = useState({
+    cached: 0,
+    processing: 0,
+    completed: 0
+  })
+
+  // 🆕 텍스트만 보기 상태
+  const [textOnlyMode, setTextOnlyMode] = useState(false)
 
   // Set user preferred language on client side
   useEffect(() => {
@@ -89,6 +320,10 @@ export default function PublicSessionPage() {
     { code: "ar", name: "Arabic", flag: "🇸🇦" },
     { code: "en", name: "English", flag: "🇺🇸" },
   ]
+
+  // 번역 캐시 (클라이언트 사이드)
+  const translationCache = useRef<Map<string, TranslationResponse>>(new Map())
+  const pendingTranslations = useRef<Set<string>>(new Set())
 
   // Load session data using slug or session ID
   useEffect(() => {
@@ -146,8 +381,9 @@ export default function PublicSessionPage() {
             id: t.id,
             timestamp: new Date(t.created_at).toLocaleTimeString(),
             original: t.original_text,
-            translated: getMockTranslation(t.original_text, selectedLanguage),
-            speaker: sessionData.host_name
+            translated: t.original_text, // 초기에는 원문으로 설정
+            speaker: sessionData.host_name,
+            isTranslating: false
           }))
           setTranscript(formattedTranscripts)
         }
@@ -163,7 +399,179 @@ export default function PublicSessionPage() {
     if (slug) {
       loadSession()
     }
-  }, [slug, supabase, selectedLanguage])
+  }, [slug, supabase])
+
+  // 개선된 번역 함수
+  const translateText = useCallback(async (text: string, targetLang: string): Promise<TranslationResponse> => {
+    const cacheKey = `${text}:${targetLang}`
+    
+    // 1. 클라이언트 캐시 확인
+    if (translationCache.current.has(cacheKey)) {
+      const cached = translationCache.current.get(cacheKey)!
+      console.log(`📋 Client cache hit for "${text.substring(0, 30)}..." → ${targetLang} (${cached.engine})`);
+      return cached
+    }
+    
+    // 2. 강화된 중복 요청 방지
+    if (pendingTranslations.current.has(cacheKey)) {
+      console.log(`🚫 BLOCKED duplicate request: "${text.substring(0, 30)}..." → ${targetLang}`);
+      // 중복 요청은 즉시 원문 반환 (API 호출 방지)
+      const duplicateResponse: TranslationResponse = {
+        translatedText: text, // 원문 그대로 반환
+        engine: 'duplicate-blocked',
+        fromCache: true // 캐시로 처리한 것처럼 표시
+      }
+      return duplicateResponse
+    }
+    
+    // 3. 영어 텍스트 자동 감지 및 passthrough
+    if (targetLang === 'en' && /^[a-zA-Z0-9\s.,!?'"()-]+$/.test(text)) {
+      console.log(`⏭️ English passthrough: "${text.substring(0, 30)}..."`)
+      const passthrough: TranslationResponse = {
+        translatedText: text,
+        engine: 'passthrough',
+        fromCache: true,
+        quality: 1.0
+      }
+      translationCache.current.set(cacheKey, passthrough)
+      return passthrough
+    }
+    
+    try {
+      pendingTranslations.current.add(cacheKey)
+      
+      console.log(`🌍 API CALL: "${text.substring(0, 30)}..." → ${targetLang} [Session: ${sessionId?.substring(0, 8)}...]`)
+      
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          targetLanguage: targetLang,
+          sessionId: sessionId // 세션 ID 포함하여 우선순위 높임
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Translation API failed: ${response.status}`)
+      }
+
+      const result: TranslationResponse = await response.json()
+      
+      // 캐시에 저장
+      translationCache.current.set(cacheKey, result)
+      
+      console.log(`✅ Translation response: ${result.engine} (fromCache: ${result.fromCache}, isProcessing: ${result.isProcessing})`)
+      
+      // 백그라운드 번역이 진행 중인 경우 즉시 상태 확인 시작
+      if (result.isProcessing && result.engine === 'mock') {
+        console.log(`🚀 Starting background translation monitoring for "${text.substring(0, 30)}..." → ${targetLang}`)
+        // 첫 번째 확인은 1초 후 (빠른 응답을 위해)
+        setTimeout(() => {
+          checkTranslationStatus(text, targetLang, cacheKey, 0)
+        }, 1000)
+      }
+      
+      return result
+      
+    } catch (error) {
+      console.error('Translation error:', error)
+      const fallback: TranslationResponse = {
+        translatedText: `[${t('translationFailed')}: ${error instanceof Error ? error.message : 'Unknown error'}]`,
+        engine: 'error',
+        fromCache: false
+      }
+      translationCache.current.set(cacheKey, fallback)
+      return fallback
+    } finally {
+      pendingTranslations.current.delete(cacheKey)
+    }
+  }, [sessionId])
+
+  // 번역 상태 확인 (백그라운드 번역 완료 체크) - 개선된 버전
+  const checkTranslationStatus = useCallback(async (text: string, targetLang: string, cacheKey: string, retryCount: number = 0) => {
+    try {
+      console.log(`🔍 Checking translation status (retry ${retryCount}): "${text.substring(0, 30)}..." → ${targetLang}`)
+      
+      const response = await fetch(`/api/translate?text=${encodeURIComponent(text)}&targetLanguage=${targetLang}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        if (result.completed) {
+          console.log(`🎉 Background translation completed: "${text.substring(0, 30)}..." → ${targetLang} (${result.engine})`)
+          
+          const updatedResult: TranslationResponse = {
+            translatedText: result.translatedText,
+            engine: result.engine,
+            fromCache: true,
+            quality: result.quality
+          }
+          
+          // 캐시 업데이트 (키 통일)
+          const unifiedCacheKey = `${text}:${targetLang}`
+          translationCache.current.set(unifiedCacheKey, updatedResult)
+          
+          // UI 업데이트 - 현재 선택된 언어와 일치하는 경우만 업데이트
+          setTranscript(prev => prev.map(line => {
+            if (line.original === text && selectedLanguage === targetLang) {
+              return {
+                ...line,
+                translated: result.translatedText,
+                translatedLanguage: targetLang,
+                isTranslating: false,
+                translationQuality: result.quality
+              }
+            }
+            return line
+          }))
+          
+          // 통계 업데이트
+          setTranslationStats(prev => ({
+            ...prev,
+            processing: Math.max(0, prev.processing - 1),
+            completed: prev.completed + 1
+          }))
+          
+          return true // 번역 완료
+        } else {
+          // 아직 진행 중인 경우, 최대 5번까지 재시도
+          if (retryCount < 5) {
+            const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000) // 지수적 백오프 (최대 10초)
+            console.log(`⏳ Translation still in progress, retrying in ${delay}ms...`)
+            setTimeout(() => {
+              checkTranslationStatus(text, targetLang, cacheKey, retryCount + 1)
+            }, delay)
+          } else {
+            console.log(`⚠️ Translation check timeout for "${text.substring(0, 30)}..." → ${targetLang}`)
+            // 타임아웃된 경우 번역 중 상태 해제
+            setTranscript(prev => prev.map(line => {
+              if (line.original === text && selectedLanguage === targetLang) {
+                return {
+                  ...line,
+                  isTranslating: false,
+                  translated: `[${t('translationFailed')}] ${text}`,
+                  translatedLanguage: targetLang
+                }
+              }
+              return line
+            }))
+            
+            setTranslationStats(prev => ({
+              ...prev,
+              processing: Math.max(0, prev.processing - 1)
+            }))
+          }
+        }
+      }
+      return false
+    } catch (error) {
+      console.error('Translation status check failed:', error)
+      return false
+    }
+  }, [selectedLanguage])
 
   // Join session as participant or guest
   const joinSession = useCallback(async () => {
@@ -216,7 +624,7 @@ export default function PublicSessionPage() {
     }
   }, [sessionId, session, hasJoined, joinSession])
 
-  // Handle new transcript updates with smart translation
+  // Handle new transcript updates (번역 자동화 개선)
   const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
     const now = new Date()
     const timestamp = now.toLocaleTimeString()
@@ -226,8 +634,10 @@ export default function PublicSessionPage() {
       id: newId,
       timestamp,
       original: newText,
-      translated: translationEnabled ? getMockTranslation(newText, selectedLanguage) : newText,
-      speaker: session?.host_name || 'Speaker'
+      translated: newText, // 초기에는 원문으로 설정
+      translatedLanguage: selectedLanguage, // 현재 선택된 언어로 설정
+      speaker: session?.host_name || 'Speaker',
+      isTranslating: false
     }
 
     if (isPartial) {
@@ -242,22 +652,141 @@ export default function PublicSessionPage() {
         return newTranscript
       })
     } else {
-      // For final updates, add as new line and translate if needed
+      // For final updates, add as new line
       setTranscript(prev => {
         // Remove any partial line and add the final line
         const withoutPartial = prev.filter(line => !line.id.includes('partial'))
-        const finalTranscript = [...withoutPartial, newLine]
-        
-        // Trigger translation for the new line if translation is enabled
-        if (translationEnabled && selectedLanguage !== 'en') {
-          translateLine(newLine, selectedLanguage)
-        }
-        
-        return finalTranscript
+        return [...withoutPartial, newLine]
       })
+      
+      // 번역이 활성화된 경우 즉시 번역 시작 (영어가 아닌 경우)
+      if (translationEnabled && selectedLanguage !== 'en') {
+        console.log(`🚀 Auto-translating new transcript: "${newText.substring(0, 30)}..." → ${selectedLanguage}`)
+        
+        // 트랜스크립트 추가 후 번역 함수 호출 (ref 방식으로 해결)
+        const currentLang = selectedLanguage
+        setTimeout(() => {
+          // 직접 번역 API 호출하여 circular dependency 방지
+          if (typeof translateText === 'function') {
+            setTranscript(prev => prev.map(t => 
+              t.id === newLine.id ? { ...t, isTranslating: true } : t
+            ))
+            
+            translateText(newText, currentLang).then(result => {
+              setTranscript(prev => prev.map(t => 
+                t.id === newLine.id ? {
+                  ...t, 
+                  translated: result.translatedText,
+                  translatedLanguage: currentLang,
+                  isTranslating: false,
+                  translationQuality: result.quality
+                } : t
+              ))
+                        }).catch(error => {
+              console.error('Auto-translation failed:', error)
+              const failedMessage = `[${t('translationFailed')}] ${newText}`
+              setTranscript(prev => prev.map(t => 
+                t.id === newLine.id ? { 
+                  ...t, 
+                  isTranslating: false,
+                  translated: failedMessage,
+                  translatedLanguage: currentLang
+                } : t
+              ))
+            })
+          }
+        }, 100)
+      } else if (selectedLanguage === 'en') {
+        // 영어인 경우 즉시 passthrough
+        setTranscript(prev => prev.map(line => 
+          line.id === newLine.id ? { 
+            ...line, 
+            translated: newText, 
+            translatedLanguage: 'en',
+            isTranslating: false
+          } : line
+        ))
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translationEnabled, selectedLanguage, session?.host_name])
+
+  // 특정 라인을 번역하는 함수 (완전 안정화된 버전)
+  const translateTextForLine = useCallback(async (line: TranscriptLine, targetLang: string) => {
+    // 이미 해당 언어로 번역된 경우 건너뛰기
+    if (line.translatedLanguage === targetLang && line.translated !== line.original) {
+      console.log(`⏭️ Line already translated to ${targetLang}: "${line.original.substring(0, 30)}..."`)
+      return
+    }
+    
+    // 번역 중인 경우 건너뛰기
+    if (line.isTranslating) {
+      console.log(`⏳ Line already being translated: "${line.original.substring(0, 30)}..."`)
+      return
+    }
+    
+    let isStillActive = true
+    
+    try {
+      // 번역 중 상태로 설정
+      setTranscript(prev => prev.map(t => 
+        t.id === line.id ? { ...t, isTranslating: true } : t
+      ))
+      
+      const result = await translateText(line.original, targetLang)
+      
+      if (!isStillActive) return
+      
+      // 번역 완료 후 상태 확실히 업데이트 (isTranslating 반드시 false로)
+      setTranscript(prev => prev.map(t => 
+        t.id === line.id ? {
+          ...t, 
+          translated: result.translatedText,
+          translatedLanguage: targetLang,
+          isTranslating: false, // 항상 false로 설정 (번역 중 상태 완전 해제)
+          translationQuality: result.quality
+        } : t
+      ))
+      
+      // 통계 업데이트 - 간소화
+      if (result.fromCache || result.engine === 'duplicate-blocked' || result.engine === 'passthrough') {
+        setTranslationStats(prev => ({
+          ...prev,
+          cached: prev.cached + 1,
+          processing: Math.max(0, prev.processing - 1)
+        }))
+      } else {
+        setTranslationStats(prev => ({
+          ...prev,
+          completed: prev.completed + 1,
+          processing: Math.max(0, prev.processing - 1)
+        }))
+      }
+      
+      console.log(`✅ Translation completed: "${line.original.substring(0, 30)}..." → ${targetLang} (${result.engine})`)
+      
+    } catch (error) {
+      if (!isStillActive) return
+      
+      console.error('Translation failed for line:', error)
+      
+      // 오류 시에도 번역 중 상태 확실히 해제
+      const failedMessage = `[${t('translationFailed')}] ${line.original}`
+      setTranscript(prev => prev.map(t => 
+        t.id === line.id ? { 
+          ...t, 
+          isTranslating: false,
+          translated: failedMessage,
+          translatedLanguage: targetLang
+        } : t
+      ))
+      
+      setTranslationStats(prev => ({ ...prev, processing: Math.max(0, prev.processing - 1) }))
+    }
+    
+    return () => {
+      isStillActive = false
+    }
+  }, [translateText])
 
   // Subscribe to real-time transcript updates
   useEffect(() => {
@@ -283,7 +812,6 @@ export default function PublicSessionPage() {
           console.log('📨 New transcript received:', payload.new)
           const newTranscript = payload.new as { original_text: string }
           
-          // Use the new efficient update function
           handleTranscriptUpdate(newTranscript.original_text, false)
         }
       )
@@ -341,133 +869,104 @@ export default function PublicSessionPage() {
     }
   }, [sessionId, supabase, updateParticipantCount])
 
-  // Debounced translation cache
-  const translationCache = useRef<Map<string, string>>(new Map())
-  const pendingTranslations = useRef<Map<string, Promise<string>>>(new Map())
-
-  // Translation with browser API fallback for instant translation
-  const translateWithBrowserAPI = async (text: string, targetLang: string): Promise<string> => {
-    // Try browser built-in translation first (Chrome/Edge)
-    if ('translation' in navigator) {
-      try {
-        // @ts-expect-error - experimental API
-        const translator = await navigator.translation.createTranslator({
-          sourceLanguage: 'auto',
-          targetLanguage: targetLang
-        });
-        
-        const result = await translator.translate(text);
-        return result;
-      } catch {
-        console.log('Browser translation not available, using API');
-      }
-    }
-    
-    // Fallback to our API
-    return translateText(text, targetLang);
-  };
-
-  const translateText = async (text: string, targetLang: string): Promise<string> => {
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          targetLanguage: targetLang,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Translation failed');
-      }
-
-      const data = await response.json();
-      return data.translatedText;
-    } catch (error) {
-      console.error('Translation error:', error);
-      return `[Translation failed] ${text}`;
-    }
-  };
-
-  // Faster translation with instant mock + real translation
-  const translateLine = async (line: TranscriptLine, targetLang: string) => {
-    const cacheKey = `${line.id}-${targetLang}`;
-    
-    // Check cache first
-    if (translationCache.current.has(cacheKey)) {
-      return translationCache.current.get(cacheKey);
-    }
-    
-    // Check if already pending
-    if (pendingTranslations.current.has(cacheKey)) {
-      return pendingTranslations.current.get(cacheKey);
-    }
-    
-    // Show instant mock translation
-    const mockResult = getMockTranslation(line.original, targetLang);
-    
-    // Set mock in cache temporarily
-    translationCache.current.set(cacheKey, mockResult);
-    
-    // Start real translation in background
-    const translationPromise = translateWithBrowserAPI(line.original, targetLang)
-      .then(result => {
-        // Replace mock with real translation
-        translationCache.current.set(cacheKey, result);
-        setTranscript(prev => prev.map(t => 
-          t.id === line.id ? { ...t, translated: result } : t
-        ));
-        return result;
-      })
-      .catch(error => {
-        console.error('Translation failed:', error);
-        const fallback = `[Translation Error] ${line.original}`;
-        translationCache.current.set(cacheKey, fallback);
-        return fallback;
-      })
-      .finally(() => {
-        pendingTranslations.current.delete(cacheKey);
-      });
-    
-    pendingTranslations.current.set(cacheKey, translationPromise);
-    
-    return mockResult;
-  };
-
-  // Update translations when language changes
+  // 언어 변경시 번역 처리 (완전 개선된 버전)
   useEffect(() => {
     if (!translationEnabled) {
-      // Reset translations when disabled
+      // 번역 비활성화시 원문으로 리셋
       setTranscript(prev => prev.map(line => ({
         ...line,
-        translated: line.original
+        translated: line.original,
+        translatedLanguage: 'en',
+        isTranslating: false
       })))
+      setTranslationStats({ cached: 0, processing: 0, completed: 0 })
       return
     }
 
-    // Show mock translations immediately, then get real ones
+    if (transcript.length === 0) return
+    
+    console.log(`🔄 COMPLETE translation reset for ${transcript.length} transcripts to ${selectedLanguage}`)
+    
+    // 즉시 모든 번역 상태 초기화 (언어 변경 시 섞임 방지)
     setTranscript(prev => prev.map(line => ({
       ...line,
-      translated: getMockTranslation(line.original, selectedLanguage)
+      translated: line.original, // 임시로 원문으로 설정
+      translatedLanguage: selectedLanguage,
+      isTranslating: false // 번역 중 상태 완전 해제
     })))
     
-    // Get real translations asynchronously (batch processing)
-    const translateBatch = async () => {
-      for (const line of transcript) {
-        await translateLine(line, selectedLanguage)
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100))
+    setTranslationStats({ cached: 0, processing: 0, completed: 0 })
+    
+    let isActive = true
+    
+    // 모든 트랜스크립트를 해당 언어로 번역 (일관성 확보)
+    const translateAllTranscripts = async () => {
+      if (!isActive) return
+      
+      let cachedCount = 0
+      let newTranslations = 0
+      
+      // 영어인 경우 즉시 passthrough
+      if (selectedLanguage === 'en') {
+        setTranscript(prev => prev.map(line => ({
+          ...line,
+          translated: line.original,
+          translatedLanguage: 'en',
+          isTranslating: false
+        })))
+        console.log(`✅ English passthrough for all ${transcript.length} transcripts`)
+        return
       }
+      
+      // 모든 트랜스크립트 번역 (일관성 보장)
+      for (const line of transcript) {
+        if (!isActive) break
+        
+        // 캐시 확인
+        const cacheKey = `${line.original}:${selectedLanguage}`
+        const cachedResult = translationCache.current.get(cacheKey)
+        
+        if (cachedResult) {
+          // 캐시된 번역 즉시 적용
+          setTranscript(prev => prev.map(l => 
+            l.id === line.id ? { 
+              ...l, 
+              translated: cachedResult.translatedText,
+              translatedLanguage: selectedLanguage,
+              isTranslating: false,
+              translationQuality: cachedResult.quality
+            } : l
+          ))
+          cachedCount++
+          console.log(`📋 Applied cached: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
+        } else {
+          // 새로운 번역이 필요한 경우만 API 호출
+          console.log(`🔄 Queuing translation: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
+          translateTextForLine(line, selectedLanguage)
+          newTranslations++
+        }
+      }
+      
+      console.log(`📊 Translation summary: ${cachedCount} cached, ${newTranslations} queued for API`)
+      
+      // 통계 업데이트
+      setTranslationStats(prev => ({
+        ...prev,
+        cached: cachedCount,
+        processing: newTranslations
+      }))
     }
     
-    if (transcript.length > 0) {
-      translateBatch()
+    // 짧은 딜레이 후 실행
+    const timeoutId = setTimeout(() => {
+      translateAllTranscripts()
+    }, 200)
+    
+    return () => {
+      isActive = false
+      clearTimeout(timeoutId)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguage, translationEnabled])
+  }, [selectedLanguage, translationEnabled, transcript.length]) // transcript.length 추가로 새 항목 감지
 
   // Clear cache when translation is disabled
   useEffect(() => {
@@ -477,22 +976,75 @@ export default function PublicSessionPage() {
     }
   }, [translationEnabled])
 
-  // Simple mock translation for immediate display
-  const getMockTranslation = useCallback((text: string, targetLang: string): string => {
-    if (!translationEnabled || targetLang === 'en') return text
-    
-    const mockTranslations: { [key: string]: string } = {
-      'ko': `[한국어] ${text}`,
-      'ja': `[日本語] ${text}`,
-      'zh': `[中文] ${text}`,
-      'es': `[Español] ${text}`,
-      'fr': `[Français] ${text}`,
+  const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
+
+  // 🆕 텍스트 복사 기능 (다국어화)
+  const copyTextOnly = useCallback(async (type: 'original' | 'translation', event?: React.MouseEvent) => {
+    // 이벤트 기본 동작 방지 (페이지 이동 방지)
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
     }
     
-    return mockTranslations[targetLang] || text
-  }, [translationEnabled])
-
-  const selectedLang = languages.find((lang) => lang.code === selectedLanguage)
+    if (transcript.length === 0) {
+      addToast({
+        type: 'warning',
+        title: t('noContent'),
+        duration: 1500
+      })
+      return
+    }
+    
+    const textContent = transcript
+      .map((line, index) => {
+        const text = type === 'original' ? line.original : line.translated
+        return textOnlyMode ? text : `${index + 1}. ${text}`
+      })
+      .join('\n\n')
+    
+    try {
+      // 모던 브라우저 (HTTPS 환경)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textContent)
+        console.log('✅ Text copied using modern clipboard API')
+      } else {
+        // 호환성 fallback (HTTP 환경 등)
+        const textArea = document.createElement('textarea')
+        textArea.value = textContent
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textArea)
+        
+        if (!successful) {
+          throw new Error('execCommand copy failed')
+        }
+        console.log('✅ Text copied using fallback method')
+      }
+      
+      // 다국어화된 성공 Toast
+      addToast({
+        type: 'success',
+        title: t('copySuccess'),
+        duration: 2000
+      })
+      
+    } catch (err) {
+      console.error('❌ Failed to copy text:', err)
+      
+      // 다국어화된 실패 Toast
+      addToast({
+        type: 'error',
+        title: t('copyFail'),
+        duration: 3000
+      })
+    }
+  }, [transcript, textOnlyMode, addToast])
 
   // Render transcript content function
   const renderTranscriptContent = (type: 'original' | 'translation') => {
@@ -507,88 +1059,107 @@ export default function PublicSessionPage() {
             )}
           </div>
           <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            {type === 'original' ? 'Waiting for the speaker to start...' : 'No content to translate'}
+            {type === 'original' ? t('waitingSpeaker') : t('noContentTranslate')}
           </h3>
           <p className="text-sm">
-            {type === 'original' ? 'Live transcription will appear here' : 'Original transcript will be translated here'}
+            {type === 'original' ? t('liveTranscription') : t('originalTranslated')}
           </p>
           {type === 'original' && (
             <div className="mt-4 flex items-center justify-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs">Session is active</span>
+              <span className="text-xs">{t('sessionActive')}</span>
             </div>
           )}
         </div>
       )
     }
 
-    return transcript.map((line, index) => {
-      const text = type === 'original' ? line.original : line.translated
-      
-      // Split text into sentences for better readability
-      const sentences = text.split(/([.!?]+)/).filter(Boolean)
-      const formattedSentences: string[] = []
-      
-      for (let i = 0; i < sentences.length; i += 2) {
-        const sentence = sentences[i]
-        const punctuation = sentences[i + 1] || ''
-        if (sentence.trim()) {
-          formattedSentences.push((sentence + punctuation).trim())
-        }
-      }
-      
-      const finalSentences = formattedSentences.length > 0 ? formattedSentences : [text]
-      
+    // 🆕 텍스트만 보기 모드
+    if (textOnlyMode) {
       return (
-        <div 
-          key={`${type}-${line.id}`} 
-          className={`p-4 rounded-lg border shadow-sm ${
-            type === 'original'
-              ? (darkMode ? 'border-blue-600 bg-gray-700' : 'border-blue-200 bg-white')
-              : (darkMode ? 'border-green-600 bg-gray-700' : 'border-green-200 bg-white')
-          }`}
-        >
-          {showTimestamps && (
-            <div className={`text-xs mb-3 pb-2 border-b ${
-              type === 'original'
-                ? (darkMode ? 'border-blue-500 text-gray-400' : 'border-blue-100 text-gray-500')
-                : (darkMode ? 'border-green-500 text-gray-400' : 'border-green-100 text-gray-500')
-            }`}>
-              <div className="flex items-center justify-between">
-                <span>
-                  <span className="font-medium">#{index + 1}</span>
-                  {' • '}
-                  <span>{line.timestamp}</span>
-                </span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  type === 'original'
-                    ? (darkMode ? 'bg-blue-600 text-blue-100' : 'bg-blue-100 text-blue-600')
-                    : (darkMode ? 'bg-green-600 text-green-100' : 'bg-green-100 text-green-600')
-                }`}>
-                  {type === 'original' ? line.speaker : selectedLang?.name}
-                </span>
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-3">
-            {finalSentences.map((sentence, sentenceIndex) => (
+        <div className="space-y-2">
+          {transcript.map((line) => {
+            const text = type === 'original' ? line.original : line.translated
+            return (
               <div 
-                key={`${line.id}-${type}-sentence-${sentenceIndex}`}
-                className={`leading-relaxed p-3 rounded-md ${
-                  type === 'original'
-                    ? (darkMode ? 'text-gray-100 bg-blue-800' : 'text-gray-900 bg-blue-50')
-                    : (darkMode ? 'text-gray-100 bg-green-800' : 'text-gray-900 bg-green-50')
-                }`}
+                key={`text-only-${type}-${line.id}`}
+                className={`leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
                 style={{ fontSize: `${fontSize[0]}px` }}
               >
-                {sentence}
+                {text}
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )
-    })
+    }
+
+    return (
+      <div className="space-y-3">
+        {transcript.map((line, index) => {
+          const text = type === 'original' ? line.original : line.translated
+          
+          return (
+            <div key={`${type}-${line.id}`} className="group">
+              {/* Timestamp */}
+              {showTimestamps && (
+                <div className={`text-xs mb-1 flex items-center space-x-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <span className="font-medium">#{index + 1}</span>
+                  <span>•</span>
+                  <span>{line.timestamp}</span>
+                  <span>•</span>
+                  <span>{type === 'original' ? line.speaker : selectedLang?.name}</span>
+                  {type === 'translation' && line.isTranslating && (
+                    <>
+                      <span>•</span>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>{t('translating')}</span>
+                    </>
+                  )}
+                  {type === 'translation' && !line.isTranslating && line.translationQuality && line.translationQuality > 0.8 && (
+                    <>
+                      <span>•</span>
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      <span>{t('completed')}</span>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {/* Main Text */}
+              <div 
+                className={`leading-relaxed mb-1 ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
+                style={{ fontSize: `${fontSize[0]}px` }}
+              >
+                {text}
+              </div>
+              
+              {/* Translation should ONLY show below original in mobile view - NOT on desktop */}
+              {type === 'original' && translationEnabled && selectedLanguage !== 'en' && 
+               line.translated !== line.original && (
+                <div 
+                  className={`lg:hidden leading-relaxed italic pl-4 border-l-2 ${
+                    darkMode 
+                      ? 'text-gray-300 border-gray-600' 
+                      : 'text-gray-700 border-gray-300'
+                  }`}
+                  style={{ fontSize: `${fontSize[0] - 1}px` }}
+                >
+                  {line.isTranslating ? (
+                    <span className="text-gray-400 flex items-center space-x-2">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>[{t('aiTranslating')}]</span>
+                    </span>
+                  ) : (
+                    line.translated
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   if (loading) {
@@ -636,7 +1207,7 @@ export default function PublicSessionPage() {
                 <h1 className="text-2xl font-bold text-gray-900">{session.title}</h1>
                 <p className="text-gray-600 mt-2">by {session.host_name}</p>
                 <Badge className="mt-2 bg-green-100 text-green-800">
-                  Live Session
+                  {t('liveSession')}
                 </Badge>
               </div>
 
@@ -659,12 +1230,12 @@ export default function PublicSessionPage() {
               <div className="space-y-3">
                 <Button onClick={joinSession} className="w-full">
                   <Globe className="mr-2 h-4 w-4" />
-                  {user && session?.host_id === user.id ? 'View as Audience' : 'Join Session'}
+                  {user && session?.host_id === user.id ? t('viewAsAudience') : t('joinSession')}
                 </Button>
               </div>
 
               <div className="text-xs text-gray-400">
-                Real-time transcription and translation
+                {t('realtimeTranscription')}
               </div>
             </div>
           </CardContent>
@@ -724,7 +1295,7 @@ export default function PublicSessionPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Translation
+                    {t('translation')}
                   </Label>
                   <div className="flex items-center space-x-2">
                     <input
@@ -735,23 +1306,56 @@ export default function PublicSessionPage() {
                       className="rounded"
                     />
                     <Label htmlFor="translationEnabled" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Enable Translation
+                      {t('enableTranslation')}
                     </Label>
                   </div>
                 </div>
                 
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                  <div className="space-y-1">
-                    <div>💡 <strong>Cost-efficient translation:</strong></div>
-                    <div>• Translation only happens when you view the translated tab</div>
-                    <div>• Your preferred language: <strong>{languages.find(l => l.code === selectedLanguage)?.name}</strong></div>
+                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className="space-y-2">
+                    <div>🚀 <strong>GPT-Powered Translation System:</strong></div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>• GPT-4o-mini for natural translation</div>
+                      <div>• Smart caching reduces costs 90%+</div>
+                      <div>• Instant placeholder responses</div>
+                      <div>• Google Translate as fallback</div>
+                    </div>
+                    <div>• Your language: <strong>{languages.find(l => l.code === selectedLanguage)?.name}</strong></div>
+                    {translationEnabled && (
+                      <div className="mt-3 pt-2 border-t border-gray-300 dark:border-gray-600">
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          <div className="space-y-1">
+                            <div className="font-bold text-green-600 text-sm">{translationStats.cached}</div>
+                            <div className="text-xs">📋 Cached</div>
+                            <div className="text-xs opacity-75">Instant</div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="font-bold text-blue-600 text-sm">{translationStats.processing}</div>
+                            <div className="text-xs">⏳ Processing</div>
+                            <div className="text-xs opacity-75">AI Working</div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="font-bold text-purple-600 text-sm">{translationStats.completed}</div>
+                            <div className="text-xs">✅ Done</div>
+                            <div className="text-xs opacity-75">High Quality</div>
+                          </div>
+                        </div>
+                        {(translationStats.cached + translationStats.completed) > 0 && (
+                          <div className="mt-2 text-center">
+                            <div className="text-xs opacity-75">
+                              💰 Cost saved: ~{Math.round((translationStats.cached / (translationStats.cached + translationStats.completed + translationStats.processing)) * 100)}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
                 {translationEnabled && (
                   <div className="space-y-2">
                     <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Target Language
+                      {t('targetLanguage')}
                     </Label>
                     <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                       <SelectTrigger>
@@ -775,7 +1379,7 @@ export default function PublicSessionPage() {
 
             <div className="space-y-2">
               <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Font Size: {fontSize[0]}px
+                {t('fontSize')}: {fontSize[0]}px
               </Label>
               <Slider
                 value={fontSize}
@@ -797,7 +1401,7 @@ export default function PublicSessionPage() {
                   className="rounded"
                 />
                 <Label htmlFor="darkMode" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Dark Mode
+                  {t('darkMode')}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -809,10 +1413,57 @@ export default function PublicSessionPage() {
                   className="rounded"
                 />
                 <Label htmlFor="showTimestamps" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Show Timestamps
+                  {t('showTimestamps')}
+                </Label>
+              </div>
+              {/* 🆕 텍스트만 보기 옵션 */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="textOnlyMode"
+                  checked={textOnlyMode}
+                  onChange={(e) => setTextOnlyMode(e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="textOnlyMode" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {t('textOnlyMode')}
                 </Label>
               </div>
             </div>
+
+            {/* 🆕 복사 버튼들 */}
+            {transcript.length > 0 && (
+              <div className="space-y-2">
+                <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {t('textCopy')}
+                </Label>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={(e) => copyTextOnly('original', e)}
+                    className="flex-1"
+                  >
+                    {t('copyOriginal')}
+                  </Button>
+                  {translationEnabled && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={(e) => copyTextOnly('translation', e)}
+                      className="flex-1"
+                    >
+                      {t('copyTranslation')}
+                    </Button>
+                  )}
+                </div>
+                {textOnlyMode && (
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {t('textOnlyModeHint')}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -830,7 +1481,7 @@ export default function PublicSessionPage() {
                   : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`
               }`}
             >
-              📝 Original
+              📝 {t('original')}
             </button>
             <button
               onClick={() => setTranslationEnabled(true)}
@@ -840,7 +1491,7 @@ export default function PublicSessionPage() {
                   : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`
               }`}
             >
-              🌍 Translation
+              🌍 {t('translation')}
               {selectedLang && (
                 <span className="ml-1 text-xs opacity-75">
                   {selectedLang.flag}
@@ -859,7 +1510,7 @@ export default function PublicSessionPage() {
                 <CardHeader>
                   <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     <Mic className="h-5 w-5" />
-                    <span>Original Transcript</span>
+                    <span>{t('original')} Transcript</span>
                     <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
                     <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Live</span>
                   </CardTitle>
@@ -882,7 +1533,7 @@ export default function PublicSessionPage() {
                     <div className="flex items-center justify-between">
                       <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                         <Globe className="h-5 w-5 text-green-600" />
-                        <span>Translation</span>
+                        <span>{t('translation')}</span>
                         {selectedLang && (
                           <span className={`text-sm font-normal ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                             ({selectedLang.flag} {selectedLang.name})
@@ -988,6 +1639,9 @@ export default function PublicSessionPage() {
           </div>
         </div>
       </div>
+      
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

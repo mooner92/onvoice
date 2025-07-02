@@ -230,7 +230,7 @@ export function RealtimeSTT({
           onTranscriptUpdate(displayText, true) // Always show as partial first
 
           if (isFinalResult) {
-            // Wait 1.5 seconds of silence before finalizing
+            // Wait 2.5 seconds of silence before finalizing (더 여유로운 설정)
             finalizeTimeoutRef.current = setTimeout(() => {
               if (accumulatedTextRef.current) {
                 console.log('📝 Finalizing transcript:', accumulatedTextRef.current)
@@ -257,7 +257,7 @@ export function RealtimeSTT({
                 // Reset accumulated text
                 accumulatedTextRef.current = ''
               }
-            }, 1500) // 1.5 second delay for better sentence completion
+            }, 2500) // 2.5 second delay for better sentence completion
           }
         }
       }
