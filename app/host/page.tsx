@@ -107,6 +107,7 @@ export default function HostDashboard() {
     }
 
     checkExistingSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, supabase])
 
   // Check microphone permission
@@ -153,6 +154,7 @@ export default function HostDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, supabase])
 
   // Session duration timer

@@ -36,7 +36,7 @@ export default function PublicSessionPage() {
   const { toasts, addToast, removeToast } = useToast()
 
   // Get user's preferred language from browser or profile
-  const getUserPreferredLanguage = () => {
+  const getUserPreferredLanguage = useCallback(() => {
     // Try to get from user metadata first
     if (user?.user_metadata?.preferred_language) {
       return user.user_metadata.preferred_language
@@ -50,16 +50,16 @@ export default function PublicSessionPage() {
     }
     
     return 'en' // Default fallback to English
-  }
+  }, [user?.user_metadata?.preferred_language])
 
   // Simple i18n for UI text based on browser language
-  const getBrowserLanguage = () => {
+  const getBrowserLanguage = useCallback(() => {
     if (typeof window === 'undefined') return 'en'
     const browserLang = navigator.language.split('-')[0]
     return ['ko', 'zh', 'hi'].includes(browserLang) ? browserLang : 'en' // 지원하는 3개 언어만
-  }
+  }, [])
 
-  const t = (key: string) => {
+  const t = useCallback((key: string) => {
     const lang = getBrowserLanguage()
     const translations: Record<string, Record<string, string>> = {
       en: {
@@ -275,7 +275,7 @@ export default function PublicSessionPage() {
     }
     
     return translations[lang]?.[key] || translations['en'][key] || key
-  }
+  }, [getBrowserLanguage])
 
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState(() => getUserPreferredLanguage())
@@ -304,7 +304,7 @@ export default function PublicSessionPage() {
   // Set user preferred language on client side
   useEffect(() => {
     setSelectedLanguage(getUserPreferredLanguage())
-  }, [user])
+  }, [user, getUserPreferredLanguage])
 
   // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
@@ -435,11 +435,10 @@ export default function PublicSessionPage() {
           .from('transcripts')
           .select('*')
           .eq('session_id', sessionData.id)
-          .eq('translation_status', 'completed') // 🆕 번역 완료된 것만 로드
           .order('created_at', { ascending: true })
 
         if (transcripts && transcripts.length > 0) {
-          console.log(`📚 Loading ${transcripts.length} completed transcripts...`)
+          console.log(`📚 Loading ${transcripts.length} transcripts...`)
           
           // 초기 로딩 시에는 기존 transcript를 모두 지우고 새로 로드
           const formattedTranscripts: TranscriptLine[] = []
@@ -497,7 +496,8 @@ export default function PublicSessionPage() {
     if (slug) {
       loadSession()
     }
-  }, [slug, supabase, selectedLanguage, translationEnabled])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, supabase])
 
 
   // Join session as participant or guest
@@ -541,7 +541,7 @@ export default function PublicSessionPage() {
       // Even if error, allow viewing
       setHasJoined(true)
     }
-  }, [sessionId, user, session?.host_id, supabase, t])
+  }, [sessionId, user, session?.host_id, supabase])
 
   // Auto-join session when session is loaded (for both logged-in and guest users)
   useEffect(() => {
@@ -601,7 +601,7 @@ export default function PublicSessionPage() {
       console.log('🧹 Cleaning up realtime subscription')
       supabase.removeChannel(channel)
     }
-           }, [sessionId, supabase]) // sessionId와 supabase만 필요
+  }, [sessionId, supabase])
 
 
 
@@ -618,7 +618,6 @@ export default function PublicSessionPage() {
           .from('transcripts')
           .select('*')
           .eq('session_id', sessionId)
-          .eq('translation_status', 'completed')
           .order('created_at', { ascending: true })
 
         if (transcripts && transcripts.length > 0) {
@@ -794,7 +793,8 @@ export default function PublicSessionPage() {
       console.log('🧹 Cleaning up real-time subscription')
       supabase.removeChannel(channel)
     }
-  }, [sessionId, supabase, handleTranscriptUpdate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, supabase, hasJoined])
 
   // Update participant count
   const updateParticipantCount = useCallback(async () => {
@@ -854,106 +854,70 @@ export default function PublicSessionPage() {
       return
     }
 
-    if (transcript.length === 0) return
+    // 언어 변경 시에만 실행
+    console.log(`🔄 Language changed to ${selectedLanguage}, updating translations...`)
     
-    console.log(`🔄 COMPLETE translation reset for ${transcript.length} transcripts to ${selectedLanguage}`)
-    
-    // 즉시 모든 번역 상태 초기화 (언어 변경 시 섞임 방지)
-    setTranscript(prev => prev.map(line => ({
-      ...line,
-      translated: line.original, // 임시로 원문으로 설정
-      translatedLanguage: selectedLanguage,
-      isTranslating: false // 번역 중 상태 완전 해제
-    })))
-    
-    setTranslationStats({ cached: 0, processing: 0, completed: 0 })
-    
-    let isActive = true
-    
-    // 모든 트랜스크립트를 해당 언어로 번역 (일관성 확보)
-    const translateAllTranscripts = async () => {
-      if (!isActive) return
-      
-      let cachedCount = 0
-      let newTranslations = 0
+    setTranscript(prev => {
+      if (prev.length === 0) return prev
       
       // 영어인 경우 즉시 passthrough
       if (selectedLanguage === 'en') {
-        setTranscript(prev => prev.map(line => ({
+        return prev.map(line => ({
           ...line,
           translated: (line.original && typeof line.original === 'string') ? line.original : '',
           translatedLanguage: 'en',
           isTranslating: false
-        })))
-        console.log(`✅ English passthrough for all ${transcript.length} transcripts`)
-        return
+        }))
       }
-
-      // 모든 트랜스크립트 번역 (일관성 보장)
-      for (const line of transcript) {
-        if (!isActive) break
-        
-        // 안전성 체크: line과 line.original이 유효한지 확인
-        if (!line || !line.original || typeof line.original !== 'string' || line.original.trim().length === 0) {
-          console.warn('⚠️ Skipping invalid transcript line:', line)
-          continue
-        }
-        
-        // 캐시 확인
-        const cacheKey = `${line.original}:${selectedLanguage}`
-        const cachedResult = translationCache.current.get(cacheKey)
-        
-        if (cachedResult) {
-          // 캐시된 번역 즉시 적용
-          setTranscript(prev => prev.map(l => 
-            l.id === line.id ? { 
-              ...l, 
-              translated: cachedResult.translatedText,
-              translatedLanguage: selectedLanguage,
-              isTranslating: false,
-              translationQuality: cachedResult.quality
-            } : l
-          ))
-          cachedCount++
-          console.log(`📋 Applied cached: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
-        } else {
-          // 새로운 번역이 필요한 경우 Mock 번역 표시 후 폴링 시작
-          console.log(`🔄 Queuing translation: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
-          
-          // 번역 중 상태로 설정
-          setTranscript(prev => prev.map(l => 
-            l.id === line.id ? { 
-              ...l, 
-              translated: `[번역 중...] ${line.original}`,
-              translatedLanguage: selectedLanguage,
-              isTranslating: true
-            } : l
-          ))
-          
-          newTranslations++
-      }
-    }
-    
-      console.log(`📊 Translation summary: ${cachedCount} cached, ${newTranslations} queued for API`)
       
-      // 통계 업데이트
-      setTranslationStats(prev => ({
-        ...prev,
-        cached: cachedCount,
-        processing: newTranslations
+      // 다른 언어인 경우 번역 중 상태로 설정
+      return prev.map(line => ({
+        ...line,
+        translated: `[번역 중...] ${line.original}`,
+        translatedLanguage: selectedLanguage,
+        isTranslating: true
       }))
+    })
+    
+    // 캐시에서 번역 확인
+    if (selectedLanguage !== 'en') {
+      setTimeout(async () => {
+        const currentTranscripts = await new Promise<TranscriptLine[]>(resolve => {
+          setTranscript(prev => {
+            resolve([...prev])
+            return prev
+          })
+        })
+        
+        for (const line of currentTranscripts) {
+          if (!line || !line.original || typeof line.original !== 'string') continue
+          
+          try {
+            const { data: cache } = await supabase
+              .from('translation_cache')
+              .select('*')
+              .eq('original_text', line.original.trim())
+              .eq('target_language', selectedLanguage)
+              .maybeSingle()
+            
+            if (cache) {
+              setTranscript(prev => prev.map(l => 
+                l.id === line.id ? {
+                  ...l,
+                  translated: cache.translated_text,
+                  isTranslating: false,
+                  translationQuality: cache.quality_score
+                } : l
+              ))
+            }
+          } catch (error) {
+            console.error('Cache check error:', error)
+          }
+        }
+      }, 500)
     }
     
-    // 짧은 딜레이 후 실행
-    const timeoutId = setTimeout(() => {
-      translateAllTranscripts()
-    }, 200)
-    
-    return () => {
-      isActive = false
-      clearTimeout(timeoutId)
-    }
-  }, [selectedLanguage, translationEnabled, transcript]) // transcript 변경도 감지
+  }, [selectedLanguage, translationEnabled, supabase]) // transcript 제거
 
   // Clear cache when translation is disabled
   useEffect(() => {
@@ -1032,7 +996,8 @@ export default function PublicSessionPage() {
         duration: 3000
       })
     }
-  }, [transcript, textOnlyMode, addToast, t])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcript, textOnlyMode, addToast])
 
   // Render transcript content function
   const renderTranscriptContent = (type: 'original' | 'translation') => {

@@ -154,38 +154,74 @@ export function RealtimeSTT({
         setIsListening(false)
         recognitionRef.current = null
         
-        // Auto-restart only if still active
+        // Auto-restart only if still active and not in error state
         if (isActiveRef.current && currentSessionRef.current) {
-          setStatus('Restarting...')
-          setTimeout(() => {
-            if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
-              startSpeechRecognition()
-            }
-          }, 500)
-        } else {
-          setStatus('Ready to start')
-        }
-      }
-
-      recognition.onerror = (event: any) => {
-        if (!mountedRef.current) return
-        console.log('⚠️ Recognition event:', event.error)
-        setIsListening(false)
-        recognitionRef.current = null
-        
-        if (event.error === 'not-allowed') {
-          setHasPermission(false)
-          setStatus('Permission denied')
-          isActiveRef.current = false
-        } else {
-          // For other errors, try to restart
-          if (isActiveRef.current && currentSessionRef.current) {
+          // Add a retry limit to prevent infinite loops
+          const retryCount = (window as any).__retryCount || 0
+          if (retryCount < 3) {
+            (window as any).__retryCount = retryCount + 1
             setStatus('Restarting...')
             setTimeout(() => {
               if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
                 startSpeechRecognition()
               }
-            }, 1000)
+            }, 1000) // Increased delay
+          } else {
+            console.log('⚠️ Max retries reached, stopping auto-restart')
+            setStatus('Connection lost - please refresh')
+            isActiveRef.current = false
+            ;(window as any).__retryCount = 0
+          }
+        } else {
+          setStatus('Ready to start')
+          ;(window as any).__retryCount = 0
+        }
+      }
+
+      recognition.onerror = (event: any) => {
+        if (!mountedRef.current) return
+        console.log('⚠️ Recognition error:', event.error, event.message)
+        setIsListening(false)
+        recognitionRef.current = null
+        
+        // Reset retry count on critical errors
+        if (event.error === 'not-allowed' || event.error === 'aborted') {
+          ;(window as any).__retryCount = 0
+          setHasPermission(false)
+          setStatus('Permission denied')
+          isActiveRef.current = false
+          onError(`Microphone error: ${event.error}`)
+        } else if (event.error === 'network') {
+          setStatus('Network error')
+          isActiveRef.current = false
+          ;(window as any).__retryCount = 0
+          onError('Network connection lost')
+        } else if (event.error === 'no-speech') {
+          // This is normal, just continue
+          console.log('No speech detected, continuing...')
+          if (isActiveRef.current && currentSessionRef.current) {
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                startSpeechRecognition()
+              }
+            }, 100)
+          }
+        } else {
+          // For other errors, try limited restart
+          const retryCount = (window as any).__retryCount || 0
+          if (isActiveRef.current && currentSessionRef.current && retryCount < 3) {
+            (window as any).__retryCount = retryCount + 1
+            setStatus('Reconnecting...')
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                startSpeechRecognition()
+              }
+            }, 2000)
+          } else {
+            console.log('⚠️ Unrecoverable error or max retries')
+            setStatus('Error - please refresh')
+            isActiveRef.current = false
+            ;(window as any).__retryCount = 0
           }
         }
       }
@@ -312,6 +348,9 @@ export function RealtimeSTT({
         isActiveRef.current = true
         
         console.log('🚀 Initializing NEW session:', sessionId)
+        
+        // Reset retry count for new session
+        ;(window as any).__retryCount = 0
         
         // Initialize session in database
         fetch('/api/stt-stream', {

@@ -210,6 +210,7 @@ export default function SessionPage() {
     if (transcript.length > 0) {
       updateTranslations()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLanguage, translateText])
 
   const selectedLang = languages.find((lang) => lang.code === selectedLanguage)

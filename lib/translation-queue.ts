@@ -182,27 +182,57 @@ ${JSON.stringify(Object.fromEntries(supportedLanguages.map(lang => [lang, `[${GP
     if (data.choices && data.choices[0] && data.choices[0].message) {
       const content = data.choices[0].message.content.trim()
       
+      // GPT 응답을 안전하게 파싱
       try {
         // JSON 파싱 시도
         const translations = JSON.parse(content)
         const result: Record<string, { text: string; quality: number }> = {}
         
         for (const [lang, translation] of Object.entries(translations)) {
-          if (typeof translation === 'string' && translation.trim()) {
-            result[lang] = {
-              text: translation.trim(),
-              quality: 0.95
-            }
+          result[lang] = {
+            text: translation as string,
+            quality: 0.95
           }
         }
         
-        console.log(`✅ GPT batch translation successful for ${Object.keys(result).length} languages`)
         return result
-        
       } catch (parseError) {
         console.error('Failed to parse GPT batch response:', parseError)
         console.log('Raw response:', content)
-        return null
+        
+        // JSON이 불완전한 경우 정규식으로 파싱 시도
+        const result: Record<string, { text: string; quality: number }> = {}
+        
+        // 각 언어별로 패턴 매칭
+        const patterns = [
+          { lang: 'ko', regex: /"ko":\s*"([^"]*)"/ },
+          { lang: 'zh', regex: /"zh":\s*"([^"]*)"/ },
+          { lang: 'hi', regex: /"hi":\s*"([^"]*)"/ },
+          { lang: 'ja', regex: /"ja":\s*"([^"]*)"/ },
+          { lang: 'es', regex: /"es":\s*"([^"]*)"/ },
+          { lang: 'fr', regex: /"fr":\s*"([^"]*)"/ },
+          { lang: 'de', regex: /"de":\s*"([^"]*)"/ },
+          { lang: 'ar', regex: /"ar":\s*"([^"]*)"/ }
+        ]
+        
+        let foundAny = false
+        for (const { lang, regex } of patterns) {
+          const match = content.match(regex)
+          if (match && match[1]) {
+            result[lang] = {
+              text: match[1],
+              quality: 0.9 // 약간 낮은 품질 점수
+            }
+            foundAny = true
+          }
+        }
+        
+        if (foundAny) {
+          console.log('Successfully extracted translations using regex:', Object.keys(result))
+          return result
+        }
+        
+        throw new Error('Could not parse GPT response')
       }
     }
 

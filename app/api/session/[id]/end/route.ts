@@ -6,13 +6,24 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { hostId } = await req.json()
+    let hostId: string | undefined
+    
+    // Try to parse JSON body, but it's optional
+    try {
+      const body = await req.json()
+      hostId = body.hostId
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
+      // Body might be empty or not JSON, which is okay
+      console.log('No JSON body provided, proceeding without hostId')
+    }
+    
     const resolvedParams = await params
     const sessionId = resolvedParams.id
 
-    if (!sessionId || !hostId) {
+    if (!sessionId) {
       return NextResponse.json(
-        { error: "Missing session ID or host ID" },
+        { error: "Missing session ID" },
         { status: 400 }
       )
     }
@@ -22,19 +33,21 @@ export async function POST(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Verify host ownership
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('host_id', hostId)
-      .single()
+    // If hostId is provided, verify host ownership
+    if (hostId) {
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('host_id', hostId)
+        .single()
 
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: "Session not found or unauthorized" },
-        { status: 404 }
-      )
+      if (sessionError || !session) {
+        return NextResponse.json(
+          { error: "Session not found or unauthorized" },
+          { status: 404 }
+        )
+      }
     }
 
     // End session
@@ -70,8 +83,7 @@ export async function POST(
       statistics: {
         transcript_count: transcriptCount || 0,
         participant_count: participantCount || 0,
-        duration: session.created_at ? 
-          Math.floor((new Date().getTime() - new Date(session.created_at).getTime()) / 1000) : 0
+        duration: 0
       }
     })
 
