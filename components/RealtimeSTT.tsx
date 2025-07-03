@@ -216,48 +216,71 @@ export function RealtimeSTT({
             finalizeTimeoutRef.current = null
           }
 
-          // Accumulate text
-          if (isFinalResult) {
+          // Show interim results immediately for UI
+          if (!isFinalResult) {
+            // Show accumulated + current for interim results
+            const displayText = (accumulatedTextRef.current + ' ' + currentTranscript).trim()
+            onTranscriptUpdate(displayText, true) // Show as partial
+          } else {
+            // Final result: accumulate and send to server
             accumulatedTextRef.current += ' ' + currentTranscript
             accumulatedTextRef.current = accumulatedTextRef.current.trim()
+            
+            // Only send final results to server (not partial)
+            if (accumulatedTextRef.current.length > 0) {
+              console.log('🎯 Final transcript:', accumulatedTextRef.current)
+              
+              // Send to server via STT stream
+              fetch('/api/stt-stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'transcript',
+                  sessionId: currentSessionRef.current,
+                  transcript: accumulatedTextRef.current,
+                  isPartial: false // Final result
+                })
+              }).then(response => {
+                if (response.ok) {
+                  console.log('✅ Final transcript sent to server')
+                } else {
+                  console.error('❌ Failed to send transcript to server')
+                }
+              }).catch(error => {
+                console.error('❌ Error sending transcript:', error)
+              })
+              
+              // Show final result in UI
+              onTranscriptUpdate(accumulatedTextRef.current, false) // Show as final
+              
+              // Clear accumulated text for next recognition
+              accumulatedTextRef.current = ''
+            }
           }
 
-          // Show interim results (accumulated + current)
-          const displayText = isFinalResult 
-            ? accumulatedTextRef.current 
-            : (accumulatedTextRef.current + ' ' + currentTranscript).trim()
-          
-          onTranscriptUpdate(displayText, true) // Always show as partial first
-
-          if (isFinalResult) {
-            // Wait 2.5 seconds of silence before finalizing (더 여유로운 설정)
+          // Set timeout for finalizing if no more results come
+          if (!isFinalResult) {
             finalizeTimeoutRef.current = setTimeout(() => {
-              if (accumulatedTextRef.current) {
-                console.log('📝 Finalizing transcript:', accumulatedTextRef.current)
-                onTranscriptUpdate(accumulatedTextRef.current, false)
+              if (mountedRef.current && accumulatedTextRef.current) {
+                console.log('⏰ Timeout: Finalizing accumulated text')
                 
-                // Save to database
-                if (currentSessionRef.current) {
-                  fetch('/api/stt-stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      type: 'transcript',
-                      sessionId: currentSessionRef.current,
-                      transcript: accumulatedTextRef.current,
-                      isPartial: false
-                    })
-                  }).then(() => {
-                    console.log('💾 Transcript saved to DB')
-                  }).catch(error => {
-                    console.error('❌ Failed to save transcript:', error)
+                // Send accumulated text as final if timeout occurs
+                fetch('/api/stt-stream', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'transcript',
+                    sessionId: currentSessionRef.current,
+                    transcript: accumulatedTextRef.current,
+                    isPartial: false
                   })
-                }
-                
-                // Reset accumulated text
-                accumulatedTextRef.current = ''
+                }).then(() => {
+                  console.log('✅ Timeout transcript sent to server')
+                  onTranscriptUpdate(accumulatedTextRef.current, false)
+                  accumulatedTextRef.current = ''
+                })
               }
-            }, 2500) // 2.5 second delay for better sentence completion
+            }, 3000) // 3 second timeout
           }
         }
       }

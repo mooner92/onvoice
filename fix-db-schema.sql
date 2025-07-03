@@ -53,3 +53,12 @@ $$ LANGUAGE plpgsql;
 -- SELECT cron.schedule('cleanup-translations', '0 2 * * *', 'SELECT cleanup_expired_translations();');
 
 -- ✅ 완료! 이제 번역 캐시 시스템이 정상 작동합니다. 
+
+-- 번역 상태 추적을 위한 컬럼 추가
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS translation_status TEXT DEFAULT 'pending' CHECK (translation_status IN ('pending', 'processing', 'completed'));
+
+-- 번역 상태별 인덱스 추가 (성능 최적화)
+CREATE INDEX IF NOT EXISTS idx_transcripts_translation_status ON transcripts(session_id, translation_status, created_at);
+
+-- 완료된 번역만 조회하는 인덱스
+CREATE INDEX IF NOT EXISTS idx_transcripts_completed ON transcripts(session_id, created_at) WHERE translation_status = 'completed'; 

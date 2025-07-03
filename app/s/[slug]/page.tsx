@@ -45,18 +45,18 @@ export default function PublicSessionPage() {
     // Fallback to browser language (only on client side)
     if (typeof window !== 'undefined' && navigator.language) {
       const browserLang = navigator.language.split('-')[0]
-      const supportedLangs = ['ko', 'ja', 'zh', 'hi', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'en']
-      return supportedLangs.includes(browserLang) ? browserLang : 'en' // Changed default to English
+      const supportedLangs = ['ko', 'zh', 'hi', 'en'] // 지원하는 3개 언어 + 영어
+      return supportedLangs.includes(browserLang) ? browserLang : 'en' // 영어 기본값
     }
     
-    return 'en' // Default fallback to English for global usage
+    return 'en' // Default fallback to English
   }
 
   // Simple i18n for UI text based on browser language
   const getBrowserLanguage = () => {
     if (typeof window === 'undefined') return 'en'
     const browserLang = navigator.language.split('-')[0]
-    return ['ko', 'ja', 'zh', 'es', 'fr', 'de'].includes(browserLang) ? browserLang : 'en'
+    return ['ko', 'zh', 'hi'].includes(browserLang) ? browserLang : 'en' // 지원하는 3개 언어만
   }
 
   const t = (key: string) => {
@@ -306,24 +306,87 @@ export default function PublicSessionPage() {
     setSelectedLanguage(getUserPreferredLanguage())
   }, [user])
 
+  // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "ja", name: "Japanese", flag: "🇯🇵" },
     { code: "zh", name: "Chinese", flag: "🇨🇳" },
     { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "es", name: "Spanish", flag: "🇪🇸" },
-    { code: "fr", name: "French", flag: "🇫🇷" },
-    { code: "de", name: "German", flag: "🇩🇪" },
-    { code: "it", name: "Italian", flag: "🇮🇹" },
-    { code: "pt", name: "Portuguese", flag: "🇵🇹" },
-    { code: "ru", name: "Russian", flag: "🇷🇺" },
-    { code: "ar", name: "Arabic", flag: "🇸🇦" },
-    { code: "en", name: "English", flag: "🇺🇸" },
+    { code: "en", name: "English", flag: "🇺🇸" }, // 원문 표시용
   ]
 
   // 번역 캐시 (클라이언트 사이드)
   const translationCache = useRef<Map<string, TranslationResponse>>(new Map())
   const pendingTranslations = useRef<Set<string>>(new Set())
+
+  // 번역 캐시 관리
+  const selectedLanguageRef = useRef(selectedLanguage)
+  
+  // selectedLanguage 변경 시 ref 업데이트
+  useEffect(() => {
+    selectedLanguageRef.current = selectedLanguage
+  }, [selectedLanguage])
+
+  // Supabase Realtime으로 번역 캐시 업데이트 구독
+  useEffect(() => {
+    if (!sessionId) return
+
+    console.log('🔔 Setting up translation cache subscription...')
+    
+    const channel = supabase
+      .channel(`translation-cache-${sessionId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public', 
+        table: 'translation_cache'
+      }, (payload) => {
+        const cache = payload.new as {
+          original_text: string
+          target_language: string
+          translated_text: string
+          quality_score: number
+        }
+        console.log('🎉 New translation cached:', {
+          text: cache.original_text,
+          language: cache.target_language,
+          translated: cache.translated_text,
+          currentLanguage: selectedLanguageRef.current
+        })
+        
+        // 현재 선택된 언어의 번역이면 UI 업데이트
+        if (cache.target_language === selectedLanguageRef.current) {
+          console.log('📝 Updating UI with cached translation')
+          setTranscript(prev => {
+            const updated = prev.map(line => {
+              if (line.original === cache.original_text && (line.isTranslating || line.translated.includes('[번역 중...]'))) {
+                console.log(`✅ Updating line: "${line.original}" → "${cache.translated_text}"`)
+                return {
+                  ...line,
+                  translated: cache.translated_text,
+                  translatedLanguage: cache.target_language,
+                  isTranslating: false,
+                  translationQuality: cache.quality_score
+                }
+              }
+              return line
+            })
+            return updated
+          })
+        } else {
+          console.log(`⏭️ Skipping update: language mismatch (${cache.target_language} !== ${selectedLanguageRef.current})`)
+        }
+      })
+      .subscribe((status) => {
+        console.log('🔔 Translation cache subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to translation cache updates')
+        }
+      })
+
+    return () => {
+      console.log('🧹 Cleaning up translation cache subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId, supabase]) // sessionId와 supabase만 필요, selectedLanguage는 이벤트 핸들러 내부에서 처리
 
   // Load session data using slug or session ID
   useEffect(() => {
@@ -334,7 +397,6 @@ export default function PublicSessionPage() {
 
         // First try to find by slug (assumed to be session ID for now)
         let sessionData
-        let sessionError
 
         // Try as session ID first
         const { data: directSession, error: directError } = await supabase
@@ -348,7 +410,7 @@ export default function PublicSessionPage() {
           sessionData = directSession
         } else {
           // Try to find by custom slug or title match
-          const { data: slugSession, error: slugError } = await supabase
+          const { data: slugSession } = await supabase
             .from('sessions')
             .select('*')
             .ilike('title', `%${slug}%`)
@@ -357,11 +419,10 @@ export default function PublicSessionPage() {
             .single()
 
           sessionData = slugSession
-          sessionError = slugError
         }
 
         if (!sessionData) {
-          console.error('Session not found:', { slug, directError, sessionError })
+          console.error('Session not found:', { slug })
           setError(`Session not found (ID: ${slug}). The session may have ended or the link may be invalid.`)
           return
         }
@@ -369,22 +430,59 @@ export default function PublicSessionPage() {
         setSession(sessionData)
         setSessionId(sessionData.id)
 
-        // Load existing transcripts
+        // Load existing transcripts - 번역이 완료된 것만 표시
         const { data: transcripts } = await supabase
           .from('transcripts')
           .select('*')
           .eq('session_id', sessionData.id)
+          .eq('translation_status', 'completed') // 🆕 번역 완료된 것만 로드
           .order('created_at', { ascending: true })
 
-        if (transcripts) {
-          const formattedTranscripts: TranscriptLine[] = transcripts.map(t => ({
+        if (transcripts && transcripts.length > 0) {
+          console.log(`📚 Loading ${transcripts.length} completed transcripts...`)
+          
+          // 초기 로딩 시에는 기존 transcript를 모두 지우고 새로 로드
+          const formattedTranscripts: TranscriptLine[] = []
+          
+          for (const t of transcripts) {
+            let translatedText = t.original_text
+            
+            // 번역이 활성화된 경우에만 번역 로드
+            if (translationEnabled && selectedLanguage !== 'en') {
+              try {
+                // 캐시 테이블에서 직접 확인
+                const { data: cache } = await supabase
+                  .from('translation_cache')
+                  .select('*')
+                  .eq('original_text', t.original_text)
+                  .eq('target_language', selectedLanguage)
+                  .maybeSingle()
+                
+                if (cache) {
+                  translatedText = cache.translated_text
+                  console.log(`✅ Loaded cached translation for "${t.original_text.substring(0, 30)}..."`)
+                } else {
+                  translatedText = `[번역 중...] ${t.original_text}`
+                  console.log(`⏳ Translation not yet cached for "${t.original_text.substring(0, 30)}..."`)
+                }
+              } catch (err) {
+                console.error(`❌ Failed to load translation for "${t.original_text.substring(0, 30)}..."`, err)
+                translatedText = t.original_text // 실패 시 원문 표시
+              }
+            }
+            
+            formattedTranscripts.push({
             id: t.id,
             timestamp: new Date(t.created_at).toLocaleTimeString(),
             original: t.original_text,
-            translated: t.original_text, // 초기에는 원문으로 설정
-            speaker: sessionData.host_name,
-            isTranslating: false
-          }))
+              translated: translatedText,
+              translatedLanguage: selectedLanguage,
+              speaker: sessionData.host_name,
+              isTranslating: false
+            })
+          }
+          
+          // 초기 로딩이므로 완전히 교체
           setTranscript(formattedTranscripts)
         }
 
@@ -399,179 +497,8 @@ export default function PublicSessionPage() {
     if (slug) {
       loadSession()
     }
-  }, [slug, supabase])
+  }, [slug, supabase, selectedLanguage, translationEnabled])
 
-  // 개선된 번역 함수
-  const translateText = useCallback(async (text: string, targetLang: string): Promise<TranslationResponse> => {
-    const cacheKey = `${text}:${targetLang}`
-    
-    // 1. 클라이언트 캐시 확인
-    if (translationCache.current.has(cacheKey)) {
-      const cached = translationCache.current.get(cacheKey)!
-      console.log(`📋 Client cache hit for "${text.substring(0, 30)}..." → ${targetLang} (${cached.engine})`);
-      return cached
-    }
-    
-    // 2. 강화된 중복 요청 방지
-    if (pendingTranslations.current.has(cacheKey)) {
-      console.log(`🚫 BLOCKED duplicate request: "${text.substring(0, 30)}..." → ${targetLang}`);
-      // 중복 요청은 즉시 원문 반환 (API 호출 방지)
-      const duplicateResponse: TranslationResponse = {
-        translatedText: text, // 원문 그대로 반환
-        engine: 'duplicate-blocked',
-        fromCache: true // 캐시로 처리한 것처럼 표시
-      }
-      return duplicateResponse
-    }
-    
-    // 3. 영어 텍스트 자동 감지 및 passthrough
-    if (targetLang === 'en' && /^[a-zA-Z0-9\s.,!?'"()-]+$/.test(text)) {
-      console.log(`⏭️ English passthrough: "${text.substring(0, 30)}..."`)
-      const passthrough: TranslationResponse = {
-        translatedText: text,
-        engine: 'passthrough',
-        fromCache: true,
-        quality: 1.0
-      }
-      translationCache.current.set(cacheKey, passthrough)
-      return passthrough
-    }
-    
-    try {
-      pendingTranslations.current.add(cacheKey)
-      
-      console.log(`🌍 API CALL: "${text.substring(0, 30)}..." → ${targetLang} [Session: ${sessionId?.substring(0, 8)}...]`)
-      
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          targetLanguage: targetLang,
-          sessionId: sessionId // 세션 ID 포함하여 우선순위 높임
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Translation API failed: ${response.status}`)
-      }
-
-      const result: TranslationResponse = await response.json()
-      
-      // 캐시에 저장
-      translationCache.current.set(cacheKey, result)
-      
-      console.log(`✅ Translation response: ${result.engine} (fromCache: ${result.fromCache}, isProcessing: ${result.isProcessing})`)
-      
-      // 백그라운드 번역이 진행 중인 경우 즉시 상태 확인 시작
-      if (result.isProcessing && result.engine === 'mock') {
-        console.log(`🚀 Starting background translation monitoring for "${text.substring(0, 30)}..." → ${targetLang}`)
-        // 첫 번째 확인은 1초 후 (빠른 응답을 위해)
-        setTimeout(() => {
-          checkTranslationStatus(text, targetLang, cacheKey, 0)
-        }, 1000)
-      }
-      
-      return result
-      
-    } catch (error) {
-      console.error('Translation error:', error)
-      const fallback: TranslationResponse = {
-        translatedText: `[${t('translationFailed')}: ${error instanceof Error ? error.message : 'Unknown error'}]`,
-        engine: 'error',
-        fromCache: false
-      }
-      translationCache.current.set(cacheKey, fallback)
-      return fallback
-    } finally {
-      pendingTranslations.current.delete(cacheKey)
-    }
-  }, [sessionId])
-
-  // 번역 상태 확인 (백그라운드 번역 완료 체크) - 개선된 버전
-  const checkTranslationStatus = useCallback(async (text: string, targetLang: string, cacheKey: string, retryCount: number = 0) => {
-    try {
-      console.log(`🔍 Checking translation status (retry ${retryCount}): "${text.substring(0, 30)}..." → ${targetLang}`)
-      
-      const response = await fetch(`/api/translate?text=${encodeURIComponent(text)}&targetLanguage=${targetLang}`)
-      
-      if (response.ok) {
-        const result = await response.json()
-        
-        if (result.completed) {
-          console.log(`🎉 Background translation completed: "${text.substring(0, 30)}..." → ${targetLang} (${result.engine})`)
-          
-          const updatedResult: TranslationResponse = {
-            translatedText: result.translatedText,
-            engine: result.engine,
-            fromCache: true,
-            quality: result.quality
-          }
-          
-          // 캐시 업데이트 (키 통일)
-          const unifiedCacheKey = `${text}:${targetLang}`
-          translationCache.current.set(unifiedCacheKey, updatedResult)
-          
-          // UI 업데이트 - 현재 선택된 언어와 일치하는 경우만 업데이트
-          setTranscript(prev => prev.map(line => {
-            if (line.original === text && selectedLanguage === targetLang) {
-              return {
-                ...line,
-                translated: result.translatedText,
-                translatedLanguage: targetLang,
-                isTranslating: false,
-                translationQuality: result.quality
-              }
-            }
-            return line
-          }))
-          
-          // 통계 업데이트
-          setTranslationStats(prev => ({
-            ...prev,
-            processing: Math.max(0, prev.processing - 1),
-            completed: prev.completed + 1
-          }))
-          
-          return true // 번역 완료
-        } else {
-          // 아직 진행 중인 경우, 최대 5번까지 재시도
-          if (retryCount < 5) {
-            const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000) // 지수적 백오프 (최대 10초)
-            console.log(`⏳ Translation still in progress, retrying in ${delay}ms...`)
-            setTimeout(() => {
-              checkTranslationStatus(text, targetLang, cacheKey, retryCount + 1)
-            }, delay)
-          } else {
-            console.log(`⚠️ Translation check timeout for "${text.substring(0, 30)}..." → ${targetLang}`)
-            // 타임아웃된 경우 번역 중 상태 해제
-            setTranscript(prev => prev.map(line => {
-              if (line.original === text && selectedLanguage === targetLang) {
-                return {
-                  ...line,
-                  isTranslating: false,
-                  translated: `[${t('translationFailed')}] ${text}`,
-                  translatedLanguage: targetLang
-                }
-              }
-              return line
-            }))
-            
-            setTranslationStats(prev => ({
-              ...prev,
-              processing: Math.max(0, prev.processing - 1)
-            }))
-          }
-        }
-      }
-      return false
-    } catch (error) {
-      console.error('Translation status check failed:', error)
-      return false
-    }
-  }, [selectedLanguage])
 
   // Join session as participant or guest
   const joinSession = useCallback(async () => {
@@ -614,7 +541,7 @@ export default function PublicSessionPage() {
       // Even if error, allow viewing
       setHasJoined(true)
     }
-  }, [sessionId, user, session?.host_id, supabase])
+  }, [sessionId, user, session?.host_id, supabase, t])
 
   // Auto-join session when session is loaded (for both logged-in and guest users)
   useEffect(() => {
@@ -624,8 +551,141 @@ export default function PublicSessionPage() {
     }
   }, [sessionId, session, hasJoined, joinSession])
 
-  // Handle new transcript updates (번역 자동화 개선)
-  const handleTranscriptUpdate = useCallback((newText: string, isPartial: boolean = false) => {
+  // 🆕 실시간 transcript 구독 (번역 완료된 것만)
+  useEffect(() => {
+    if (!sessionId) return
+
+    console.log('🔔 Setting up realtime subscription for completed transcripts...')
+    
+    // 모든 transcript 변경사항 구독 (클라이언트에서 필터링)
+    const channel = supabase
+      .channel(`transcripts-${sessionId}`)
+      .on('postgres_changes', {
+        event: '*', // INSERT, UPDATE, DELETE 모든 이벤트
+        schema: 'public',
+        table: 'transcripts',
+        filter: `session_id=eq.${sessionId}` // 세션 ID만 필터링
+      }, (payload) => {
+        console.log('🔔 Realtime transcript update:', payload.eventType, payload.new)
+        
+        // UPDATE 이벤트만 처리 (INSERT는 폴링에서 처리)
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          const updatedTranscript = payload.new as {
+            original_text: string
+            translation_status: string
+            created_at: string
+          }
+          if (updatedTranscript.translation_status === 'completed') {
+            console.log(`🔄 Transcript status updated to completed: "${updatedTranscript.original_text}"`)
+            
+            // 이미 있는 transcript 업데이트 (새로 추가하지 않음)
+            setTranscript(prev => prev.map(line => {
+              if (line.original === updatedTranscript.original_text) {
+                // 번역 상태를 완료로 업데이트
+                return {
+                  ...line,
+                  isTranslating: false
+                }
+              }
+              return line
+            }))
+          }
+        }
+      })
+      .subscribe((status) => {
+        console.log('🔔 Realtime subscription status:', status)
+      })
+
+    // Cleanup
+    return () => {
+      console.log('🧹 Cleaning up realtime subscription')
+      supabase.removeChannel(channel)
+    }
+           }, [sessionId, supabase]) // sessionId와 supabase만 필요
+
+
+
+  // 🆕 언어 변경 시 transcript 재로드
+  useEffect(() => {
+    if (!translationEnabled || !sessionId || !session) return
+    
+    console.log(`🌍 Language changed to: ${selectedLanguage}`)
+    
+    // 언어 변경 시 transcript 재로드
+    const reloadForNewLanguage = async () => {
+      try {
+        const { data: transcripts } = await supabase
+          .from('transcripts')
+          .select('*')
+          .eq('session_id', sessionId)
+          .eq('translation_status', 'completed')
+          .order('created_at', { ascending: true })
+
+        if (transcripts && transcripts.length > 0) {
+          console.log(`🔄 Reloading ${transcripts.length} transcripts for ${selectedLanguage}`)
+          
+          const formattedTranscripts: TranscriptLine[] = []
+          
+          for (const t of transcripts) {
+            let translatedText = t.original_text
+            let isTranslating = false
+            
+            if (selectedLanguage !== 'en') {
+              // 캐시 테이블에서 직접 확인
+              try {
+                const { data: cache } = await supabase
+                  .from('translation_cache')
+                  .select('*')
+                  .eq('original_text', t.original_text)
+                  .eq('target_language', selectedLanguage)
+                  .maybeSingle()
+                
+                if (cache) {
+                  translatedText = cache.translated_text
+                  console.log(`✅ Found cached translation`)
+                } else {
+                  translatedText = `[번역 중...] ${t.original_text}`
+                  isTranslating = true
+                  console.log(`⏳ Translation not yet cached`)
+                }
+              } catch (error) {
+                console.error(`Cache check failed:`, error)
+                translatedText = t.original_text
+              }
+            }
+            
+            formattedTranscripts.push({
+              id: t.id,
+              timestamp: new Date(t.created_at).toLocaleTimeString(),
+              original: t.original_text,
+              translated: translatedText,
+              translatedLanguage: selectedLanguage,
+              speaker: session.host_name,
+              isTranslating: isTranslating
+            })
+          }
+          
+          setTranscript(formattedTranscripts)
+        }
+      } catch (error) {
+        console.error('Error reloading transcripts:', error)
+      }
+    }
+    
+    reloadForNewLanguage()
+  }, [selectedLanguage, translationEnabled, sessionId, session, supabase])
+
+
+
+
+
+  // Handle new transcript updates (심플하게 개선)
+  const handleTranscriptUpdate = useCallback(async (newText: string, isPartial: boolean = false) => {
+    if (!newText || newText.trim().length === 0) {
+      console.warn('⚠️ Skipping empty transcript update')
+      return
+    }
+    
     const now = new Date()
     const timestamp = now.toLocaleTimeString()
     const newId = `${now.getTime()}-${Math.random()}`
@@ -633,15 +693,15 @@ export default function PublicSessionPage() {
     const newLine: TranscriptLine = {
       id: newId,
       timestamp,
-      original: newText,
-      translated: newText, // 초기에는 원문으로 설정
-      translatedLanguage: selectedLanguage, // 현재 선택된 언어로 설정
+      original: newText.trim(),
+      translated: newText.trim(),
+      translatedLanguage: selectedLanguage,
       speaker: session?.host_name || 'Speaker',
       isTranslating: false
     }
 
     if (isPartial) {
-      // For partial updates, replace the last line if it exists
+      // Partial 업데이트는 UI에만 표시
       setTranscript(prev => {
         const newTranscript = [...prev]
         if (newTranscript.length > 0 && newTranscript[newTranscript.length - 1].id.includes('partial')) {
@@ -652,141 +712,52 @@ export default function PublicSessionPage() {
         return newTranscript
       })
     } else {
-      // For final updates, add as new line
+      // Final 업데이트
       setTranscript(prev => {
-        // Remove any partial line and add the final line
         const withoutPartial = prev.filter(line => !line.id.includes('partial'))
         return [...withoutPartial, newLine]
       })
       
-      // 번역이 활성화된 경우 즉시 번역 시작 (영어가 아닌 경우)
+      // 번역이 필요한 경우
       if (translationEnabled && selectedLanguage !== 'en') {
-        console.log(`🚀 Auto-translating new transcript: "${newText.substring(0, 30)}..." → ${selectedLanguage}`)
-        
-        // 트랜스크립트 추가 후 번역 함수 호출 (ref 방식으로 해결)
-        const currentLang = selectedLanguage
-        setTimeout(() => {
-          // 직접 번역 API 호출하여 circular dependency 방지
-          if (typeof translateText === 'function') {
-            setTranscript(prev => prev.map(t => 
-              t.id === newLine.id ? { ...t, isTranslating: true } : t
-            ))
-            
-            translateText(newText, currentLang).then(result => {
-              setTranscript(prev => prev.map(t => 
-                t.id === newLine.id ? {
-                  ...t, 
-                  translated: result.translatedText,
-                  translatedLanguage: currentLang,
-                  isTranslating: false,
-                  translationQuality: result.quality
-                } : t
-              ))
-                        }).catch(error => {
-              console.error('Auto-translation failed:', error)
-              const failedMessage = `[${t('translationFailed')}] ${newText}`
-              setTranscript(prev => prev.map(t => 
-                t.id === newLine.id ? { 
-                  ...t, 
-                  isTranslating: false,
-                  translated: failedMessage,
-                  translatedLanguage: currentLang
-                } : t
-              ))
-            })
-          }
-        }, 100)
-      } else if (selectedLanguage === 'en') {
-        // 영어인 경우 즉시 passthrough
+        // 번역 중 상태로 설정
         setTranscript(prev => prev.map(line => 
-          line.id === newLine.id ? { 
-            ...line, 
-            translated: newText, 
-            translatedLanguage: 'en',
-            isTranslating: false
+          line.id === newId ? {
+            ...line,
+            translated: `[번역 중...] ${newText.trim()}`,
+            isTranslating: true
           } : line
         ))
+        
+        // 캐시 확인 (백그라운드에서 실행)
+        setTimeout(async () => {
+          try {
+            const { data: cache } = await supabase
+              .from('translation_cache')
+              .select('*')
+              .eq('original_text', newText.trim())
+              .eq('target_language', selectedLanguage)
+              .maybeSingle()
+            
+            if (cache) {
+              console.log(`✅ Found cached translation for new transcript`)
+              setTranscript(prev => prev.map(line => 
+                line.id === newId ? {
+                  ...line,
+                  translated: cache.translated_text,
+                  isTranslating: false,
+                  translationQuality: cache.quality_score
+                } : line
+              ))
+            }
+            // 캐시에 없으면 Realtime 구독이 처리할 것임
+          } catch (error) {
+            console.error('Cache check error:', error)
+          }
+        }, 1000) // 1초 후 확인
       }
     }
-  }, [translationEnabled, selectedLanguage, session?.host_name])
-
-  // 특정 라인을 번역하는 함수 (완전 안정화된 버전)
-  const translateTextForLine = useCallback(async (line: TranscriptLine, targetLang: string) => {
-    // 이미 해당 언어로 번역된 경우 건너뛰기
-    if (line.translatedLanguage === targetLang && line.translated !== line.original) {
-      console.log(`⏭️ Line already translated to ${targetLang}: "${line.original.substring(0, 30)}..."`)
-      return
-    }
-    
-    // 번역 중인 경우 건너뛰기
-    if (line.isTranslating) {
-      console.log(`⏳ Line already being translated: "${line.original.substring(0, 30)}..."`)
-      return
-    }
-    
-    let isStillActive = true
-    
-    try {
-      // 번역 중 상태로 설정
-      setTranscript(prev => prev.map(t => 
-        t.id === line.id ? { ...t, isTranslating: true } : t
-      ))
-      
-      const result = await translateText(line.original, targetLang)
-      
-      if (!isStillActive) return
-      
-      // 번역 완료 후 상태 확실히 업데이트 (isTranslating 반드시 false로)
-      setTranscript(prev => prev.map(t => 
-        t.id === line.id ? {
-          ...t, 
-          translated: result.translatedText,
-          translatedLanguage: targetLang,
-          isTranslating: false, // 항상 false로 설정 (번역 중 상태 완전 해제)
-          translationQuality: result.quality
-        } : t
-      ))
-      
-      // 통계 업데이트 - 간소화
-      if (result.fromCache || result.engine === 'duplicate-blocked' || result.engine === 'passthrough') {
-        setTranslationStats(prev => ({
-          ...prev,
-          cached: prev.cached + 1,
-          processing: Math.max(0, prev.processing - 1)
-        }))
-      } else {
-        setTranslationStats(prev => ({
-          ...prev,
-          completed: prev.completed + 1,
-          processing: Math.max(0, prev.processing - 1)
-        }))
-      }
-      
-      console.log(`✅ Translation completed: "${line.original.substring(0, 30)}..." → ${targetLang} (${result.engine})`)
-      
-    } catch (error) {
-      if (!isStillActive) return
-      
-      console.error('Translation failed for line:', error)
-      
-      // 오류 시에도 번역 중 상태 확실히 해제
-      const failedMessage = `[${t('translationFailed')}] ${line.original}`
-      setTranscript(prev => prev.map(t => 
-        t.id === line.id ? { 
-          ...t, 
-          isTranslating: false,
-          translated: failedMessage,
-          translatedLanguage: targetLang
-        } : t
-      ))
-      
-      setTranslationStats(prev => ({ ...prev, processing: Math.max(0, prev.processing - 1) }))
-    }
-    
-    return () => {
-      isStillActive = false
-    }
-  }, [translateText])
+  }, [selectedLanguage, session, translationEnabled, supabase])
 
   // Subscribe to real-time transcript updates
   useEffect(() => {
@@ -910,17 +881,23 @@ export default function PublicSessionPage() {
       if (selectedLanguage === 'en') {
         setTranscript(prev => prev.map(line => ({
           ...line,
-          translated: line.original,
+          translated: (line.original && typeof line.original === 'string') ? line.original : '',
           translatedLanguage: 'en',
           isTranslating: false
         })))
         console.log(`✅ English passthrough for all ${transcript.length} transcripts`)
         return
       }
-      
+
       // 모든 트랜스크립트 번역 (일관성 보장)
       for (const line of transcript) {
         if (!isActive) break
+        
+        // 안전성 체크: line과 line.original이 유효한지 확인
+        if (!line || !line.original || typeof line.original !== 'string' || line.original.trim().length === 0) {
+          console.warn('⚠️ Skipping invalid transcript line:', line)
+          continue
+        }
         
         // 캐시 확인
         const cacheKey = `${line.original}:${selectedLanguage}`
@@ -940,13 +917,23 @@ export default function PublicSessionPage() {
           cachedCount++
           console.log(`📋 Applied cached: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
         } else {
-          // 새로운 번역이 필요한 경우만 API 호출
+          // 새로운 번역이 필요한 경우 Mock 번역 표시 후 폴링 시작
           console.log(`🔄 Queuing translation: "${line.original.substring(0, 30)}..." → ${selectedLanguage}`)
-          translateTextForLine(line, selectedLanguage)
+          
+          // 번역 중 상태로 설정
+          setTranscript(prev => prev.map(l => 
+            l.id === line.id ? { 
+              ...l, 
+              translated: `[번역 중...] ${line.original}`,
+              translatedLanguage: selectedLanguage,
+              isTranslating: true
+            } : l
+          ))
+          
           newTranslations++
-        }
       }
-      
+    }
+    
       console.log(`📊 Translation summary: ${cachedCount} cached, ${newTranslations} queued for API`)
       
       // 통계 업데이트
@@ -966,7 +953,7 @@ export default function PublicSessionPage() {
       isActive = false
       clearTimeout(timeoutId)
     }
-  }, [selectedLanguage, translationEnabled, transcript.length]) // transcript.length 추가로 새 항목 감지
+  }, [selectedLanguage, translationEnabled, transcript]) // transcript 변경도 감지
 
   // Clear cache when translation is disabled
   useEffect(() => {
@@ -996,8 +983,9 @@ export default function PublicSessionPage() {
     }
     
     const textContent = transcript
+      .filter(line => line && line.original && typeof line.original === 'string' && line.original.trim().length > 0)
       .map((line, index) => {
-        const text = type === 'original' ? line.original : line.translated
+        const text = type === 'original' ? line.original : (line.translated || line.original)
         return textOnlyMode ? text : `${index + 1}. ${text}`
       })
       .join('\n\n')
@@ -1017,7 +1005,7 @@ export default function PublicSessionPage() {
         document.body.appendChild(textArea)
         textArea.focus()
         textArea.select()
-        
+
         const successful = document.execCommand('copy')
         document.body.removeChild(textArea)
         
@@ -1044,7 +1032,7 @@ export default function PublicSessionPage() {
         duration: 3000
       })
     }
-  }, [transcript, textOnlyMode, addToast])
+  }, [transcript, textOnlyMode, addToast, t])
 
   // Render transcript content function
   const renderTranscriptContent = (type: 'original' | 'translation') => {
@@ -1078,33 +1066,37 @@ export default function PublicSessionPage() {
     if (textOnlyMode) {
       return (
         <div className="space-y-2">
-          {transcript.map((line) => {
-            const text = type === 'original' ? line.original : line.translated
-            return (
-              <div 
-                key={`text-only-${type}-${line.id}`}
-                className={`leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
-                style={{ fontSize: `${fontSize[0]}px` }}
-              >
-                {text}
-              </div>
-            )
-          })}
+          {transcript
+            .filter(line => line && line.original && typeof line.original === 'string' && line.original.trim().length > 0)
+            .map((line) => {
+              const text = type === 'original' ? line.original : (line.translated || line.original)
+              return (
+                <div 
+                  key={`text-only-${type}-${line.id}`}
+                  className={`leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
+                  style={{ fontSize: `${fontSize[0]}px` }}
+                >
+                  {text}
+                </div>
+              )
+            })}
         </div>
       )
     }
 
     return (
       <div className="space-y-3">
-        {transcript.map((line, index) => {
-          const text = type === 'original' ? line.original : line.translated
-          
-          return (
-            <div key={`${type}-${line.id}`} className="group">
+        {transcript
+          .filter(line => line && line.original && typeof line.original === 'string' && line.original.trim().length > 0)
+          .map((line, idx) => {
+            const text = type === 'original' ? line.original : (line.translated || line.original)
+        
+            return (
+              <div key={`${type}-${line.original}-${line.translatedLanguage}-${idx}`} className="group">
               {/* Timestamp */}
-              {showTimestamps && (
+          {showTimestamps && (
                 <div className={`text-xs mb-1 flex items-center space-x-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  <span className="font-medium">#{index + 1}</span>
+                  <span className="font-medium">#{idx + 1}</span>
                   <span>•</span>
                   <span>{line.timestamp}</span>
                   <span>•</span>
@@ -1123,9 +1115,9 @@ export default function PublicSessionPage() {
                       <span>{t('completed')}</span>
                     </>
                   )}
-                </div>
-              )}
-              
+            </div>
+          )}
+          
               {/* Main Text */}
               <div 
                 className={`leading-relaxed mb-1 ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
@@ -1153,10 +1145,10 @@ export default function PublicSessionPage() {
                   ) : (
                     line.translated
                   )}
-                </div>
+          </div>
               )}
-            </div>
-          )
+        </div>
+      )
         })}
       </div>
     )
@@ -1324,7 +1316,7 @@ export default function PublicSessionPage() {
                     {translationEnabled && (
                       <div className="mt-3 pt-2 border-t border-gray-300 dark:border-gray-600">
                         <div className="grid grid-cols-3 gap-3 text-center">
-                          <div className="space-y-1">
+                  <div className="space-y-1">
                             <div className="font-bold text-green-600 text-sm">{translationStats.cached}</div>
                             <div className="text-xs">📋 Cached</div>
                             <div className="text-xs opacity-75">Instant</div>
@@ -1428,8 +1420,8 @@ export default function PublicSessionPage() {
                 <Label htmlFor="textOnlyMode" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   {t('textOnlyMode')}
                 </Label>
-              </div>
             </div>
+          </div>
 
             {/* 🆕 복사 버튼들 */}
             {transcript.length > 0 && (
@@ -1645,3 +1637,5 @@ export default function PublicSessionPage() {
     </div>
   )
 }
+
+

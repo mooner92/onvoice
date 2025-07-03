@@ -45,12 +45,30 @@ export async function POST(req: NextRequest) {
           )
         }
 
-        if (!isPartial && transcript) {
+        // 텍스트 유효성 검증
+        const cleanedTranscript = transcript?.trim()
+        if (!cleanedTranscript || cleanedTranscript.length < 3) {
+          console.log(`⚠️ Skipping empty or too short transcript: "${cleanedTranscript}"`)
+          return NextResponse.json({ 
+            success: true, 
+            message: "Transcript too short, skipped"
+          })
+        }
+
+        // 중복 방지: 같은 텍스트가 이미 처리되었는지 확인
+        if (session.fullTranscript.includes(cleanedTranscript)) {
+          console.log(`⚠️ Duplicate transcript detected, skipping: "${cleanedTranscript.substring(0, 30)}..."`);
+          return NextResponse.json({ 
+            success: true, 
+            message: "Duplicate transcript, skipped"
+          })
+        }
+
+        if (!isPartial && cleanedTranscript) {
           // Only append final transcripts (not partial)
-          session.fullTranscript += transcript + ' '
+          session.fullTranscript += cleanedTranscript + ' '
           session.lastUpdate = new Date()
-          console.log(`📝 Transcript added to session ${sessionId}:`, transcript)
-          console.log(`📊 Current full transcript length:`, session.fullTranscript.length)
+          console.log(`📝 Final transcript added to session ${sessionId}:`, cleanedTranscript)
 
           // Save EACH final sentence immediately to Supabase
           const supabase = createClient(
@@ -64,44 +82,63 @@ export async function POST(req: NextRequest) {
               {
                 session_id: sessionId,
                 timestamp: new Date().toLocaleTimeString(),
-                original_text: transcript.trim(),
+                original_text: cleanedTranscript,
                 created_at: new Date().toISOString(),
-                is_final: true
+                is_final: true,
+                translation_status: 'pending' // 번역 대기 상태로 설정
               }
             ])
             .select()
 
           if (insertError) {
-            console.error("❌ DB insert error (per sentence):", insertError)
-          } else {
-            console.log("✅ Sentence saved (id):", data?.[0]?.id)
-            
-            // 🚀 자동 번역 작업 시작 (백그라운드)
-            console.log("🌍 Starting background translation jobs...")
-            
-            // 우선순위 언어들에 대해 번역 작업 추가
-            const translationJobs = PRIORITY_LANGUAGES.map((language: string) => {
-              if (language === 'en') return null // 영어는 건너뜀 (대부분 영어 → 영어)
-              
-              const jobId = addTranslationJob(
-                transcript.trim(),
-                language,
-                sessionId,
-                20 // 실시간 세션은 높은 우선순위
-              )
-              
-              console.log(`📋 Translation job ${jobId} queued for ${language}`)
-              return { language, jobId }
-            }).filter(Boolean)
-            
-            console.log(`✅ ${translationJobs.length} translation jobs queued for priority languages`)
+            console.error("❌ DB insert error:", insertError)
+            return NextResponse.json(
+              { error: "Database error" },
+              { status: 500 }
+            )
           }
+
+          console.log("✅ Transcript saved (id):", data?.[0]?.id)
+          const transcriptId = data?.[0]?.id
+          
+          // 🚀 우선순위 언어들에 대해 자동 번역 작업 시작
+          console.log("🌍 Starting priority translation jobs...")
+          
+          // 먼저 번역 상태를 'processing'으로 업데이트
+          await supabase
+            .from("transcripts")
+            .update({ translation_status: 'processing' })
+            .eq('id', transcriptId)
+
+          const translationJobs = []
+          for (const language of PRIORITY_LANGUAGES) {
+            if (language === 'en') continue // 영어는 건너뜀
+            
+            const jobId = addTranslationJob(
+              cleanedTranscript,
+              language,
+              sessionId,
+              25, // 실시간 세션 + 우선순위 언어 = 높은 우선순위
+              transcriptId
+            )
+            
+            translationJobs.push({ language, jobId })
+            console.log(`📋 Translation job ${jobId} queued for ${language}`)
+          }
+          
+          console.log(`✅ ${translationJobs.length} priority translation jobs queued`)
+
+          return NextResponse.json({ 
+            success: true,
+            transcriptId: transcriptId,
+            translationJobsStarted: translationJobs.length,
+            priorityLanguages: PRIORITY_LANGUAGES.filter(lang => lang !== 'en')
+          })
         }
 
         return NextResponse.json({ 
           success: true,
-          currentLength: session.fullTranscript.length,
-          translationJobsStarted: !isPartial && transcript ? PRIORITY_LANGUAGES.length - 1 : 0
+          message: isPartial ? "Partial transcript received" : "Final transcript processed"
         })
 
       case 'end':

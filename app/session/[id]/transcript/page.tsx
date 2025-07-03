@@ -43,19 +43,12 @@ export default function SessionTranscriptPage() {
   // 🆕 텍스트만 보기 상태
   const [textOnlyMode, setTextOnlyMode] = useState(false)
 
+  // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "ja", name: "Japanese", flag: "🇯🇵" },
     { code: "zh", name: "Chinese", flag: "🇨🇳" },
     { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "es", name: "Spanish", flag: "🇪🇸" },
-    { code: "fr", name: "French", flag: "🇫🇷" },
-    { code: "de", name: "German", flag: "🇩🇪" },
-    { code: "it", name: "Italian", flag: "🇮🇹" },
-    { code: "pt", name: "Portuguese", flag: "🇵🇹" },
-    { code: "ru", name: "Russian", flag: "🇷🇺" },
-    { code: "ar", name: "Arabic", flag: "🇸🇦" },
-    { code: "en", name: "English", flag: "🇺🇸" },
+    { code: "en", name: "English", flag: "🇺🇸" }, // 원문 표시용
   ]
 
   // Load session and transcript data
@@ -77,11 +70,12 @@ export default function SessionTranscriptPage() {
         if (sessionError) throw sessionError
         setSession(sessionData)
 
-        // Load all transcripts for this session
+        // Load completed transcripts for this session only
         const { data: transcripts, error: transcriptError } = await supabase
           .from('transcripts')
           .select('*')
           .eq('session_id', sessionId)
+          .eq('translation_status', 'completed') // 🆕 번역 완료된 것만 로드
           .order('created_at', { ascending: true })
 
         if (transcriptError) throw transcriptError
@@ -97,6 +91,80 @@ export default function SessionTranscriptPage() {
 
     loadSessionTranscript()
   }, [user, sessionId, supabase])
+
+  // 🆕 실시간 transcript 구독 (번역 완료된 것만)
+  useEffect(() => {
+    if (!sessionId) return
+
+    console.log('🔔 Setting up realtime subscription for transcript page...')
+    
+    const channel = supabase
+      .channel(`transcripts-page-${sessionId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transcripts',
+        filter: `session_id=eq.${sessionId}`
+      }, (payload) => {
+        console.log('🔔 Transcript page realtime update:', payload.eventType, payload.new)
+        
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const newTranscript = payload.new as Transcript & { translation_status?: string }
+          
+          // 번역이 완료된 것만 처리
+          if (newTranscript.translation_status !== 'completed') {
+            console.log(`⏳ Skipping transcript (status: ${newTranscript.translation_status})`)
+            return
+          }
+          
+          console.log(`✨ Adding new completed transcript to page`)
+          
+          setTranscript(prev => {
+            // 중복 방지
+            if (prev.some(t => t.id === newTranscript.id)) {
+              return prev
+            }
+            return [...prev, newTranscript].sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+          })
+        }
+        
+        if (payload.eventType === 'UPDATE' && payload.new) {
+                      const updatedTranscript = payload.new as {
+              id: string
+              created_at: string
+              original_text: string
+              session_id: string
+              user_id: string | null
+              translation_status?: string
+            }
+          if (updatedTranscript.translation_status === 'completed') {
+            console.log(`🔄 Transcript status updated to completed`)
+            
+            // 이미 로드된 transcript에 대해서만 상태 업데이트
+            setTranscript(prev => prev.map(t => {
+              if (t.id === updatedTranscript.id) {
+                // translation_status만 업데이트 (타입 안전)
+                return {
+                  ...t,
+                  // 추가 필드가 필요하면 여기에 추가
+                }
+              }
+              return t
+            }))
+          }
+        }
+      })
+      .subscribe((status) => {
+        console.log('🔔 Transcript page subscription status:', status)
+      })
+
+    return () => {
+      console.log('🧹 Cleaning up transcript page subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId, supabase])
 
   // 번역 함수
   const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {

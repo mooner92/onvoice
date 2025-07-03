@@ -87,6 +87,7 @@ export interface TranslationJob {
   text: string
   targetLanguage: string
   sessionId?: string
+  transcriptId?: string // 🆕 transcript 상태 업데이트를 위한 ID
   priority: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
   createdAt: number

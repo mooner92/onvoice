@@ -154,8 +154,8 @@ export async function saveBatchTranslationsToCache(
   return cacheIds
 }
 
-// 인기 언어 목록 (우선순위 번역용)
-export const PRIORITY_LANGUAGES = ['ko', 'en', 'ja', 'zh', 'es', 'fr', 'de', 'hi']
+// 인기 언어 목록 (우선순위 번역용) - 사용량이 많은 3개 언어로 축소
+export const PRIORITY_LANGUAGES = ['ko', 'zh', 'hi']
 
 // 번역 우선순위 계산
 export function calculateTranslationPriority(

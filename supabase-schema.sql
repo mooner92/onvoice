@@ -221,3 +221,24 @@ CREATE INDEX idx_translation_cache_expires ON translation_cache(expires_at);
 -- 트랜스크립트에 번역 참조 추가
 ALTER TABLE transcripts ADD COLUMN translation_cache_ids JSONB;
 -- { "ko": "uuid1", "ja": "uuid2", "zh": "uuid3" }
+
+
+
+-- 번역 상태 추적을 위한 컬럼 추가
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS translation_status TEXT DEFAULT 'pending' CHECK (translation_status IN ('pending', 'processing', 'completed'));
+
+-- 번역 상태별 인덱스 추가 (성능 최적화)
+CREATE INDEX IF NOT EXISTS idx_transcripts_translation_status ON transcripts(session_id, translation_status, created_at);
+
+-- 완료된 번역만 조회하는 인덱스
+CREATE INDEX IF NOT EXISTS idx_transcripts_completed ON transcripts(session_id, created_at) WHERE translation_status = 'completed';
+
+
+-- 📡 Realtime 활성화
+--ALTER PUBLICATION supabase_realtime ADD TABLE transcripts;
+ALTER PUBLICATION supabase_realtime ADD TABLE translation_cache;
+
+-- 활성화 확인
+SELECT schemaname, tablename 
+FROM pg_publication_tables 
+WHERE pubname = 'supabase_realtime';

@@ -486,6 +486,9 @@ class TranslationQueueManager {
         
         console.log(`🎉 Completed batch translation for "${textGroup.text.substring(0, 30)}..." (${Object.keys(batchResults).length} languages)`)
         
+        // 🆕 번역 완료 시 transcript 상태 업데이트
+        await this.updateTranscriptStatus(textGroup.jobs)
+        
       } catch (error) {
         console.error(`❌ Batch translation failed for "${textGroup.text.substring(0, 50)}...":`, error)
         
@@ -509,6 +512,9 @@ class TranslationQueueManager {
             console.error(`❌ Individual translation failed for ${language}:`, individualError)
           }
         }
+        
+        // fallback 번역 완료 시에도 transcript 상태 업데이트
+        await this.updateTranscriptStatus(textGroup.jobs)
       }
       
       // 텍스트 큐에서 제거
@@ -520,6 +526,40 @@ class TranslationQueueManager {
     }
   }
   
+  // 🆕 번역 완료 시 transcript 상태 업데이트
+  private async updateTranscriptStatus(jobs: TranslationJob[]): Promise<void> {
+    // transcript ID가 있는 작업들만 필터링
+    const transcriptIds = jobs
+      .map(job => job.transcriptId)
+      .filter((id): id is string => !!id)
+    
+    if (transcriptIds.length === 0) return
+    
+    try {
+      // Supabase 클라이언트 import 필요
+      const { createClient } = await import("@supabase/supabase-js")
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      
+      // 해당 transcript들의 상태를 'completed'로 업데이트
+      const { error } = await supabase
+        .from('transcripts')
+        .update({ translation_status: 'completed' })
+        .in('id', transcriptIds)
+      
+      if (error) {
+        console.error('❌ Failed to update transcript status:', error)
+      } else {
+        console.log(`✅ Updated ${transcriptIds.length} transcript(s) status to completed`)
+      }
+      
+    } catch (error) {
+      console.error('❌ Error updating transcript status:', error)
+    }
+  }
+
   // 큐 상태 조회
   getQueueStats(): Record<string, number> {
     const stats: Record<string, number> = {}
@@ -548,7 +588,8 @@ export function addTranslationJob(
   text: string,
   targetLanguage: string,
   sessionId?: string,
-  priority?: number
+  priority?: number,
+  transcriptId?: string // 🆕 transcript ID 추가
 ): string {
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
@@ -557,6 +598,7 @@ export function addTranslationJob(
     text,
     targetLanguage,
     sessionId,
+    transcriptId, // 🆕 transcript ID 포함
     priority: priority || calculatePriority(targetLanguage, sessionId),
     status: 'pending',
     createdAt: Date.now()
