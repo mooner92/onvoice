@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface RealtimeSTTProps {
   sessionId: string
@@ -94,21 +94,119 @@ export function RealtimeSTT({
     }
   }, [onError])
 
+  // Check microphone status
+  const checkMicrophoneStatus = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const audioDevices = devices.filter(device => device.kind === 'audioinput')
+      
+      console.log('🎤 Microphone status check:', {
+        devices: audioDevices.length,
+        permission: hasPermission,
+        isListening,
+        timestamp: new Date().toISOString()
+      })
+      
+      if (audioDevices.length === 0) {
+        console.warn('⚠️ No microphone devices found')
+        return false
+      }
+      
+      // Try to get permission status
+      if ('permissions' in navigator) {
+        const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        console.log('🎤 Permission status:', permission.state)
+        
+        if (permission.state === 'denied') {
+          setHasPermission(false)
+          setStatus('Permission denied')
+          return false
+        }
+      }
+      
+      return true
+    } catch (error) {
+      console.error('❌ Microphone status check failed:', error)
+      return false
+    }
+  }, [hasPermission, isListening])
+
+  // Check microphone status on component mount
+  useEffect(() => {
+    checkMicrophoneStatus()
+  }, [checkMicrophoneStatus])
+
   // Request microphone permission
   const requestMicrophonePermission = async () => {
     try {
       console.log('🎤 Requesting microphone permission...')
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(track => track.stop())
+      
+      // Check if microphone is available
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const audioDevices = devices.filter(device => device.kind === 'audioinput')
+      console.log('🎤 Available audio devices:', audioDevices.length)
+      
+      if (audioDevices.length === 0) {
+        console.error('❌ No audio input devices found')
+        setHasPermission(false)
+        setStatus('No microphone found')
+        onError('No microphone device found. Please check your microphone connection.')
+        return false
+      }
+      
+      // Request permission
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000
+        }
+      })
+      
+      console.log('✅ Microphone stream obtained:', {
+        tracks: stream.getAudioTracks().length,
+        settings: stream.getAudioTracks()[0]?.getSettings()
+      })
+      
+      // Stop the stream immediately
+      stream.getTracks().forEach(track => {
+        track.stop()
+        console.log('🛑 Track stopped:', track.label)
+      })
+      
       setHasPermission(true)
       setStatus('Permission granted')
       console.log('✅ Microphone permission granted')
       return true
+      
     } catch (error) {
-      console.error('❌ Microphone permission denied:', error)
+      console.error('❌ Microphone permission error:', error)
       setHasPermission(false)
-      setStatus('Permission denied')
-      onError('Microphone permission denied. Please allow microphone access.')
+      
+      let errorMessage = 'Microphone permission denied.'
+      let statusMessage = 'Permission denied'
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings.'
+          statusMessage = 'Access denied'
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No microphone found. Please check your microphone connection.'
+          statusMessage = 'No microphone'
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'Microphone is being used by another application. Please close other apps using the microphone.'
+          statusMessage = 'Microphone busy'
+        } else if (error.name === 'AbortError') {
+          errorMessage = 'Microphone access was aborted. Please try again.'
+          statusMessage = 'Access aborted'
+        } else {
+          errorMessage = `Microphone error: ${error.message}`
+          statusMessage = 'Error'
+        }
+      }
+      
+      setStatus(statusMessage)
+      onError(errorMessage)
       return false
     }
   }
@@ -181,6 +279,11 @@ export function RealtimeSTT({
       recognition.onerror = (event: any) => {
         if (!mountedRef.current) return
         console.log('⚠️ Recognition error:', event.error, event.message)
+        console.log('⚠️ Recognition error details:', {
+          error: event.error,
+          message: event.message,
+          timestamp: new Date().toISOString()
+        })
         setIsListening(false)
         recognitionRef.current = null
         
@@ -188,14 +291,27 @@ export function RealtimeSTT({
         if (event.error === 'not-allowed' || event.error === 'aborted') {
           ;(window as any).__retryCount = 0
           setHasPermission(false)
-          setStatus('Permission denied')
           isActiveRef.current = false
-          onError(`Microphone error: ${event.error}`)
+          
+          let errorMessage = 'Speech recognition error.'
+          let statusMessage = 'Error'
+          
+          if (event.error === 'not-allowed') {
+            errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings and refresh the page.'
+            statusMessage = 'Access denied'
+          } else if (event.error === 'aborted') {
+            errorMessage = 'Speech recognition was aborted. This usually happens when the microphone is used by another app or browser tab. Please close other apps using the microphone and try again.'
+            statusMessage = 'Recognition aborted'
+          }
+          
+          setStatus(statusMessage)
+          onError(errorMessage)
+          
         } else if (event.error === 'network') {
           setStatus('Network error')
           isActiveRef.current = false
           ;(window as any).__retryCount = 0
-          onError('Network connection lost')
+          onError('Network connection lost. Please check your internet connection and try again.')
         } else if (event.error === 'no-speech') {
           // This is normal, just continue
           console.log('No speech detected, continuing...')
@@ -206,6 +322,11 @@ export function RealtimeSTT({
               }
             }, 100)
           }
+        } else if (event.error === 'audio-capture') {
+          setStatus('Audio capture error')
+          isActiveRef.current = false
+          ;(window as any).__retryCount = 0
+          onError('Audio capture failed. Please check your microphone connection and try again.')
         } else {
           // For other errors, try limited restart
           const retryCount = (window as any).__retryCount || 0
@@ -222,6 +343,7 @@ export function RealtimeSTT({
             setStatus('Error - please refresh')
             isActiveRef.current = false
             ;(window as any).__retryCount = 0
+            onError(`Speech recognition error: ${event.error}. Please refresh the page and try again.`)
           }
         }
       }
@@ -450,12 +572,26 @@ export function RealtimeSTT({
 
       {/* Controls */}
       {!hasPermission && (
-        <button
-          onClick={requestMicrophonePermission}
-          className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg w-full"
-        >
-          🎤 Grant Microphone Permission
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={requestMicrophonePermission}
+            className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg w-full"
+          >
+            🎤 Grant Microphone Permission
+          </button>
+          
+          {status.includes('denied') || status.includes('aborted') || status.includes('busy') && (
+            <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+              <p className="font-medium text-yellow-800">💡 Troubleshooting:</p>
+              <ul className="mt-1 space-y-1 text-yellow-700">
+                <li>• Click the microphone icon in the address bar</li>
+                <li>• Select "Always allow" for this site</li>
+                <li>• Close other apps using the microphone</li>
+                <li>• Refresh the page and try again</li>
+              </ul>
+            </div>
+          )}
+        </div>
       )}
       
       {hasPermission && !isListening && isRecording && (
@@ -472,6 +608,20 @@ export function RealtimeSTT({
         <div>Session: {currentSessionRef.current ? 'Active' : 'None'}</div>
         <div>Status: {status}</div>
         <div>Listening: {isListening ? 'Yes' : 'No'}</div>
+        <div>Permission: {hasPermission ? 'Granted' : 'Denied'}</div>
+        <div>Supported: {isSupported ? 'Yes' : 'No'}</div>
+        {status.includes('Error') || status.includes('denied') || status.includes('aborted') ? (
+          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+            <p className="font-medium text-red-700">🚨 Error Details:</p>
+            <p className="text-red-600">{status}</p>
+            <button
+              onClick={checkMicrophoneStatus}
+              className="mt-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded"
+            >
+              🔍 Check Microphone Status
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )
