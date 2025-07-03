@@ -2,10 +2,34 @@ import { createClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 import type { TranslationCache } from "./types"
 
-// Supabase 클라이언트 (서버용)
+// 환경 감지
+const isVercel = process.env.VERCEL === '1'
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Supabase 클라이언트 (서버용) - 연결 최적화
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    db: {
+      schema: 'public',
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: isVercel ? 5 : 10, // Vercel에서는 더 보수적으로
+      },
+    },
+    global: {
+      headers: {
+        'x-application-name': 'onvoice-translation-cache',
+        'x-environment': isVercel ? 'vercel' : 'local',
+      },
+    },
+  }
 )
 
 // UUID v4 생성 함수 (DB DEFAULT 대신 코드에서 생성)
@@ -73,6 +97,8 @@ export async function saveTranslationToCache(
   engine: string,
   qualityScore: number = 0.9
 ): Promise<string | null> {
+  const startTime = Date.now()
+  
   try {
     const contentHash = generateContentHash(text, targetLanguage)
     const id = generateUUID() // 명시적 ID 생성
@@ -84,12 +110,17 @@ export async function saveTranslationToCache(
     expiresAt.setDate(expiresAt.getDate() + daysToKeep)
     
     // 중복 체크 먼저 수행
+    const duplicateCheckStart = Date.now()
     const existing = await getTranslationFromCache(text, targetLanguage)
+    const duplicateCheckTime = Date.now() - duplicateCheckStart
+    
     if (existing) {
-      console.log(`📋 Translation already cached: "${text.substring(0, 30)}..." → ${targetLanguage}`)
+      const totalTime = Date.now() - startTime
+      console.log(`📋 Translation already cached: "${text.substring(0, 30)}..." → ${targetLanguage} (check: ${duplicateCheckTime}ms, total: ${totalTime}ms)`)
       return existing.id
     }
     
+    const insertStart = Date.now()
     console.log(`💾 Saving to cache: "${text.substring(0, 30)}..." → ${targetLanguage} (${engine})`)
     
     const { data, error } = await supabase
@@ -109,8 +140,11 @@ export async function saveTranslationToCache(
       .select('id')
       .single()
     
+    const insertTime = Date.now() - insertStart
+    const totalTime = Date.now() - startTime
+    
     if (error) {
-      console.error('❌ Error saving translation to cache:', error)
+      console.error(`❌ Error saving translation to cache (${totalTime}ms):`, error)
       
       // 중복 키 에러인 경우 기존 캐시 반환
       if (error.code === '23505') { // unique_violation
@@ -122,8 +156,8 @@ export async function saveTranslationToCache(
       return null
     }
     
-    console.log(`✅ Successfully cached: "${text.substring(0, 30)}..." → ${targetLanguage} (ID: ${data?.id || id})`)
-    return data?.id || id
+    console.log(`✅ Successfully cached: "${text.substring(0, 30)}..." → ${targetLanguage} (ID: ${data.id}) - Insert: ${insertTime}ms, Total: ${totalTime}ms`)
+    return data.id
   } catch (error) {
     console.error('❌ Error saving translation to cache:', error)
     return null
@@ -377,4 +411,57 @@ export async function smartCacheCleanup(maxSizeMB: number = 100): Promise<number
   }
   
   return cleaned
+}
+
+// 🆕 성능 메트릭스 수집
+interface PerformanceMetrics {
+  dbInsertTime: number[]
+  cacheCheckTime: number[]
+  totalSaveTime: number[]
+  environment: string
+}
+
+const metrics: PerformanceMetrics = {
+  dbInsertTime: [],
+  cacheCheckTime: [],
+  totalSaveTime: [],
+  environment: isVercel ? 'vercel' : 'local'
+}
+
+// 성능 메트릭스 추가
+function addMetric(type: keyof PerformanceMetrics, value: number) {
+  if (typeof value === 'number' && Array.isArray(metrics[type])) {
+    const arr = metrics[type] as number[]
+    arr.push(value)
+    // 최근 50개만 유지
+    if (arr.length > 50) {
+      arr.shift()
+    }
+  }
+}
+
+// 성능 통계 조회
+export function getPerformanceStats(): {
+  environment: string
+  dbInsert: { avg: number; min: number; max: number; count: number }
+  cacheCheck: { avg: number; min: number; max: number; count: number }
+  totalSave: { avg: number; min: number; max: number; count: number }
+} {
+  const calculateStats = (arr: number[]) => {
+    if (arr.length === 0) return { avg: 0, min: 0, max: 0, count: 0 }
+    const sum = arr.reduce((a, b) => a + b, 0)
+    return {
+      avg: Math.round(sum / arr.length),
+      min: Math.min(...arr),
+      max: Math.max(...arr),
+      count: arr.length
+    }
+  }
+
+  return {
+    environment: metrics.environment,
+    dbInsert: calculateStats(metrics.dbInsertTime),
+    cacheCheck: calculateStats(metrics.cacheCheckTime),
+    totalSave: calculateStats(metrics.totalSaveTime)
+  }
 } 

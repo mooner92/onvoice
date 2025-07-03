@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { addTranslationJob } from "@/lib/translation-queue"
+import { performBatchTranslation, saveBatchTranslationsToCache } from "@/lib/translation-queue"
 import { PRIORITY_LANGUAGES } from "@/lib/translation-cache"
 
 // In-memory session storage for quick access
@@ -76,6 +76,9 @@ export async function POST(req: NextRequest) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
           )
 
+          const dbInsertStart = Date.now()
+          console.log(`💾 Inserting transcript to DB: "${cleanedTranscript.substring(0, 50)}..."`)
+          
           const { data, error: insertError } = await supabase
             .from("transcripts")
             .insert([
@@ -90,50 +93,86 @@ export async function POST(req: NextRequest) {
             ])
             .select()
 
+          const dbInsertTime = Date.now() - dbInsertStart
+
           if (insertError) {
-            console.error("❌ DB insert error:", insertError)
+            console.error(`❌ DB insert error (${dbInsertTime}ms):`, insertError)
             return NextResponse.json(
               { error: "Database error" },
               { status: 500 }
             )
           }
 
-          console.log("✅ Transcript saved (id):", data?.[0]?.id)
+          console.log(`✅ Transcript saved (id): ${data?.[0]?.id} - DB insert: ${dbInsertTime}ms`)
           const transcriptId = data?.[0]?.id
           
-          // 🚀 우선순위 언어들에 대해 자동 번역 작업 시작
-          console.log("🌍 Starting priority translation jobs...")
+          // 🚀 즉시 번역 실행 (큐 시스템 제거)
+          console.log("🌍 Starting immediate translation...")
           
-          // 먼저 번역 상태를 'processing'으로 업데이트
+          // 번역 상태를 'processing'으로 업데이트
+          const statusUpdateStart = Date.now()
           await supabase
             .from("transcripts")
             .update({ translation_status: 'processing' })
             .eq('id', transcriptId)
-
-          const translationJobs = []
-          for (const language of PRIORITY_LANGUAGES) {
-            if (language === 'en') continue // 영어는 건너뜀
-            
-            const jobId = addTranslationJob(
-              cleanedTranscript,
-              language,
-              sessionId,
-              25, // 실시간 세션 + 우선순위 언어 = 높은 우선순위
-              transcriptId
-            )
-            
-            translationJobs.push({ language, jobId })
-            console.log(`📋 Translation job ${jobId} queued for ${language}`)
-          }
+          const statusUpdateTime = Date.now() - statusUpdateStart
           
-          console.log(`✅ ${translationJobs.length} priority translation jobs queued`)
+          console.log(`🔄 Translation status updated to 'processing' (${statusUpdateTime}ms)`)
 
-          return NextResponse.json({ 
-            success: true,
-            transcriptId: transcriptId,
-            translationJobsStarted: translationJobs.length,
-            priorityLanguages: PRIORITY_LANGUAGES.filter(lang => lang !== 'en')
-          })
+          // 영어 제외한 우선순위 언어들
+          const targetLanguages = PRIORITY_LANGUAGES.filter(lang => lang !== 'en')
+          
+          try {
+            // 즉시 배치 번역 실행
+            const translationStart = Date.now()
+            const batchResults = await performBatchTranslation(cleanedTranscript, targetLanguages)
+            const translationTime = Date.now() - translationStart
+            
+            console.log(`🚀 Batch translation completed in ${translationTime}ms for ${Object.keys(batchResults).length} languages`)
+            
+            // 번역 결과를 캐시에 즉시 저장
+            const cacheStart = Date.now()
+            const cacheIds = await saveBatchTranslationsToCache(cleanedTranscript, batchResults)
+            const cacheTime = Date.now() - cacheStart
+            
+            console.log(`💾 Translation cache saved in ${cacheTime}ms for ${Object.keys(cacheIds).length} languages`)
+            
+            // 번역 완료 상태로 업데이트
+            await supabase
+              .from("transcripts")
+              .update({ translation_status: 'completed' })
+              .eq('id', transcriptId)
+            
+            console.log(`✅ Immediate translation completed for "${cleanedTranscript.substring(0, 30)}..." (${Object.keys(batchResults).length} languages)`)
+            
+            return NextResponse.json({ 
+              success: true,
+              transcriptId: transcriptId,
+              translationCompleted: true,
+              translatedLanguages: Object.keys(batchResults),
+              translationTime: translationTime,
+              cacheTime: cacheTime,
+              totalTime: Date.now() - dbInsertStart
+            })
+            
+          } catch (translationError) {
+            console.error('❌ Immediate translation failed:', translationError)
+            
+            // 번역 실패 시 상태를 pending으로 되돌림
+            await supabase
+              .from("transcripts")
+              .update({ translation_status: 'pending' })
+              .eq('id', transcriptId)
+            
+            // 번역 실패해도 transcript 저장은 성공으로 처리
+            return NextResponse.json({ 
+              success: true,
+              transcriptId: transcriptId,
+              translationCompleted: false,
+              translationError: translationError instanceof Error ? translationError.message : 'Unknown error',
+              note: 'Transcript saved but translation failed'
+            })
+          }
         }
 
         return NextResponse.json({ 

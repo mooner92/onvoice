@@ -346,8 +346,8 @@ async function performTranslation(text: string, targetLanguage: string): Promise
   }
 }
 
-// 🆕 하이브리드 번역 수행 (배치 + 개별 fallback)
-async function performBatchTranslation(
+// 🆕 하이브리드 번역 수행 (배치 + 개별 fallback) - 외부에서 직접 호출 가능
+export async function performBatchTranslation(
   text: string, 
   targetLanguages: string[]
 ): Promise<Record<string, { text: string; engine: string; quality: number }>> {
@@ -406,6 +406,35 @@ async function performBatchTranslation(
   }
   
   return results
+}
+
+// 🆕 배치 번역 결과를 캐시에 저장하는 함수
+export async function saveBatchTranslationsToCache(
+  text: string,
+  batchResults: Record<string, { text: string; engine: string; quality: number }>
+): Promise<Record<string, string>> {
+  const cacheIds: Record<string, string> = {}
+  
+  for (const [language, result] of Object.entries(batchResults)) {
+    try {
+      const cacheId = await saveTranslationToCache(
+        text,
+        language,
+        result.text,
+        result.engine,
+        result.quality
+      )
+      
+      if (cacheId) {
+        cacheIds[language] = cacheId
+        console.log(`✅ Cached translation: "${text.substring(0, 30)}..." → ${language} (${result.engine})`)
+      }
+    } catch (error) {
+      console.error(`❌ Failed to cache translation for ${language}:`, error)
+    }
+  }
+  
+  return cacheIds
 }
 
 // 번역 큐 매니저 클래스
