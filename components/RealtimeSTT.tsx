@@ -184,29 +184,44 @@ export function RealtimeSTT({
         setIsListening(false)
         recognitionRef.current = null
         
-        if (event.error === 'not-allowed') {
+        // Reset retry count on critical errors
+        if (event.error === 'not-allowed' || event.error === 'aborted') {
+          ;(window as any).__retryCount = 0
           setHasPermission(false)
           setStatus('Permission denied')
           isActiveRef.current = false
           onError(`Microphone error: ${event.error}`)
-        } else {
-          // For other errors (including aborted), try to restart
+        } else if (event.error === 'network') {
+          setStatus('Network error')
+          isActiveRef.current = false
+          ;(window as any).__retryCount = 0
+          onError('Network connection lost')
+        } else if (event.error === 'no-speech') {
+          // This is normal, just continue
+          console.log('No speech detected, continuing...')
           if (isActiveRef.current && currentSessionRef.current) {
-            const retryCount = (window as any).__retryCount || 0
-            if (retryCount < 3) {
-              (window as any).__retryCount = retryCount + 1
-              setStatus('Reconnecting...')
-              setTimeout(() => {
-                if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
-                  startSpeechRecognition()
-                }
-              }, 1000)
-            } else {
-              console.log('⚠️ Max retries reached, stopping auto-restart')
-              setStatus('Connection lost - please refresh')
-              isActiveRef.current = false
-              ;(window as any).__retryCount = 0
-            }
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                startSpeechRecognition()
+              }
+            }, 100)
+          }
+        } else {
+          // For other errors, try limited restart
+          const retryCount = (window as any).__retryCount || 0
+          if (isActiveRef.current && currentSessionRef.current && retryCount < 3) {
+            (window as any).__retryCount = retryCount + 1
+            setStatus('Reconnecting...')
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                startSpeechRecognition()
+              }
+            }, 2000)
+          } else {
+            console.log('⚠️ Unrecoverable error or max retries')
+            setStatus('Error - please refresh')
+            isActiveRef.current = false
+            ;(window as any).__retryCount = 0
           }
         }
       }

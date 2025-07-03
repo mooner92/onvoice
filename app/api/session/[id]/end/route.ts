@@ -12,8 +12,7 @@ export async function POST(
     try {
       const body = await req.json()
       hostId = body.hostId
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_) {
+    } catch {
       // Body might be empty or not JSON, which is okay
       console.log('No JSON body provided, proceeding without hostId')
     }

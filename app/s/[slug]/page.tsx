@@ -36,7 +36,7 @@ export default function PublicSessionPage() {
   const { toasts, addToast, removeToast } = useToast()
 
   // Get user's preferred language from browser or profile
-  const getUserPreferredLanguage = useCallback(() => {
+  const getUserPreferredLanguage = () => {
     // Try to get from user metadata first
     if (user?.user_metadata?.preferred_language) {
       return user.user_metadata.preferred_language
@@ -50,16 +50,16 @@ export default function PublicSessionPage() {
     }
     
     return 'en' // Default fallback to English
-  }, [user?.user_metadata?.preferred_language])
+  }
 
   // Simple i18n for UI text based on browser language
-  const getBrowserLanguage = useCallback(() => {
+  const getBrowserLanguage = () => {
     if (typeof window === 'undefined') return 'en'
     const browserLang = navigator.language.split('-')[0]
     return ['ko', 'zh', 'hi'].includes(browserLang) ? browserLang : 'en' // 지원하는 3개 언어만
-  }, [])
+  }
 
-  const t = useCallback((key: string) => {
+  const t = (key: string) => {
     const lang = getBrowserLanguage()
     const translations: Record<string, Record<string, string>> = {
       en: {
@@ -275,7 +275,7 @@ export default function PublicSessionPage() {
     }
     
     return translations[lang]?.[key] || translations['en'][key] || key
-  }, [getBrowserLanguage])
+  }
 
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState(() => getUserPreferredLanguage())
@@ -304,7 +304,7 @@ export default function PublicSessionPage() {
   // Set user preferred language on client side
   useEffect(() => {
     setSelectedLanguage(getUserPreferredLanguage())
-  }, [user, getUserPreferredLanguage])
+  }, [user])
 
   // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
@@ -496,7 +496,6 @@ export default function PublicSessionPage() {
     if (slug) {
       loadSession()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, supabase])
 
 
@@ -541,7 +540,7 @@ export default function PublicSessionPage() {
       // Even if error, allow viewing
       setHasJoined(true)
     }
-  }, [sessionId, user, session?.host_id, supabase])
+  }, [sessionId, user, session?.host_id, supabase, t])
 
   // Auto-join session when session is loaded (for both logged-in and guest users)
   useEffect(() => {
@@ -601,7 +600,7 @@ export default function PublicSessionPage() {
       console.log('🧹 Cleaning up realtime subscription')
       supabase.removeChannel(channel)
     }
-  }, [sessionId, supabase])
+           }, [sessionId, supabase]) // sessionId와 supabase만 필요
 
 
 
@@ -793,8 +792,7 @@ export default function PublicSessionPage() {
       console.log('🧹 Cleaning up real-time subscription')
       supabase.removeChannel(channel)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, supabase, hasJoined])
+  }, [sessionId, supabase, handleTranscriptUpdate])
 
   // Update participant count
   const updateParticipantCount = useCallback(async () => {
@@ -996,8 +994,7 @@ export default function PublicSessionPage() {
         duration: 3000
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcript, textOnlyMode, addToast])
+  }, [transcript, textOnlyMode, addToast, t])
 
   // Render transcript content function
   const renderTranscriptContent = (type: 'original' | 'translation') => {
