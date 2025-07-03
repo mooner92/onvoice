@@ -585,7 +585,7 @@ export function RealtimeSTT({
               <p className="font-medium text-yellow-800">💡 Troubleshooting:</p>
               <ul className="mt-1 space-y-1 text-yellow-700">
                 <li>• Click the microphone icon in the address bar</li>
-                <li>• Select "Always allow" for this site</li>
+                <li>• Select &quot;Always allow&quot; for this site</li>
                 <li>• Close other apps using the microphone</li>
                 <li>• Refresh the page and try again</li>
               </ul>
