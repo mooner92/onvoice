@@ -4,7 +4,6 @@ import type { TranslationCache } from "./types"
 
 // 환경 감지
 const isVercel = process.env.VERCEL === '1'
-const isProduction = process.env.NODE_ENV === 'production'
 
 // Supabase 클라이언트 (서버용) - 연결 최적화
 const supabase = createClient(
@@ -426,18 +425,6 @@ const metrics: PerformanceMetrics = {
   cacheCheckTime: [],
   totalSaveTime: [],
   environment: isVercel ? 'vercel' : 'local'
-}
-
-// 성능 메트릭스 추가
-function addMetric(type: keyof PerformanceMetrics, value: number) {
-  if (typeof value === 'number' && Array.isArray(metrics[type])) {
-    const arr = metrics[type] as number[]
-    arr.push(value)
-    // 최근 50개만 유지
-    if (arr.length > 50) {
-      arr.shift()
-    }
-  }
 }
 
 // 성능 통계 조회
