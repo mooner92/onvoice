@@ -230,3 +230,5 @@ For support and questions, please open an issue on GitHub or contact the develop
 ---
 
 **LiveTranscribe** - Making lectures accessible to everyone, everywhere. 🌍
+
+this branch is change-demini
