@@ -838,6 +838,54 @@ export default function PublicSessionPage() {
     }
   }, [sessionId, supabase, updateParticipantCount])
 
+  // 🆕 세션 상태 변경 감지 (세션 종료 시 공개 요약 페이지로 리디렉션)
+  useEffect(() => {
+    if (!sessionId) return
+
+    console.log('🔔 Setting up session status subscription...')
+
+    const channel = supabase
+      .channel(`session-status-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sessions',
+          filter: `id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('🔔 Session status update:', payload.new)
+          const updatedSession = payload.new as { status: string, id: string }
+          
+          if (updatedSession.status === 'ended') {
+            console.log('🏁 Session ended, redirecting to summary page...')
+            
+            // 세션 종료 알림
+            addToast({
+              type: 'success',
+              title: '세션이 종료되었습니다',
+              duration: 3000
+            })
+            
+            // 2초 후 공개 요약 페이지로 리디렉션
+            setTimeout(() => {
+              const summaryUrl = `/summary/${sessionId}`
+              window.location.href = summaryUrl
+            }, 2000)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 Session status subscription:', status)
+      })
+
+    return () => {
+      console.log('🧹 Cleaning up session status subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId, supabase, addToast])
+
   // 언어 변경시 번역 처리 (완전 개선된 버전)
   useEffect(() => {
     if (!translationEnabled) {

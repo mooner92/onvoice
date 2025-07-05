@@ -258,11 +258,11 @@ export function RealtimeSTT({
           const retryCount = (window as any).__retryCount || 0
           if (retryCount < 3) {
             (window as any).__retryCount = retryCount + 1
-            setStatus('Restarting...')
-            setTimeout(() => {
-              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
-                startSpeechRecognition()
-              }
+          setStatus('Restarting...')
+          setTimeout(() => {
+            if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+              startSpeechRecognition()
+            }
             }, 1000) // Increased delay
           } else {
             console.log('⚠️ Max retries reached, stopping auto-restart')
@@ -423,19 +423,19 @@ export function RealtimeSTT({
                 console.log('⏰ Timeout: Finalizing accumulated text')
                 
                 // Send accumulated text as final if timeout occurs
-                fetch('/api/stt-stream', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    type: 'transcript',
-                    sessionId: currentSessionRef.current,
-                    transcript: accumulatedTextRef.current,
-                    isPartial: false
-                  })
-                }).then(() => {
+                  fetch('/api/stt-stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'transcript',
+                      sessionId: currentSessionRef.current,
+                      transcript: accumulatedTextRef.current,
+                      isPartial: false
+                    })
+                  }).then(() => {
                   console.log('✅ Timeout transcript sent to server')
                   onTranscriptUpdate(accumulatedTextRef.current, false)
-                  accumulatedTextRef.current = ''
+                accumulatedTextRef.current = ''
                 })
               }
             }, 3000) // 3 second timeout
@@ -573,12 +573,12 @@ export function RealtimeSTT({
       {/* Controls */}
       {!hasPermission && (
         <div className="space-y-2">
-          <button
-            onClick={requestMicrophonePermission}
-            className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg w-full"
-          >
-            🎤 Grant Microphone Permission
-          </button>
+        <button
+          onClick={requestMicrophonePermission}
+          className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg w-full"
+        >
+          🎤 Grant Microphone Permission
+        </button>
           
           {status.includes('denied') || status.includes('aborted') || status.includes('busy') && (
             <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">

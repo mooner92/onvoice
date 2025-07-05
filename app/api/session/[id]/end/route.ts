@@ -77,12 +77,39 @@ export async function POST(
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId)
 
+    // Generate summary if there are transcripts
+    let summaryGenerated = false
+    if (transcriptCount && transcriptCount > 0) {
+      try {
+        console.log(`🤖 Generating summary for session ${sessionId} with ${transcriptCount} transcripts`)
+        
+        // Call summary API
+        const summaryResponse = await fetch(`${req.headers.get('origin') || 'http://localhost:3000'}/api/session/${sessionId}/summary`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        if (summaryResponse.ok) {
+          const summaryData = await summaryResponse.json()
+          console.log(`✅ Summary generated: ${summaryData.summary?.substring(0, 50)}...`)
+          summaryGenerated = true
+        } else {
+          console.error('Failed to generate summary:', summaryResponse.status)
+        }
+      } catch (summaryError) {
+        console.error('Error generating summary:', summaryError)
+      }
+    }
+
     return NextResponse.json({
       message: "Session ended successfully",
       statistics: {
         transcript_count: transcriptCount || 0,
         participant_count: participantCount || 0,
-        duration: 0
+        duration: 0,
+        summary_generated: summaryGenerated
       }
     })
 

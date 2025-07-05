@@ -42,6 +42,13 @@ export default function SessionTranscriptPage() {
 
   // 🆕 텍스트만 보기 상태
   const [textOnlyMode, setTextOnlyMode] = useState(false)
+  
+  // 🆕 요약 관련 상태
+  const [summary, setSummary] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [translatedSummary, setTranslatedSummary] = useState<string>('')
+  const [summaryTranslating, setSummaryTranslating] = useState(false)
 
   // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
@@ -70,16 +77,20 @@ export default function SessionTranscriptPage() {
         if (sessionError) throw sessionError
         setSession(sessionData)
 
-        // Load completed transcripts for this session only
+        // Load all transcripts for this session (remove translation_status filter)
         const { data: transcripts, error: transcriptError } = await supabase
           .from('transcripts')
           .select('*')
           .eq('session_id', sessionId)
-          .eq('translation_status', 'completed') // 🆕 번역 완료된 것만 로드
           .order('created_at', { ascending: true })
 
         if (transcriptError) throw transcriptError
         setTranscript(transcripts || [])
+
+        // 🆕 세션이 종료된 경우 요약 로드
+        if (sessionData.status === 'ended') {
+          loadSessionSummary()
+        }
 
       } catch (error) {
         console.error('Error loading session transcript:', error)
@@ -91,6 +102,126 @@ export default function SessionTranscriptPage() {
 
     loadSessionTranscript()
   }, [user, sessionId, supabase])
+
+  // 🆕 요약 로드 함수
+  const loadSessionSummary = useCallback(async () => {
+    if (!sessionId) return
+
+    try {
+      setSummaryLoading(true)
+      setSummaryError(null)
+
+      const response = await fetch(`/api/session/${sessionId}/summary`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSummary(data.summary)
+        
+        // 요약 로드 후 즉시 번역 실행
+        if (data.summary && showTranslation && selectedLanguage !== 'en') {
+          await translateSummary(data.summary, selectedLanguage)
+        } else if (data.summary) {
+          setTranslatedSummary(data.summary)
+        }
+      } else if (response.status === 404) {
+        // 요약이 없는 경우 - 생성 시도
+        await generateSummary()
+      } else {
+        throw new Error(`Failed to load summary: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error loading summary:', error)
+      setSummaryError('요약을 불러오는데 실패했습니다.')
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [sessionId])
+
+  // 🆕 요약 생성 함수
+  const generateSummary = useCallback(async () => {
+    if (!sessionId) return
+
+    try {
+      setSummaryLoading(true)
+      setSummaryError(null)
+
+      const response = await fetch(`/api/session/${sessionId}/summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSummary(data.summary)
+        
+        // 요약 생성 후 즉시 번역 실행
+        if (data.summary && showTranslation && selectedLanguage !== 'en') {
+          await translateSummary(data.summary, selectedLanguage)
+        } else if (data.summary) {
+          setTranslatedSummary(data.summary)
+        }
+        
+        addToast({
+          type: 'success',
+          title: '요약 생성 완료!',
+          message: '세션 내용이 성공적으로 요약되었습니다.',
+          duration: 3000
+        })
+      } else {
+        throw new Error(`Failed to generate summary: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error generating summary:', error)
+      setSummaryError('요약을 생성하는데 실패했습니다.')
+      
+      addToast({
+        type: 'error',
+        title: '요약 생성 실패',
+        message: '요약을 생성하는데 실패했습니다. 다시 시도해주세요.',
+        duration: 5000
+      })
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [sessionId, addToast])
+
+  // 🆕 요약 번역 함수
+  const translateSummary = useCallback(async (summaryText: string, targetLang: string) => {
+    if (!summaryText || targetLang === 'en') {
+      setTranslatedSummary(summaryText)
+      return
+    }
+
+    setSummaryTranslating(true)
+    
+    try {
+      // translation_cache에서 번역된 요약 찾기
+      const { data: cachedTranslation, error } = await supabase
+        .from('translation_cache')
+        .select('translated_text')
+        .eq('original_text', summaryText)
+        .eq('target_language', targetLang)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error loading summary translation:', error)
+        setTranslatedSummary(summaryText) // 실패 시 영어 원문 표시
+      } else if (cachedTranslation) {
+        setTranslatedSummary(cachedTranslation.translated_text)
+        console.log(`✅ Loaded ${targetLang} summary translation from cache`)
+      } else {
+        console.log(`⚠️ No ${targetLang} summary translation found, using original`)
+        setTranslatedSummary(summaryText)
+      }
+    } catch (error) {
+      console.error('Error loading summary translation:', error)
+      setTranslatedSummary(summaryText)
+    } finally {
+      setSummaryTranslating(false)
+    }
+  }, [supabase])
 
   // 🆕 실시간 transcript 구독 (번역 완료된 것만)
   useEffect(() => {
@@ -165,6 +296,15 @@ export default function SessionTranscriptPage() {
       supabase.removeChannel(channel)
     }
   }, [sessionId, supabase])
+
+  // 🆕 요약 번역 실행 (요약 로드 시 또는 언어 변경 시)
+  useEffect(() => {
+    if (summary && showTranslation) {
+      translateSummary(summary, selectedLanguage)
+    } else if (summary) {
+      setTranslatedSummary(summary) // 번역 비활성화 시 원문 표시
+    }
+  }, [summary, selectedLanguage, showTranslation, translateSummary])
 
   // 번역 함수
   const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
@@ -571,6 +711,199 @@ export default function SessionTranscriptPage() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
+          {/* 🆕 Summary Section */}
+          {session?.status === 'ended' && (
+            <div className={`mb-8 p-6 rounded-lg border-2 border-dashed ${
+              darkMode 
+                ? 'bg-gray-800 border-gray-600' 
+                : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-full ${
+                    darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className={`text-xl font-semibold ${
+                      darkMode ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      Session Summary
+                    </h2>
+                    <p className={`text-sm ${
+                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      {session.category && (
+                        <span className="inline-flex items-center space-x-1">
+                          <span>
+                            {session.category === 'sports' && '⚽'}
+                            {session.category === 'economics' && '💰'}
+                            {session.category === 'technology' && '💻'}
+                            {session.category === 'education' && '📚'}
+                            {session.category === 'business' && '🏢'}
+                            {session.category === 'medical' && '🏥'}
+                            {session.category === 'legal' && '⚖️'}
+                            {session.category === 'entertainment' && '🎬'}
+                            {session.category === 'science' && '🔬'}
+                            {session.category === 'general' && '📋'}
+                          </span>
+                          <span className="capitalize">{session.category}</span>
+                          <span>•</span>
+                        </span>
+                      )}
+                      <span>AI-generated summary based on {transcript.length} transcript lines</span>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Generate Summary Button */}
+                {!summary && !summaryLoading && (
+                  <Button
+                    onClick={generateSummary}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center space-x-2"
+                  >
+                    <span>🤖</span>
+                    <span>Generate Summary</span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Summary Content */}
+              <div className={`rounded-lg p-4 ${
+                darkMode ? 'bg-gray-700' : 'bg-white'
+              }`}>
+                {summaryLoading && (
+                  <div className="flex items-center space-x-3 text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    <div>
+                      <p className={`font-medium ${
+                        darkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        AI 요약 생성 중...
+                      </p>
+                      <p className={`text-sm ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        전체 transcript를 분석하여 {session.category} 분야에 맞는 요약을 생성하고 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {summaryError && (
+                  <div className="text-center py-8">
+                    <div className="text-red-500 mb-2">⚠️ 요약 생성 실패</div>
+                    <p className={`text-sm mb-4 ${
+                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      {summaryError}
+                    </p>
+                    <Button
+                      onClick={generateSummary}
+                      variant="outline"
+                      size="sm"
+                    >
+                      다시 시도
+                    </Button>
+                  </div>
+                )}
+
+                {summary && (
+                  <div className="space-y-4">
+                    {summaryTranslating && (
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Translating summary to {selectedLang?.name}...
+                        </span>
+                      </div>
+                    )}
+                    <div 
+                      className={`leading-relaxed ${
+                        darkMode ? 'text-gray-100' : 'text-gray-800'
+                      }`}
+                      style={{ fontSize: `${fontSize[0]}px` }}
+                    >
+                      {showTranslation && selectedLanguage !== 'en' 
+                        ? (translatedSummary || summary)
+                        : summary
+                      }
+                    </div>
+                    
+                    {/* Summary Actions */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
+                      <div className={`text-xs ${
+                        darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        Generated by GPT-4 • {
+                          showTranslation && selectedLanguage !== 'en' 
+                            ? (translatedSummary || summary).length
+                            : summary.length
+                        } characters
+                        {showTranslation && selectedLanguage !== 'en' && translatedSummary && (
+                          <span> • Translated to {selectedLang?.name}</span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const summaryToCopy = showTranslation && selectedLanguage !== 'en' 
+                              ? (translatedSummary || summary)
+                              : summary
+                            navigator.clipboard.writeText(summaryToCopy)
+                            addToast({
+                              type: 'success',
+                              title: '요약 복사 완료!',
+                              message: `${showTranslation && selectedLanguage !== 'en' ? '번역된 ' : ''}요약이 클립보드에 복사되었습니다.`,
+                              duration: 2000
+                            })
+                          }}
+                        >
+                          📋 Copy Summary
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSummary(null)
+                            generateSummary()
+                          }}
+                        >
+                          🔄 Regenerate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!summary && !summaryLoading && !summaryError && (
+                  <div className="text-center py-8">
+                    <div className={`text-6xl mb-4 ${
+                      darkMode ? 'text-gray-600' : 'text-gray-300'
+                    }`}>
+                      📄
+                    </div>
+                    <p className={`font-medium mb-2 ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      No summary available yet
+                    </p>
+                    <p className={`text-sm ${
+                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      Click &quot;Generate Summary&quot; to create an AI-powered summary of this session.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {transcript.length === 0 ? (
             <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />

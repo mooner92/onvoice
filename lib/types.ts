@@ -5,7 +5,9 @@ export interface Session {
   host_id: string
   host_name: string
   primary_language: string
+  category: 'general' | 'sports' | 'economics' | 'technology' | 'education' | 'business' | 'medical' | 'legal' | 'entertainment' | 'science'
   status: 'active' | 'ended'
+  summary?: string
   created_at: string
   ended_at?: string
   qr_code_url?: string

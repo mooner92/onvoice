@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, hostId, hostName, primaryLanguage } = await req.json()
+    const { title, description, category, hostId, hostName, primaryLanguage } = await req.json()
 
     if (!title || !hostId || !hostName || !primaryLanguage) {
       return NextResponse.json(
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       .insert({
         title,
         description,
+        category: category || 'general',
         host_id: hostId,
         host_name: hostName,
         primary_language: primaryLanguage,

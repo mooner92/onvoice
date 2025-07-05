@@ -21,7 +21,9 @@ CREATE TABLE sessions (
   host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   host_name TEXT NOT NULL,
   primary_language TEXT NOT NULL,
+  category TEXT DEFAULT 'general' CHECK (category IN ('general', 'sports', 'economics', 'technology', 'education', 'business', 'medical', 'legal', 'entertainment', 'science')),
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'ended')),
+  summary TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ended_at TIMESTAMP WITH TIME ZONE,
   qr_code_url TEXT,
@@ -68,6 +70,7 @@ CREATE TABLE user_sessions (
 -- Create indexes for better performance
 CREATE INDEX idx_sessions_host_id ON sessions(host_id);
 CREATE INDEX idx_sessions_status ON sessions(status);
+CREATE INDEX idx_sessions_category ON sessions(category);
 CREATE INDEX idx_session_participants_session_id ON session_participants(session_id);
 CREATE INDEX idx_session_participants_user_id ON session_participants(user_id);
 CREATE INDEX idx_transcripts_session_id ON transcripts(session_id);

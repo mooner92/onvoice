@@ -189,9 +189,9 @@ ${JSON.stringify(Object.fromEntries(supportedLanguages.map(lang => [lang, `[${GP
         const result: Record<string, { text: string; quality: number }> = {}
         
         for (const [lang, translation] of Object.entries(translations)) {
-          result[lang] = {
+            result[lang] = {
             text: translation as string,
-            quality: 0.95
+              quality: 0.95
           }
         }
         

@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
           const dbInsertStart = Date.now()
           console.log(`💾 Inserting transcript to DB: "${cleanedTranscript.substring(0, 50)}..."`)
-          
+
           const { data, error: insertError } = await supabase
             .from("transcripts")
             .insert([
@@ -105,10 +105,10 @@ export async function POST(req: NextRequest) {
 
           console.log(`✅ Transcript saved (id): ${data?.[0]?.id} - DB insert: ${dbInsertTime}ms`)
           const transcriptId = data?.[0]?.id
-          
+            
           // 🚀 즉시 번역 실행 (큐 시스템 제거)
           console.log("🌍 Starting immediate translation...")
-          
+            
           // 번역 상태를 'processing'으로 업데이트
           const statusUpdateStart = Date.now()
           await supabase
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
               .from("transcripts")
               .update({ translation_status: 'completed' })
               .eq('id', transcriptId)
-            
+              
             console.log(`✅ Immediate translation completed for "${cleanedTranscript.substring(0, 30)}..." (${Object.keys(batchResults).length} languages)`)
             
             return NextResponse.json({ 

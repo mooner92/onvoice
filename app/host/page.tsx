@@ -32,6 +32,7 @@ export default function HostDashboard() {
   
   const [sessionTitle, setSessionTitle] = useState("")
   const [sessionDescription, setSessionDescription] = useState("")
+  const [sessionCategory, setSessionCategory] = useState("general")
   const [primaryLanguage, setPrimaryLanguage] = useState("auto")
   const [isRecording, setIsRecording] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -48,6 +49,8 @@ export default function HostDashboard() {
   
   // Refs for cleanup
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastTranscriptTimeRef = useRef<number>(Date.now())
 
   const sttLanguages = [
     { code: 'auto', name: 'Auto-detect (Recommended)' },
@@ -61,6 +64,19 @@ export default function HostDashboard() {
     { code: 'ja-JP', name: 'Japanese' },
     { code: 'ko-KR', name: 'Korean' },
     { code: 'zh-CN', name: 'Chinese' },
+  ]
+
+  const sessionCategories = [
+    { code: 'general', name: '일반', icon: '📋', description: '일반적인 내용' },
+    { code: 'sports', name: '스포츠', icon: '⚽', description: '스포츠 관련 내용' },
+    { code: 'economics', name: '경제', icon: '💰', description: '경제, 금융 관련 내용' },
+    { code: 'technology', name: '기술', icon: '💻', description: '기술, IT 관련 내용' },
+    { code: 'education', name: '교육', icon: '📚', description: '교육, 학습 관련 내용' },
+    { code: 'business', name: '비즈니스', icon: '🏢', description: '비즈니스, 경영 관련 내용' },
+    { code: 'medical', name: '의료', icon: '🏥', description: '의료, 건강 관련 내용' },
+    { code: 'legal', name: '법률', icon: '⚖️', description: '법률, 법무 관련 내용' },
+    { code: 'entertainment', name: '엔터테인먼트', icon: '🎬', description: '엔터테인먼트, 문화 관련 내용' },
+    { code: 'science', name: '과학', icon: '🔬', description: '과학, 연구 관련 내용' },
   ]
 
   // Check if user is authenticated
@@ -92,6 +108,7 @@ export default function HostDashboard() {
           setSessionId(activeSession.id)
           setSessionTitle(activeSession.title)
           setSessionDescription(activeSession.description || "")
+          setSessionCategory(activeSession.category || "general")
           setPrimaryLanguage(activeSession.primary_language)
           setHasActiveSession(true)
     setIsRecording(true)
@@ -166,9 +183,9 @@ export default function HostDashboard() {
         const duration = Math.floor((now - startTime) / 1000)
         setSessionDuration(duration)
         
-        // Auto-stop after 5 minutes (300 seconds)
-        if (duration >= 300) {
-          console.log('Auto-stopping session after 5 minutes')
+        // Auto-stop after 1 hour (3600 seconds)
+        if (duration >= 3600) {
+          console.log('Auto-stopping session after 1 hour')
           handleStopSession()
         }
       }, 1000)
@@ -185,17 +202,37 @@ export default function HostDashboard() {
   // Auto-stop timer for new sessions
   useEffect(() => {
     if (isRecording && sessionId) {
-      // Set 5-minute auto-stop timer
+      // Set 1-hour auto-stop timer
       autoStopTimerRef.current = setTimeout(() => {
-        console.log('Auto-stopping session after 5 minutes (timer)')
+        console.log('Auto-stopping session after 1 hour (timer)')
         handleStopSession()
-      }, 5 * 60 * 1000) // 5 minutes
+      }, 60 * 60 * 1000) // 1 hour
+
+      // Start inactivity monitoring
+      const startInactivityTimer = () => {
+        if (inactivityTimerRef.current) {
+          clearTimeout(inactivityTimerRef.current)
+        }
+        
+        inactivityTimerRef.current = setTimeout(() => {
+          console.log('Auto-stopping session after 5 minutes of inactivity')
+          handleStopSession()
+        }, 5 * 60 * 1000) // 5 minutes
+      }
+
+      // Initialize inactivity timer
+      startInactivityTimer()
+      lastTranscriptTimeRef.current = Date.now()
     }
 
     return () => {
       if (autoStopTimerRef.current) {
         clearTimeout(autoStopTimerRef.current)
         autoStopTimerRef.current = null
+      }
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = null
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,6 +296,16 @@ export default function HostDashboard() {
       
       setTranscript(prev => [...prev, newLine])
       setCurrentPartialText("") // Clear partial text
+      
+      // Reset inactivity timer when new transcript is received
+      lastTranscriptTimeRef.current = Date.now()
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = setTimeout(() => {
+          console.log('Auto-stopping session after 5 minutes of inactivity')
+          handleStopSession()
+        }, 5 * 60 * 1000) // 5 minutes
+      }
     }
   }
 
@@ -283,6 +330,7 @@ export default function HostDashboard() {
         body: JSON.stringify({
           title: sessionTitle,
           description: sessionDescription,
+          category: sessionCategory,
           hostId: user.id,
           hostName: user.user_metadata?.full_name || user.email,
           primaryLanguage: primaryLanguage,
@@ -336,10 +384,14 @@ export default function HostDashboard() {
         }
       }
 
-      // Clear auto-stop timer
+      // Clear auto-stop timer and inactivity timer
       if (autoStopTimerRef.current) {
         clearTimeout(autoStopTimerRef.current)
         autoStopTimerRef.current = null
+      }
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = null
       }
 
       // Wait a moment for RealtimeSTT to cleanup
@@ -359,6 +411,19 @@ export default function HostDashboard() {
       if (response.ok) {
         const { statistics } = await response.json()
         console.log('Session ended:', statistics)
+        
+        // 세션 종료 후 공개 요약 페이지로 리디렉션
+        if (sessionId) {
+          const summaryUrl = `${window.location.origin}/summary/${sessionId}`
+          
+          // 새 탭에서 공개 요약 페이지 열기
+          window.open(summaryUrl, '_blank')
+          
+          // 현재 탭은 홈으로 이동
+          setTimeout(() => {
+            router.push('/')
+          }, 1000)
+        }
       }
 
       // Reset state
@@ -529,7 +594,7 @@ export default function HostDashboard() {
                   Configure your lecture session. Attendees can join via QR code with or without authentication.
                   Perfect for both local and online/remote sessions.
                   <br />
-                  <span className="text-amber-600 font-medium">⏰ Sessions auto-stop after 5 minutes to prevent unexpected charges.</span>
+                  <span className="text-amber-600 font-medium">⏰ Sessions auto-stop after 1 hour or 5 minutes of inactivity to prevent unexpected charges.</span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -553,6 +618,28 @@ export default function HostDashboard() {
                     onChange={(e) => setSessionDescription(e.target.value)}
                     disabled={isRecording}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Session Category</Label>
+                  <Select value={sessionCategory} onValueChange={setSessionCategory}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sessionCategories.map(category => (
+                        <SelectItem key={category.code} value={category.code}>
+                          <div className="flex items-center space-x-2">
+                            <span>{category.icon}</span>
+                            <span>{category.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500">
+                    카테고리를 선택하면 해당 분야에 맞는 번역 및 요약을 제공합니다.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
