@@ -187,7 +187,7 @@ export default function SessionTranscriptPage() {
     }
   }, [sessionId, addToast])
 
-  // 🆕 요약 번역 함수
+  // 🆕 요약 번역 함수 (새로운 캐시 시스템 사용)
   const translateSummary = useCallback(async (summaryText: string, targetLang: string) => {
     if (!summaryText || targetLang === 'en') {
       setTranslatedSummary(summaryText)
@@ -197,19 +197,19 @@ export default function SessionTranscriptPage() {
     setSummaryTranslating(true)
     
     try {
-      // translation_cache에서 번역된 요약 찾기
-      const { data: cachedTranslation, error } = await supabase
-        .from('translation_cache')
-        .select('translated_text')
-        .eq('original_text', summaryText)
-        .eq('target_language', targetLang)
+      // session_summary_cache에서 번역된 요약 찾기
+      const { data: cachedSummary, error } = await supabase
+        .from('session_summary_cache')
+        .select('summary_text')
+        .eq('session_id', sessionId)
+        .eq('language_code', targetLang)
         .maybeSingle()
 
       if (error) {
         console.error('Error loading summary translation:', error)
         setTranslatedSummary(summaryText) // 실패 시 영어 원문 표시
-      } else if (cachedTranslation) {
-        setTranslatedSummary(cachedTranslation.translated_text)
+      } else if (cachedSummary) {
+        setTranslatedSummary(cachedSummary.summary_text)
         console.log(`✅ Loaded ${targetLang} summary translation from cache`)
       } else {
         console.log(`⚠️ No ${targetLang} summary translation found, using original`)
@@ -221,7 +221,7 @@ export default function SessionTranscriptPage() {
     } finally {
       setSummaryTranslating(false)
     }
-  }, [supabase])
+  }, [supabase, sessionId])
 
   // 🆕 실시간 transcript 구독 (번역 완료된 것만)
   useEffect(() => {
