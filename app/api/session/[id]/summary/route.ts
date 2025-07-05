@@ -148,12 +148,20 @@ Please consider the following when summarizing:
       // Still return the summary even if saving fails
     }
 
-    // Generate translations for supported languages and cache them
+    // 🆕 Generate translations for supported languages and save to session_summary_cache
     const supportedLanguages = ['ko', 'zh', 'hi']
-    const summaryId = `summary-${sessionId}`
     
     console.log(`🌍 Generating translations for summary...`)
     
+    // Save English summary to cache first
+    await supabase
+      .from('session_summary_cache')
+      .upsert({
+        session_id: sessionId,
+        language_code: 'en',
+        summary_text: englishSummary
+      })
+
     for (const lang of supportedLanguages) {
       try {
         const translationPrompt = `Translate the following English summary to ${lang === 'ko' ? 'Korean' : lang === 'zh' ? 'Chinese' : 'Hindi'}. Maintain the professional tone and technical accuracy:
@@ -179,24 +187,19 @@ ${englishSummary}`
         const translatedSummary = translationCompletion.choices[0]?.message?.content?.trim()
 
         if (translatedSummary) {
-          // Save to translation cache
+          // 🆕 Save to session_summary_cache instead of translation_cache
           const { error: cacheError } = await supabase
-            .from('translation_cache')
+            .from('session_summary_cache')
             .upsert({
-              content_hash: `${summaryId}-${lang}`,
-              original_text: englishSummary,
-              target_language: lang,
-              translated_text: translatedSummary,
-              translation_engine: 'gpt',
-              quality_score: 0.95,
-              usage_count: 0,
-              expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
+              session_id: sessionId,
+              language_code: lang,
+              summary_text: translatedSummary
             })
 
           if (cacheError) {
-            console.error(`Error caching ${lang} translation:`, cacheError)
+            console.error(`Error caching ${lang} summary translation:`, cacheError)
           } else {
-            console.log(`✅ Cached ${lang} translation for summary`)
+            console.log(`✅ Cached ${lang} summary translation`)
           }
         }
       } catch (error) {
@@ -240,6 +243,8 @@ export async function GET(
   try {
     const resolvedParams = await params
     const sessionId = resolvedParams.id
+    const url = new URL(req.url)
+    const lang = url.searchParams.get('lang') || 'en'
 
     if (!sessionId) {
       return NextResponse.json(
@@ -266,11 +271,31 @@ export async function GET(
       )
     }
 
+    // 🆕 Get translated summary from session_summary_cache
+    let summary = session.summary
+    if (lang !== 'en') {
+      const { data: cachedSummary } = await supabase
+        .from('session_summary_cache')
+        .select('summary_text')
+        .eq('session_id', sessionId)
+        .eq('language_code', lang)
+        .maybeSingle()
+
+      if (cachedSummary) {
+        summary = cachedSummary.summary_text
+        console.log(`✅ Retrieved ${lang} summary from cache`)
+      } else {
+        console.log(`⚠️ No ${lang} summary found, using English`)
+      }
+    }
+
     return NextResponse.json({
-      summary: session.summary,
+      summary,
       category: session.category,
       title: session.title,
-      hasSummary: !!session.summary
+      hasSummary: !!session.summary,
+      language: lang,
+      fromCache: lang !== 'en'
     })
 
   } catch (error) {

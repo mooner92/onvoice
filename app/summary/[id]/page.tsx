@@ -51,6 +51,10 @@ export default function PublicSessionSummaryPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('ko')
   const [translatedSummary, setTranslatedSummary] = useState<string>('')
   const [summaryTranslating, setSummaryTranslating] = useState(false)
+  
+  // 🆕 Transcript 번역 상태
+  const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({})
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set())
 
   // 카테고리 아이콘 매핑
   const getCategoryIcon = (category: string) => {
@@ -274,7 +278,7 @@ export default function PublicSessionSummaryPage() {
     detectLanguage()
   }, [])
 
-  // 요약 번역 함수 (공개 페이지용)
+  // 🆕 요약 번역 함수 (새로운 캐시 시스템 사용)
   const translateSummaryPublic = async (summaryText: string, targetLang: string) => {
     if (!summaryText || targetLang === 'en') {
       setTranslatedSummary(summaryText)
@@ -284,19 +288,19 @@ export default function PublicSessionSummaryPage() {
     setSummaryTranslating(true)
     
     try {
-      // translation_cache에서 번역된 요약 찾기
-      const { data: cachedTranslation, error } = await supabase
-        .from('translation_cache')
-        .select('translated_text')
-        .eq('original_text', summaryText)
-        .eq('target_language', targetLang)
+      // session_summary_cache에서 번역된 요약 찾기
+      const { data: cachedSummary, error } = await supabase
+        .from('session_summary_cache')
+        .select('summary_text')
+        .eq('session_id', sessionId)
+        .eq('language_code', targetLang)
         .maybeSingle()
 
       if (error) {
         console.error('Error loading summary translation:', error)
         setTranslatedSummary(summaryText) // 실패 시 영어 원문 표시
-      } else if (cachedTranslation) {
-        setTranslatedSummary(cachedTranslation.translated_text)
+      } else if (cachedSummary) {
+        setTranslatedSummary(cachedSummary.summary_text)
         console.log(`✅ Loaded ${targetLang} summary translation from cache`)
       } else {
         console.log(`⚠️ No ${targetLang} summary translation found, using original`)
@@ -310,7 +314,39 @@ export default function PublicSessionSummaryPage() {
     }
   }
 
-  // 요약 번역 로드 함수
+  // 🆕 Transcript 번역 함수 (기존 translation_cache 사용)
+  const translateText = async (text: string, targetLang: string): Promise<string> => {
+    try {
+      console.log(`🌍 Loading translation: "${text.substring(0, 30)}..." → ${targetLang}`)
+      
+      // translation_cache에서 기존 번역 찾기
+      const { data: cachedTranslation, error } = await supabase
+        .from('translation_cache')
+        .select('translated_text')
+        .eq('original_text', text)
+        .eq('target_language', targetLang)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Translation cache error:', error)
+        return `[번역 실패] ${text}`
+      }
+
+      if (cachedTranslation) {
+        console.log(`✅ Found cached translation`)
+        return cachedTranslation.translated_text
+      } else {
+        console.log(`⚠️ No cached translation found`)
+        return `[${targetLang}] ${text}` // 번역이 없으면 원문 표시
+      }
+      
+    } catch (error) {
+      console.error('Translation error:', error)
+      return `[번역 실패] ${text}`
+    }
+  }
+
+  // 🆕 요약 번역 로드 함수 (새로운 캐시 시스템 사용)
   const loadSummaryTranslation = async (englishSummary: string, targetLang: string) => {
     if (!englishSummary || targetLang === 'en') {
       setSummary(englishSummary || '')
@@ -320,19 +356,19 @@ export default function PublicSessionSummaryPage() {
     setSummaryLoading(true)
     
     try {
-      // translation_cache에서 번역된 요약 찾기
-      const { data: cachedTranslation, error } = await supabase
-        .from('translation_cache')
-        .select('translated_text')
-        .eq('original_text', englishSummary)
-        .eq('target_language', targetLang)
+      // session_summary_cache에서 번역된 요약 찾기
+      const { data: cachedSummary, error } = await supabase
+        .from('session_summary_cache')
+        .select('summary_text')
+        .eq('session_id', sessionId)
+        .eq('language_code', targetLang)
         .maybeSingle()
 
       if (error) {
         console.error('Error loading summary translation:', error)
         setSummary(englishSummary) // 실패 시 영어 원문 표시
-      } else if (cachedTranslation) {
-        setSummary(cachedTranslation.translated_text)
+      } else if (cachedSummary) {
+        setSummary(cachedSummary.summary_text)
         console.log(`✅ Loaded ${targetLang} summary translation from cache`)
       } else {
         console.log(`⚠️ No ${targetLang} translation found, showing English`)
@@ -414,6 +450,60 @@ export default function PublicSessionSummaryPage() {
       setTranslatedSummary(session.summary) // 번역 비활성화 시 원문 표시
     }
   }, [session?.summary, selectedLanguage, showTranslation])
+
+  // 🆕 Transcript 번역 활성화/언어 변경시 번역 수행
+  useEffect(() => {
+    if (!showTranslation) {
+      setTranslatedTexts({})
+      setTranslatingIds(new Set())
+      return
+    }
+
+    const translateAllTexts = async () => {
+      console.log(`🔄 Starting batch translation for ${transcript.length} items`)
+      setTranslatingIds(new Set(transcript.map(t => t.id)))
+      
+      const newTranslatedTexts: Record<string, string> = {}
+      
+      // 병렬로 번역 (최대 3개씩)
+      for (let i = 0; i < transcript.length; i += 3) {
+        const batch = transcript.slice(i, i + 3)
+        
+        await Promise.all(batch.map(async (item) => {
+          try {
+            const translated = await translateText(item.original_text, selectedLanguage)
+            newTranslatedTexts[item.id] = translated
+            
+            // 개별 완료시마다 UI 업데이트
+            setTranslatedTexts(prev => ({ ...prev, [item.id]: translated }))
+            setTranslatingIds(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(item.id)
+              return newSet
+            })
+          } catch (error) {
+            console.error(`Translation failed for ${item.id}:`, error)
+            setTranslatingIds(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(item.id)
+              return newSet
+            })
+          }
+        }))
+        
+        // 배치 간 짧은 딜레이
+        if (i + 3 < transcript.length) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+      
+      console.log(`✅ Batch translation completed`)
+    }
+
+    if (transcript.length > 0) {
+      translateAllTexts()
+    }
+  }, [showTranslation, selectedLanguage, transcript])
 
   // 텍스트 복사 기능
   const copyText = async (text: string, type: string) => {
@@ -804,6 +894,27 @@ export default function PublicSessionSummaryPage() {
                         >
                           {item.original_text}
                         </div>
+                        
+                        {/* 🆕 Translation Display */}
+                        {showTranslation && (
+                          <div 
+                            className={`mt-2 leading-relaxed italic pl-4 border-l-2 ${
+                              darkMode 
+                                ? 'text-gray-300 border-gray-600' 
+                                : 'text-gray-700 border-gray-300'
+                            }`}
+                            style={{ fontSize: `${fontSize[0] - 1}px` }}
+                          >
+                            {translatingIds.has(item.id) ? (
+                              <span className="text-gray-400 flex items-center">
+                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                [AI 번역 중...]
+                              </span>
+                            ) : (
+                              translatedTexts[item.id] || `[${languages.find(l => l.code === selectedLanguage)?.name}] ${item.original_text}`
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
