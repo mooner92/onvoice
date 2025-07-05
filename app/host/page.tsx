@@ -791,13 +791,13 @@ export default function HostDashboard() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Duration:</span>
-                        <span className={`font-medium ${sessionDuration >= 240 ? 'text-red-600' : ''}`}>
-                          {formatDuration(sessionDuration)} / 5:00
+                        <span className={`font-medium ${sessionDuration >= 3540 ? 'text-red-600' : ''}`}>
+                          {formatDuration(sessionDuration)} / 60:00
                         </span>
                       </div>
-                      {sessionDuration >= 240 && (
+                      {sessionDuration >= 3540 && (
                         <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                          ⚠️ Session will auto-stop in {300 - sessionDuration} seconds
+                          ⚠️ Session will auto-stop in {3600 - sessionDuration} seconds
                         </div>
                       )}
                       <div className="flex justify-between text-sm">
