@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, Search, Download, Play, Crown, Lock, Mic, Users, Zap, Trash2, FileText } from "lucide-react"
+import { Calendar, Clock, Search, Download, Play, Crown, Lock, Mic, Users, Zap, Trash2, FileText, Share2 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
@@ -380,15 +380,19 @@ export default function MySessionsPage() {
                           </Link>
                       </Button>
                     ) : (
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/session/${session.original_id || session.id}/transcript`}>
-                            <FileText className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/session/${session.original_id || session.id}/transcript`}>
+                              <FileText className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/summary/${session.original_id || session.id}`}>
+                              <Share2 className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </>
                       )}
-                        <Button size="sm" variant="outline">
-                          <Download className="h-4 w-4" />
-                      </Button>
                       {session.role === 'audience' && (
                         <Button 
                           size="sm" 

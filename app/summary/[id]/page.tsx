@@ -823,18 +823,23 @@ export default function PublicSessionSummaryPage() {
                        className={`leading-relaxed mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
                        style={{ fontSize: `${fontSize[0]}px` }}
                      >
-                       {showTranslation && selectedLanguage !== 'en' 
-                         ? (translatedSummary || summary || session.summary)
-                         : (summary || session.summary)
-                       }
+                       {(() => {
+                         // 번역 토글이 켜져 있으면 translatedSummary 사용
+                         if (showTranslation && selectedLanguage !== 'en') {
+                           return translatedSummary || session.summary
+                         }
+                         // 번역 토글이 꺼져 있으면 자동 언어 감지 summary 사용
+                         return summary || session.summary
+                       })()}
                      </div>
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
                                              <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                         {t('generatedBy')} • {
-                           showTranslation && selectedLanguage !== 'en' 
-                             ? (translatedSummary || summary || session.summary || '').length
-                             : (summary || session.summary || '').length
-                         } {t('characters')}
+                         {t('generatedBy')} • {(() => {
+                           if (showTranslation && selectedLanguage !== 'en') {
+                             return (translatedSummary || session.summary || '').length
+                           }
+                           return (summary || session.summary || '').length
+                         })()} {t('characters')}
                          {showTranslation && selectedLanguage !== 'en' && translatedSummary && (
                            <span> • Translated to {languages.find(l => l.code === selectedLanguage)?.name}</span>
                          )}
@@ -843,9 +848,12 @@ export default function PublicSessionSummaryPage() {
                          variant="ghost"
                          size="sm"
                          onClick={() => {
-                           const summaryToCopy = showTranslation && selectedLanguage !== 'en' 
-                             ? (translatedSummary || summary || session.summary || '')
-                             : (summary || session.summary || '')
+                           const summaryToCopy = (() => {
+                             if (showTranslation && selectedLanguage !== 'en') {
+                               return translatedSummary || session.summary || ''
+                             }
+                             return summary || session.summary || ''
+                           })()
                            copyText(summaryToCopy, t('copySummary'))
                          }}
                        >
