@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, FileText, Languages, Share2, Loader2, Clock } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
+import Chatbot from '@/components/Chatbot'
 
 interface Session {
   id: string
@@ -942,6 +943,9 @@ export default function PublicSessionSummaryPage() {
               )}
             </Card>
           )}
+
+          {/* Chatbot for past session */}
+          <Chatbot transcript={transcript.map(line => line.original_text).join('\n')} sessionId={sessionId} />
 
           {/* Footer */}
           <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
