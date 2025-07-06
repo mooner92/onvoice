@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 import ChatbotWidget from '@/components/ChatbotWidget'
+//import Chatbot from '@/components/Chatbot'
+
 
 export default function SessionPage() {
   const params = useParams()
