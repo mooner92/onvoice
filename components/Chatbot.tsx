@@ -47,7 +47,7 @@ export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
       } else {
         setError('No answer received.');
       }
-    } catch (e) {
+    } catch {
       setError('Failed to get response.');
     } finally {
       setLoading(false);
@@ -110,7 +110,7 @@ export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
             {/* Messages */}
             <div className="flex-1 h-0 overflow-y-auto px-4 py-3" style={{ background: '#f7f8fa' }}>
               {messages.length === 0 && (
-                <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session's transcript!</div>
+                <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session&apos;s transcript!</div>
               )}
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
