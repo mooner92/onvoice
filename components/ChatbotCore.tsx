@@ -56,7 +56,7 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
       } else {
         setError('No answer received.');
       }
-    } catch (e) {
+    } catch {
       setError('Failed to get response.');
     } finally {
       setLoading(false);

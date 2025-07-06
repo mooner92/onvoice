@@ -11,7 +11,7 @@ export default function ChatbotInline({ transcript, sessionId }: { transcript: s
           </div>
           <div className="h-64 overflow-y-auto px-1 py-2 mb-2 bg-gray-50 dark:bg-gray-800 rounded-2xl">
             {messages.length === 0 && (
-              <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session's transcript!</div>
+              <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session&apos;s transcript!</div>
             )}
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
