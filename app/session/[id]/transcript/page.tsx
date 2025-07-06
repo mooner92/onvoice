@@ -13,6 +13,7 @@ import { useToast, ToastContainer } from "@/components/ui/toast"
 import { Session, Transcript } from "@/lib/types"
 import type { TranslationResponse } from "@/lib/types"
 import Link from "next/link"
+import ChatbotWidget from '@/components/ChatbotWidget'
 
 
 
@@ -995,6 +996,7 @@ export default function SessionTranscriptPage() {
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ChatbotWidget transcript={transcript.map(line => line.original_text).join('\n')} sessionId={sessionId} />
     </div>
   )
 }

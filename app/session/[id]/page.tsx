@@ -11,6 +11,8 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
+import Chatbot from '@/components/Chatbot'
+import ChatbotWidget from '@/components/ChatbotWidget'
 
 export default function SessionPage() {
   const params = useParams()
@@ -454,6 +456,9 @@ export default function SessionPage() {
           </div>
         </div>
       )}
+
+      {/* Chatbot for live session */}
+      <ChatbotWidget transcript={transcript.map(line => line.original).join('\n')} sessionId={sessionId} />
     </div>
   )
 }
