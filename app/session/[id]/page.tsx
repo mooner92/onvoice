@@ -11,7 +11,7 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
-
+import ChatbotWidget from '@/components/ChatbotWidget'
 //import Chatbot from '@/components/Chatbot'
 
 
