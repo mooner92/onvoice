@@ -762,7 +762,7 @@ export default function SessionTranscriptPage() {
                 {/* Generate Summary Button */}
                 {!summary && !summaryLoading && (
                   <Button
-                    onClick={generateSummary}
+                    onClick={() => generateSummary()}
                     variant="outline"
                     size="sm"
                     className="flex items-center space-x-2"
@@ -804,7 +804,7 @@ export default function SessionTranscriptPage() {
                       {summaryError}
                     </p>
                     <Button
-                      onClick={generateSummary}
+                      onClick={() => generateSummary()}
                       variant="outline"
                       size="sm"
                     >
