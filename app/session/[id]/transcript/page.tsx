@@ -139,7 +139,7 @@ export default function SessionTranscriptPage() {
   }, [sessionId])
 
   // 🆕 요약 생성 함수
-  const generateSummary = useCallback(async () => {
+  const generateSummary = useCallback(async (force = false) => {
     if (!sessionId) return
 
     try {
@@ -151,6 +151,7 @@ export default function SessionTranscriptPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify(force ? { force: true } : {}),
       })
 
       if (response.ok) {
@@ -761,7 +762,7 @@ export default function SessionTranscriptPage() {
                 {/* Generate Summary Button */}
                 {!summary && !summaryLoading && (
                   <Button
-                    onClick={generateSummary}
+                    onClick={() => generateSummary()}
                     variant="outline"
                     size="sm"
                     className="flex items-center space-x-2"
@@ -803,7 +804,7 @@ export default function SessionTranscriptPage() {
                       {summaryError}
                     </p>
                     <Button
-                      onClick={generateSummary}
+                      onClick={() => generateSummary()}
                       variant="outline"
                       size="sm"
                     >
@@ -827,12 +828,11 @@ export default function SessionTranscriptPage() {
                         darkMode ? 'text-gray-100' : 'text-gray-800'
                       }`}
                       style={{ fontSize: `${fontSize[0]}px` }}
-                    >
-                      {showTranslation && selectedLanguage !== 'en' 
-                        ? (translatedSummary || summary)
-                        : summary
-                      }
-                    </div>
+                      dangerouslySetInnerHTML={{ __html: showTranslation && selectedLanguage !== 'en' 
+                        ? (translatedSummary || summary) 
+                        : summary 
+                      }}
+                    />
                     
                     {/* Summary Actions */}
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
@@ -872,7 +872,7 @@ export default function SessionTranscriptPage() {
                           size="sm"
                           onClick={() => {
                             setSummary(null)
-                            generateSummary()
+                            generateSummary(true)
                           }}
                         >
                           🔄 Regenerate
