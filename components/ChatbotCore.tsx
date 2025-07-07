@@ -36,35 +36,35 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    setError(null);
-    setLoading(true);
-    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: input }];
-    setMessages(newMessages);
-    setInput('');
-    try {
-      const res = await fetch(`/api/session/${sessionId}/chatbot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: transcriptRef.current, // always use the latest transcript
-          question: input,
-          history: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await res.json();
-      if (data.answer) {
-        setMessages([...newMessages, { role: 'assistant', content: data.answer }]);
-      } else {
-        setError('No answer received.');
-      }
-    } catch {
-      setError('Failed to get response.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const handleSend = async () => {
+  //   if (!input.trim()) return;
+  //   setError(null);
+  //   setLoading(true);
+  //   const newMessages: ChatMessage[] = [...messages, { role: 'user', content: input }];
+  //   setMessages(newMessages);
+  //   setInput('');
+  //   try {
+  //     const res = await fetch(`/api/session/${sessionId}/chatbot`, {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         transcript: transcriptRef.current, // always use the latest transcript
+  //         question: input,
+  //         history: newMessages.map(m => ({ role: m.role, content: m.content })),
+  //       }),
+  //     });
+  //     const data = await res.json();
+  //     if (data.answer) {
+  //       setMessages([...newMessages, { role: 'assistant', content: data.answer }]);
+  //     } else {
+  //       setError('No answer received.');
+  //     }
+  //   } catch {
+  //     setError('Failed to get response.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   // const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
   //   if (e.key === 'Enter' && !loading) {
