@@ -39,7 +39,7 @@ export async function POST(
     try {
       const body = await req.json()
       force = !!body.force
-    } catch (e) {
+    } catch {
       // ignore if no body or invalid JSON
     }
 
