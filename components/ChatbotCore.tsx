@@ -27,6 +27,12 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Add a ref to always have the latest transcript
+  const transcriptRef = useRef(transcript);
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -45,7 +51,7 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transcript,
+          transcript: transcriptRef.current, // always use the latest transcript
           question: input,
           history: newMessages.map(m => ({ role: m.role, content: m.content })),
         }),
