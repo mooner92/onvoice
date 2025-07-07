@@ -1,30 +1,27 @@
-import { useState, useRef, useEffect, ReactNode } from 'react';
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useRef, useEffect, ReactNode } from 'react';
+import { useChat, Message } from 'ai/react';
 
 interface ChatbotCoreProps {
   transcript: string;
   sessionId: string;
   children: (props: {
-    messages: ChatMessage[];
+    messages: Message[];
     input: string;
-    setInput: (v: string) => void;
-    loading: boolean;
-    error: string | null;
-    handleSend: () => void;
-    handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+    handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
+    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+    isLoading: boolean;
+    error: Error | undefined;
     messagesEndRef: React.RefObject<HTMLDivElement | null>;
   }) => ReactNode;
 }
 
 export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProps) {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+    api: `/api/session/${sessionId}/chatbot`,
+    body: {
+      transcript,
+    },
+  });
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Add a ref to always have the latest transcript
@@ -78,11 +75,10 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
   return children({
     messages,
     input,
-    setInput,
-    loading,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
     error,
-    handleSend,
-    handleKeyDown,
     messagesEndRef,
   });
 } 
