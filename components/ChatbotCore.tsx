@@ -66,11 +66,11 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !loading) {
-      handleSend();
-    }
-  };
+  // const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  //   if (e.key === 'Enter' && !loading) {
+  //     handleSend();
+  //   }
+  // };
 
   return children({
     messages,
