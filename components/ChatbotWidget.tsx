@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { ChatbotCore } from './ChatbotCore';
-import ReactMarkdown from 'react-markdown';
 
 export default function ChatbotWidget({ transcript, sessionId }: { transcript: string; sessionId: string }) {
   const [open, setOpen] = useState(false);
@@ -139,7 +138,7 @@ export default function ChatbotWidget({ transcript, sessionId }: { transcript: s
           }}
         >
           <ChatbotCore transcript={transcript} sessionId={sessionId}>
-            {({ messages, input, setInput, loading, error, handleSend, handleKeyDown, messagesEndRef }) => (
+            {({ messages, input, handleInputChange, handleSubmit, isLoading, error, messagesEndRef }) => (
               <div className="flex flex-col h-[520px]" style={{ borderRadius: 20, background: 'rgba(255,255,255,0.98)' }}>
                 {/* Header (Drag handle) */}
                 <div
@@ -166,8 +165,8 @@ export default function ChatbotWidget({ transcript, sessionId }: { transcript: s
                   {messages.length === 0 && (
                     <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session&apos;s transcript!</div>
                   )}
-                  {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
                       <div
                         className={
                           msg.role === 'user'
@@ -176,37 +175,34 @@ export default function ChatbotWidget({ transcript, sessionId }: { transcript: s
                         }
                         style={{ wordBreak: 'break-word', fontSize: 15 }}
                       >
-                        {msg.role === 'assistant'
-                          ? <div className="prose prose-sm"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                          : msg.content}
+                        {msg.content}
                       </div>
                     </div>
                   ))}
-                  {loading && <div className="text-gray-400 text-sm text-center">Thinking...</div>}
+                  {isLoading && <div className="text-gray-400 text-sm text-center">Thinking...</div>}
+                  {error && <div className="text-red-500 text-sm px-4 pb-2">Error: {error.message}</div>}
                   <div ref={messagesEndRef} />
                 </div>
                 {/* Input */}
-                <div className="p-3 border-t bg-white flex gap-2" style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
+                <form onSubmit={handleSubmit} className="p-3 border-t bg-white flex gap-2" style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
                   <input
                     className="flex-1 border border-gray-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                     type="text"
                     value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
+                    onChange={handleInputChange}
                     placeholder="Type your question..."
-                    disabled={loading}
+                    disabled={isLoading}
                     style={{ minHeight: 40 }}
                   />
                   <button
                     className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-2xl text-sm font-semibold disabled:opacity-50 shadow"
-                    onClick={handleSend}
-                    disabled={loading || !input.trim()}
+                    type="submit"
+                    disabled={isLoading || !input.trim()}
                     style={{ minHeight: 40 }}
                   >
                     Send
                   </button>
-                </div>
-                {error && <div className="text-red-500 text-sm px-4 pb-2">{error}</div>}
+                </form>
               </div>
             )}
           </ChatbotCore>

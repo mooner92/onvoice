@@ -1,20 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
+import { useChat } from 'ai/react';
 
 interface ChatbotProps {
   transcript: string;
   sessionId: string;
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+    api: `/api/session/${sessionId}/chatbot`,
+    body: {
+      transcript: transcript || '',
+    },
+  });
   const [open, setOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,39 +22,15 @@ export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
     }
   }, [messages, open]);
 
-  const handleSend = async () => {
+  const handleSend = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (!input.trim()) return;
-    setError(null);
-    setLoading(true);
-    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: input }];
-    setMessages(newMessages);
-    setInput('');
-    try {
-      const res = await fetch(`/api/session/${sessionId}/chatbot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript,
-          question: input,
-          history: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await res.json();
-      if (data.answer) {
-        setMessages([...newMessages, { role: 'assistant', content: data.answer }]);
-      } else {
-        setError('No answer received.');
-      }
-    } catch {
-      setError('Failed to get response.');
-    } finally {
-      setLoading(false);
-    }
+    handleSubmit(e);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !loading) {
-      handleSend();
+    if (e.key === 'Enter' && !isLoading) {
+      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
     }
   };
 
@@ -112,8 +86,8 @@ export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
               {messages.length === 0 && (
                 <div className="text-gray-400 text-sm text-center mt-8">Ask anything about this session&apos;s transcript!</div>
               )}
-              {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
                   <div
                     className={
                       msg.role === 'user'
@@ -126,31 +100,31 @@ export default function Chatbot({ transcript, sessionId }: ChatbotProps) {
                   </div>
                 </div>
               ))}
-              {loading && <div className="text-gray-400 text-sm text-center">Thinking...</div>}
+              {isLoading && <div className="text-gray-400 text-sm text-center">Thinking...</div>}
+              {error && <div className="text-red-500 text-sm px-4 pb-2">Error: {error.message}</div>}
               <div ref={messagesEndRef} />
             </div>
             {/* Input */}
-            <div className="p-3 border-t bg-white flex gap-2" style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
+            <form onSubmit={handleSend} className="p-3 border-t bg-white flex gap-2" style={{ borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
               <input
                 className="flex-1 border border-gray-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                 type="text"
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your question..."
-                disabled={loading}
+                disabled={isLoading}
                 style={{ minHeight: 40 }}
               />
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-2xl text-sm font-semibold disabled:opacity-50 shadow"
-                onClick={handleSend}
-                disabled={loading || !input.trim()}
+                type="submit"
+                disabled={isLoading || !input.trim()}
                 style={{ minHeight: 40 }}
               >
                 Send
               </button>
-            </div>
-            {error && <div className="text-red-500 text-sm px-4 pb-2">{error}</div>}
+            </form>
           </div>
         </div>
       )}
