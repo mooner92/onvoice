@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { QRCodeDisplay } from "@/components/ui/qr-code"
-import { RealtimeSTT } from "@/components/RealtimeSTT"
+import { GeminiLiveSTT } from "@/components/GeminiLiveSTT"
 import type { Session } from "@/lib/types"
 
 interface TranscriptLine {
@@ -23,6 +23,28 @@ interface TranscriptLine {
   text: string;
   confidence: number;
   isPartial?: boolean;
+}
+
+interface TranscriptData {
+  id: string
+  sessionId: string
+  timestamp: string
+  original_text: string
+  translations: {
+    ko?: string
+    zh?: string
+    hi?: string
+  }
+  confidence: number
+  streaming: boolean
+  is_final: boolean
+}
+
+interface SessionStats {
+  participantCount: number
+  transcriptCount: number
+  wordsTranscribed: number
+  lastUpdate: string
 }
 
 export default function HostDashboard() {
@@ -34,7 +56,6 @@ export default function HostDashboard() {
   const [sessionDescription, setSessionDescription] = useState("")
   const [sessionCategory, setSessionCategory] = useState("general")
   const [primaryLanguage, setPrimaryLanguage] = useState("auto")
-  const [isRecording, setIsRecording] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
@@ -46,6 +67,10 @@ export default function HostDashboard() {
   const [hasActiveSession, setHasActiveSession] = useState(false)
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
   const [sttError, setSTTError] = useState<string | null>(null)
+  const [sessionSummary, setSessionSummary] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  // 🆕 세션 조인 상태
+  const [joined, setJoined] = useState(false)
   
   // Refs for cleanup
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -111,7 +136,6 @@ export default function HostDashboard() {
           setSessionCategory(activeSession.category || "general")
           setPrimaryLanguage(activeSession.primary_language)
           setHasActiveSession(true)
-    setIsRecording(true)
           
           // Load existing transcripts
           await loadExistingTranscripts(activeSession.id)
@@ -144,39 +168,14 @@ export default function HostDashboard() {
     checkMicPermission()
   }, [])
 
-  // Subscribe to participant count updates
-  useEffect(() => {
-    if (!sessionId) return
-
-    const channel = supabase
-      .channel(`session-${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'session_participants',
-          filter: `session_id=eq.${sessionId}`
-        },
-        async () => {
-          await updateParticipantCount()
-        }
-      )
-      .subscribe()
-
-    // Initial count load
-    updateParticipantCount()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [sessionId, supabase])
+  // 참여자 수는 이제 WebSocket을 통해 자동 업데이트됩니다 (handleSessionStatsUpdate에서 처리)
+  // 기존 Supabase 실시간 구독은 제거됨
 
   // Session duration timer
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
     
-    if (isRecording && session) {
+    if (session) {
       interval = setInterval(() => {
         const startTime = new Date(session.created_at).getTime()
         const now = new Date().getTime()
@@ -197,11 +196,11 @@ export default function HostDashboard() {
       if (interval) clearInterval(interval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecording, session])
+  }, [session])
 
   // Auto-stop timer for new sessions
   useEffect(() => {
-    if (isRecording && sessionId) {
+    if (sessionId) {
       // Set 1-hour auto-stop timer
       autoStopTimerRef.current = setTimeout(() => {
         console.log('Auto-stopping session after 1 hour (timer)')
@@ -236,24 +235,9 @@ export default function HostDashboard() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecording, sessionId])
+  }, [sessionId])
 
-  const updateParticipantCount = useCallback(async () => {
-    if (!sessionId) return
-
-    try {
-      const { count, error } = await supabase
-        .from('session_participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', sessionId)
-        .is('left_at', null)
-
-      if (error) throw error
-      setParticipantCount(count || 0)
-    } catch (error) {
-      console.error('Error updating participant count:', error)
-    }
-  }, [sessionId, supabase])
+  // updateParticipantCount 함수는 제거됨 - WebSocket을 통해 자동 업데이트
 
   const loadExistingTranscripts = useCallback(async (sessionId: string) => {
     try {
@@ -278,20 +262,20 @@ export default function HostDashboard() {
     }
   }, [supabase])
 
-  // Handle real-time transcript updates
-  const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
-    console.log('Transcript update:', { text, isPartial })
+  // Handle real-time transcript updates (새로운 백엔드 구조)
+  const handleTranscriptUpdate = (data: TranscriptData) => {
+    console.log('📝 Transcript update from backend:', data)
     
-    if (isPartial) {
+    if (!data.is_final) {
       // Update partial text display
-      setCurrentPartialText(text)
+      setCurrentPartialText(data.original_text)
     } else {
       // Add final transcript to list
       const newLine: TranscriptLine = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleTimeString(),
-        text: text.trim(),
-        confidence: 0.9
+        id: data.id,
+        timestamp: new Date(data.timestamp).toLocaleTimeString(),
+        text: data.original_text.trim(),
+        confidence: data.confidence
       }
       
       setTranscript(prev => [...prev, newLine])
@@ -306,7 +290,36 @@ export default function HostDashboard() {
           handleStopSession()
         }, 5 * 60 * 1000) // 5 minutes
       }
+      
+      // Log translation results for debugging
+      if (data.translations) {
+        console.log('🌍 Received translations from backend:', data.translations)
+      }
     }
+  }
+
+  // Handle session stats updates
+  const handleSessionStatsUpdate = (stats: SessionStats) => {
+    console.log('📊 Session stats update from backend:', stats)
+    setParticipantCount(stats.participantCount)
+    
+    // 백엔드에서 제공하는 통계로 UI 업데이트
+    // transcript.length 대신 백엔드 통계 사용
+    console.log(`📊 Stats: ${stats.participantCount} participants, ${stats.transcriptCount} transcripts, ${stats.wordsTranscribed} words`)
+  }
+
+  // Handle summary generation
+  const handleSummaryGenerated = (summaryData: any) => {
+    console.log('📄 Summary generated:', summaryData)
+    setSessionSummary(summaryData.summary)
+    setSummaryLoading(false)
+  }
+
+  // Generate summary manually
+  const generateSummary = () => {
+    setSummaryLoading(true)
+    // GeminiLiveSTT 컴포넌트에서 제공하는 generateSummary 함수를 호출
+    // 실제 구현은 컴포넌트 ref를 통해 처리하거나 별도 API 호출
   }
 
   const handleSTTError = (error: string) => {
@@ -345,9 +358,7 @@ export default function HostDashboard() {
 
       setSession(newSession)
       setSessionId(newSession.id)
-      setIsRecording(true)
       setHasActiveSession(true)
-      setMicPermission('granted')
 
     } catch (error) {
       console.error('Error starting session:', error)
@@ -358,31 +369,12 @@ export default function HostDashboard() {
   }
 
   const handleStopSession = useCallback(async () => {
-    if (!sessionId || !user || !isRecording) return
+    if (!sessionId || !user) return
 
     console.log('Stopping session:', sessionId)
     
     try {
-      // First, immediately set recording to false to stop STT
-      setIsRecording(false)
-      
-      // Immediately call STT stream end API to persist transcript
-    if (sessionId) {
-        try {
-          const sttEndResp = await fetch('/api/stt-stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'end',
-              sessionId
-            })
-          })
-          const sttEndData = await sttEndResp.json()
-          console.log('STT stream end result:', sttEndData)
-        } catch (sttErr) {
-          console.error('Failed to end STT stream:', sttErr)
-        }
-      }
+      // WebSocket will handle session cleanup automatically
 
       // Clear auto-stop timer and inactivity timer
       if (autoStopTimerRef.current) {
@@ -394,7 +386,7 @@ export default function HostDashboard() {
         inactivityTimerRef.current = null
       }
 
-      // Wait a moment for RealtimeSTT to cleanup
+      // Wait a moment for GeminiLiveSTT to cleanup
       await new Promise(resolve => setTimeout(resolve, 1000))
 
       // End session via API
@@ -439,13 +431,12 @@ export default function HostDashboard() {
     } catch (error) {
       console.error('Error stopping session:', error)
       // Still reset state even if API call fails
-      setIsRecording(false)
       setSessionId(null)
       setSession(null)
       setHasActiveSession(false)
       setSTTError(null)
     }
-  }, [sessionId, user, isRecording])
+  }, [sessionId, user])
 
   const handleResumeSession = () => {
     if (sessionId) {
@@ -490,6 +481,13 @@ export default function HostDashboard() {
     // Public access URL (no auth required)
     return `${baseUrl}/s/${sessionId}`
   }
+
+  // 🆕 마이크 권한과 세션 조인 모두 true일 때만 녹음 시작
+  useEffect(() => {
+    if (joined && micPermission === 'granted') {
+      // setIsRecording(true) // 제거
+    }
+  }, [joined, micPermission])
 
   if (!user) {
     return <div>Loading...</div>
@@ -560,7 +558,7 @@ export default function HostDashboard() {
         )}
 
         {/* Active Session Resume */}
-        {hasActiveSession && !isRecording && (
+        {hasActiveSession && (
           <Card className="mb-6 border-green-200 bg-green-50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -605,7 +603,7 @@ export default function HostDashboard() {
                     placeholder="e.g., Introduction to Machine Learning"
                     value={sessionTitle}
                     onChange={(e) => setSessionTitle(e.target.value)}
-                    disabled={isRecording}
+                    disabled={hasActiveSession}
                   />
                 </div>
 
@@ -616,7 +614,7 @@ export default function HostDashboard() {
                     placeholder="Brief description of the lecture content..."
                     value={sessionDescription}
                     onChange={(e) => setSessionDescription(e.target.value)}
-                    disabled={isRecording}
+                    disabled={hasActiveSession}
                   />
                 </div>
 
@@ -660,7 +658,7 @@ export default function HostDashboard() {
                 </div>
 
                 <div className="flex justify-center pt-4">
-                  {!isRecording ? (
+                  {!hasActiveSession ? (
                     <Button 
                       size="lg" 
                       onClick={handleStartSession} 
@@ -681,7 +679,7 @@ export default function HostDashboard() {
             </Card>
 
             {/* Live Transcript */}
-            {isRecording && (
+            {hasActiveSession && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -699,12 +697,15 @@ export default function HostDashboard() {
                   {/* Real-time STT Status */}
                   {sessionId && (
                     <div className="mt-2">
-                      <RealtimeSTT
+                      <GeminiLiveSTT
                         sessionId={sessionId}
-                        isRecording={isRecording}
+                        userId={user.id}
+                        userName={user.user_metadata?.full_name || user.email || 'Host'}
+                        userType="speaker"
                         onTranscriptUpdate={handleTranscriptUpdate}
                         onError={handleSTTError}
-                        lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
+                        onSessionStatsUpdate={handleSessionStatsUpdate}
+                        onSummaryGenerated={handleSummaryGenerated}
                       />
                     </div>
                   )}
@@ -767,7 +768,7 @@ export default function HostDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {!isRecording ? (
+                {!hasActiveSession ? (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Mic className="h-8 w-8 text-gray-400" />
@@ -817,7 +818,7 @@ export default function HostDashboard() {
             </Card>
 
             {/* QR Code */}
-            {isRecording && sessionId && (
+            {hasActiveSession && sessionId && (
               <div className="space-y-4">
                 <QRCodeDisplay
                   value={getPublicSessionUrl()}

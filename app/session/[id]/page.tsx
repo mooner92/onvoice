@@ -12,7 +12,30 @@ import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 import ChatbotWidget from '@/components/ChatbotWidget'
+import { GeminiLiveSTT } from "@/components/GeminiLiveSTT"
 //import Chatbot from '@/components/Chatbot'
+
+interface TranscriptData {
+  id: string
+  sessionId: string
+  timestamp: string
+  original_text: string
+  translations: {
+    ko?: string
+    zh?: string
+    hi?: string
+  }
+  confidence: number
+  streaming: boolean
+  is_final: boolean
+}
+
+interface SessionStats {
+  participantCount: number
+  transcriptCount: number
+  wordsTranscribed: number
+  lastUpdate: string
+}
 
 
 export default function SessionPage() {
@@ -34,6 +57,7 @@ export default function SessionPage() {
   const [isSaved, setIsSaved] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
+  const [translationCache, setTranslationCache] = useState<Record<string, string>>({})
 
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
@@ -70,16 +94,29 @@ export default function SessionPage() {
         if (error) throw error
         setSession(sessionData)
 
-        // Join session as participant
-        await supabase
-          .from('session_participants')
-          .insert({
-            session_id: sessionId,
-            user_id: user?.id,
-            user_name: user?.user_metadata?.full_name || user?.email,
-            role: 'audience',
-            joined_at: new Date().toISOString()
+        // Join session as participant (새로운 백엔드 API)
+        try {
+          const joinResponse = await fetch(`/api/session/${sessionId}/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: user?.id,
+              userName: user?.user_metadata?.full_name || user?.email,
+              role: 'audience'
+            }),
           })
+          
+          if (!joinResponse.ok) {
+            console.warn('Failed to join session via backend, continuing anyway')
+          } else {
+            const joinData = await joinResponse.json()
+            console.log('✅ Successfully joined session:', joinData)
+          }
+        } catch (joinError) {
+          console.warn('Session join error:', joinError)
+        }
 
       } catch (error) {
         console.error('Error loading session:', error)
@@ -92,71 +129,69 @@ export default function SessionPage() {
     }
   }, [user, sessionId, supabase, router])
 
-  // 개선된 번역 함수
-  const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          targetLanguage: targetLang,
-          sessionId: sessionId // 세션 ID 포함
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Translation failed')
-      }
-
-      const result: TranslationResponse = await response.json()
-      return result.translatedText
-    } catch (error) {
-      console.error('Translation error:', error)
-      return `[번역 실패] ${text}`
+  // WebSocket에서 실시간 전사 수신 핸들러 (새로운 백엔드 구조)
+  const handleTranscriptUpdate = useCallback((data: TranscriptData) => {
+    console.log('📝 Received transcript from backend:', data)
+    
+    if (!data.is_final) {
+      // 부분 전사는 무시 (최종 결과만 처리)
+      return
     }
-  }, [sessionId])
 
-  // Subscribe to real-time transcript updates
-  useEffect(() => {
-    if (!sessionId) return
+    // 백엔드에서 제공된 번역 사용
+    const currentTranslation = data.translations[selectedLanguage as keyof typeof data.translations] || 
+                              `[${selectedLanguage.toUpperCase()}] ${data.original_text}`
 
-    const channel = supabase
-      .channel(`transcript-${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'transcripts',
-          filter: `session_id=eq.${sessionId}`
-        },
-        async (payload) => {
-          const newTranscript = payload.new as Transcript
-          
-          // 번역된 텍스트 가져오기 (개선된 캐싱 시스템 활용)
-          const translatedText = await translateText(newTranscript.original_text, selectedLanguage)
-          
-          const newLine: TranscriptLine = {
-            id: newTranscript.id,
-            timestamp: newTranscript.timestamp,
-            original: newTranscript.original_text,
-            translated: translatedText,
-            speaker: session?.host_name,
-            isTranslating: false
+    const newLine: TranscriptLine = {
+      id: data.id,
+      timestamp: new Date(data.timestamp).toLocaleTimeString(),
+      original: data.original_text,
+      translated: currentTranslation,
+      speaker: session?.host_name || 'Speaker',
+      isTranslating: false // 백엔드에서 즉시 번역 제공
+    }
+
+    setTranscript(prev => [...prev, newLine])
+
+    // 번역 캐시 업데이트 (다른 언어로 변경 시 사용)
+    if (data.translations) {
+      setTranslationCache(prev => {
+        const updated = { ...prev }
+        Object.entries(data.translations).forEach(([lang, text]) => {
+          if (text) {
+            updated[`${data.original_text}:${lang}`] = text
           }
-
-          setTranscript(prev => [...prev, newLine])
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
+        })
+        return updated
+      })
     }
-  }, [sessionId, selectedLanguage, session?.host_name, supabase, translateText])
+  }, [session?.host_name, selectedLanguage])
+
+  // 세션 통계 업데이트 핸들러
+  const handleSessionStatsUpdate = useCallback((stats: SessionStats) => {
+    console.log('📊 Session stats update:', stats)
+    setParticipantCount(stats.participantCount)
+    // 추가 통계 업데이트는 여기서 처리
+  }, [])
+
+  // Mock 번역 함수 (Gemini Live API가 실시간으로 번역 제공)
+  const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
+    // 캐시 확인
+    const cacheKey = `${text}:${targetLang}`
+    if (translationCache[cacheKey]) {
+      return translationCache[cacheKey]
+    }
+
+    // Gemini Live API에서 실시간 번역을 제공하므로 임시 표시
+    // 실제 번역은 WebSocket을 통해 실시간으로 수신됨
+    return `[${targetLang.toUpperCase()}] ${text}`
+  }, [translationCache])
+
+  // WebSocket 에러 핸들러
+  const handleWebSocketError = useCallback((error: string) => {
+    console.error('WebSocket error:', error)
+    // 에러 발생 시 폴백으로 기존 Supabase 실시간 구독 사용 가능
+  }, [])
 
   // Update participant count function
   const updateParticipantCount = useCallback(async () => {
@@ -387,6 +422,22 @@ export default function SessionPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* WebSocket Connection (Hidden) */}
+      {user && sessionId && (
+        <div className="hidden">
+                     <GeminiLiveSTT
+             sessionId={sessionId}
+             userId={user.id}
+             userName={user.user_metadata?.full_name || user.email || 'Audience'}
+             userType="audience"
+             isRecording={false} // Audience는 녹음하지 않음
+             onTranscriptUpdate={handleTranscriptUpdate}
+             onError={handleWebSocketError}
+             onSessionStatsUpdate={handleSessionStatsUpdate}
+           />
         </div>
       )}
 

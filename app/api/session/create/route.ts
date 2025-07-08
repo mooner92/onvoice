@@ -1,71 +1,78 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, category, hostId, hostName, primaryLanguage } = await req.json()
+    const { 
+      title, 
+      description, 
+      category, 
+      hostId, 
+      hostName, 
+      primaryLanguage,
+      autoTranslate = true,
+      languages = ['en', 'ko', 'zh', 'hi']
+    } = await req.json()
 
-    if (!title || !hostId || !hostName || !primaryLanguage) {
+    if (!title || !hostId || !hostName) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Title, host ID, and host name are required" },
         { status: 400 }
       )
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    // Create session
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .insert({
+    // 백엔드 API 호출
+    const backendResponse = await fetch('http://localhost:3001/api/sessions/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         title,
         description,
+        hostId,
+        hostName,
+        primaryLanguage: primaryLanguage || 'en',
         category: category || 'general',
-        host_id: hostId,
-        host_name: hostName,
-        primary_language: primaryLanguage,
-        status: 'active',
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+        autoTranslate,
+        languages
+      }),
+    })
 
-    if (error) {
-      console.error('Database error:', error)
+    if (!backendResponse.ok) {
+      const errorData = await backendResponse.json().catch(() => ({ message: 'Unknown error' }))
       return NextResponse.json(
-        { error: "Failed to create session" },
-        { status: 500 }
+        { error: errorData.message || "Failed to create session" },
+        { status: backendResponse.status }
       )
     }
 
-    // Generate session URLs
-    const baseUrl = req.headers.get('origin') || 'http://localhost:3001'
-    const publicUrl = `${baseUrl}/s/${session.id}`
-    const authUrl = `${baseUrl}/session/${session.id}`
+    const backendData = await backendResponse.json()
+    
+    // 백엔드 응답 구조에 맞춰 변환
+    const session = {
+      id: backendData.data.sessionId,
+      title,
+      description,
+      category: category || 'general',
+      host_id: hostId,
+      host_name: hostName,
+      primary_language: primaryLanguage || 'en',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      websocket_url: backendData.data.websocketUrl,
+      public_url: backendData.data.publicUrl,
+      qr_code_data: backendData.data.qrCodeData
+    }
 
-    // Update session with URLs
-    await supabase
-      .from('sessions')
-      .update({
-        session_url: authUrl,
-        qr_code_url: publicUrl
-      })
-      .eq('id', session.id)
-
-    return NextResponse.json({
-      session: {
-        ...session,
-        session_url: authUrl,
-        qr_code_url: publicUrl,
-        public_url: publicUrl
-      }
+    return NextResponse.json({ 
+      session,
+      websocketUrl: backendData.data.websocketUrl,
+      publicUrl: backendData.data.publicUrl,
+      qrCodeData: backendData.data.qrCodeData
     })
 
   } catch (error) {
-    console.error('Session creation error:', error)
+    console.error('API error:', error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

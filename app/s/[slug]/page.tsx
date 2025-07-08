@@ -27,6 +27,7 @@ import { useToast, ToastContainer } from "@/components/ui/toast"
 import { Session } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 import ChatbotWidget from '@/components/ChatbotWidget'
+import { GeminiLiveSTT } from '@/components/GeminiLiveSTT'
 
 export default function PublicSessionPage() {
   const params = useParams()
@@ -302,6 +303,10 @@ export default function PublicSessionPage() {
   // 🆕 텍스트만 보기 상태
   const [textOnlyMode, setTextOnlyMode] = useState(false)
 
+  // 🆕 백엔드 통합 상태
+  const [wsStatus, setWsStatus] = useState('disconnected')
+  const [joinStatus, setJoinStatus] = useState('pending') // pending, joined, error
+
   // Set user preferred language on client side
   useEffect(() => {
     setSelectedLanguage(getUserPreferredLanguage())
@@ -396,40 +401,82 @@ export default function PublicSessionPage() {
         setLoading(true)
         setError(null)
 
-        // First try to find by slug (assumed to be session ID for now)
-        let sessionData
-
-        // Try as session ID first
-        const { data: directSession, error: directError } = await supabase
-          .from('sessions')
-          .select('*')
-          .eq('id', slug)
-          .eq('status', 'active')
-          .single()
-
-        if (directSession && !directError) {
-          sessionData = directSession
-        } else {
-          // Try to find by custom slug or title match
-          const { data: slugSession } = await supabase
-            .from('sessions')
-            .select('*')
-            .ilike('title', `%${slug}%`)
-            .eq('status', 'active')
-            .limit(1)
-            .single()
-
-          sessionData = slugSession
-        }
-
-        if (!sessionData) {
-          console.error('Session not found:', { slug })
-          setError(`Session not found (ID: ${slug}). The session may have ended or the link may be invalid.`)
+        // 1️⃣ 먼저 백엔드에서 세션 존재 확인
+        const existsResponse = await fetch(`/api/session/${slug}/exists`)
+        const existsData = await existsResponse.json()
+        
+        if (!existsData.exists) {
+          console.error('❌ Session not found in backend:', existsData.message)
+          setError(existsData.message)
           return
         }
 
-        setSession(sessionData)
-        setSessionId(sessionData.id)
+        if (!existsData.active) {
+          console.error('❌ Session has ended:', existsData.message)
+          setError(existsData.message)
+          return
+        }
+
+        console.log('✅ Session exists in backend:', existsData.data)
+
+        // 2️⃣ 기존 Supabase 조회는 보조적으로 사용
+        const { data: sessionData, error: supabaseError } = await supabase
+          .from('sessions')
+          .select('*')
+          .eq('id', slug)
+          .single()
+
+                 if (supabaseError) {
+           console.warn('⚠️ Supabase session not found, using backend data')
+           // 백엔드 데이터를 사용하여 세션 객체 생성
+           const backendSession: Session = {
+             id: slug,
+             title: existsData.data?.title || 'Live Session',
+             host_name: existsData.data?.host_name || 'Host',
+             host_id: existsData.data?.host_id || '',
+             primary_language: existsData.data?.primary_language || 'en',
+             category: existsData.data?.category || 'general',
+             status: 'active',
+             created_at: existsData.data?.created_at || new Date().toISOString()
+           }
+           setSession(backendSession)
+        } else {
+          console.log('✅ Session found in both backend and Supabase')
+          setSession(sessionData)
+        }
+
+        setSessionId(slug)
+
+        // 3️⃣ 백엔드 API로 세션 참여 (사용자가 있는 경우에만)
+        if (user) {
+          try {
+            const joinResponse = await fetch(`/api/session/${slug}/join`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.id,
+                userName: user.user_metadata?.full_name || user.email,
+                role: 'audience'
+              }),
+            })
+            
+            const joinData = await joinResponse.json()
+            
+            if (!joinResponse.ok) {
+              console.error('❌ Failed to join session:', joinData)
+              setError(`Failed to join session: ${joinData.error}`)
+              setJoinStatus('error')
+            } else {
+              console.log('✅ Successfully joined session:', joinData)
+              setJoinStatus('joined')
+              setHasJoined(true)
+            }
+          } catch (joinError) {
+            console.error('❌ Session join error:', joinError)
+            setError('Failed to join session. Please try again.')
+            setJoinStatus('error')
+          }
+        }
 
         // Load existing transcripts - 번역이 완료된 것만 표시
         const { data: transcripts } = await supabase
@@ -497,7 +544,7 @@ export default function PublicSessionPage() {
     if (slug) {
       loadSession()
     }
-  }, [slug, supabase])
+  }, [slug, supabase, user])
 
 
   // Join session as participant or guest
@@ -965,6 +1012,30 @@ export default function PublicSessionPage() {
     }
     
   }, [selectedLanguage, translationEnabled, supabase]) // transcript 제거
+
+  // 🆕 WebSocket 핸들러들
+  const handleWebSocketError = useCallback((error: string) => {
+    console.error('❌ WebSocket error:', error)
+    setError(`WebSocket connection error: ${error}`)
+  }, [])
+
+  const handleSessionStatsUpdate = useCallback((stats: any) => {
+    console.log('📊 Session stats update:', stats)
+    setParticipantCount(stats.participantCount || 0)
+  }, [])
+
+  // 🆕 GeminiLiveSTT용 전사 업데이트 핸들러
+  const handleGeminiTranscriptUpdate = useCallback((data: any) => {
+    console.log('📝 Gemini transcript update:', data)
+    
+    // TranscriptData 구조에서 필요한 정보 추출
+    const transcriptText = data.original_text || data.text || ''
+    const isPartial = !data.is_final
+    
+    if (transcriptText.trim()) {
+      handleTranscriptUpdate(transcriptText, isPartial)
+    }
+  }, [handleTranscriptUpdate])
 
   // Clear cache when translation is disabled
   useEffect(() => {
@@ -1646,6 +1717,55 @@ export default function PublicSessionPage() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ChatbotWidget transcript={transcript.map(line => line.original).join('\n')} sessionId={sessionId || ''} />
+      
+      {/* 🆕 에러 표시 UI */}
+      {error && (
+        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-4 z-50">
+          <div className="flex justify-between items-center">
+            <span>❌ {error}</span>
+            <button onClick={() => setError(null)} className="text-white">×</button>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 WebSocket 상태 표시 (개발 모드에서만) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-16 right-4 bg-black text-white p-2 text-xs rounded z-50">
+          <div>🔌 WS: {wsStatus}</div>
+          <div>🎯 Join: {joinStatus}</div>
+          <div>📊 Transcripts: {transcript.length}</div>
+        </div>
+      )}
+
+      {/* 🆕 GeminiLiveSTT 컴포넌트 - 디버깅 가능하도록 표시 */}
+      {process.env.NODE_ENV === 'development' && user && sessionId && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '10px', 
+          right: '10px', 
+          zIndex: 9999,
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '10px',
+          borderRadius: '5px',
+          fontSize: '12px',
+          maxWidth: '300px'
+        }}>
+          <div>🔌 WebSocket Status: {wsStatus}</div>
+          <div>📺 Session: {sessionId}</div>
+          <div>👤 User: {user.user_metadata?.full_name || user.email || 'Audience'}</div>
+                     <GeminiLiveSTT
+             sessionId={sessionId}
+             userId={user.id}
+             userName={user.user_metadata?.full_name || user.email || 'Audience'}
+             userType="audience"
+             isRecording={false}
+             onTranscriptUpdate={handleGeminiTranscriptUpdate}
+             onError={handleWebSocketError}
+             onSessionStatsUpdate={handleSessionStatsUpdate}
+           />
+        </div>
+      )}
     </div>
   )
 }
