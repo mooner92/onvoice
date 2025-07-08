@@ -26,6 +26,7 @@ import { createClient } from "@/lib/supabase"
 import { useToast, ToastContainer } from "@/components/ui/toast"
 import { Session } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
+import ChatbotWidget from '@/components/ChatbotWidget'
 
 export default function PublicSessionPage() {
   const params = useParams()
@@ -1644,6 +1645,7 @@ export default function PublicSessionPage() {
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ChatbotWidget transcript={transcript.map(line => line.original).join('\n')} sessionId={sessionId || ''} />
     </div>
   )
 }
