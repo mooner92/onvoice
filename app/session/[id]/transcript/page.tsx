@@ -828,11 +828,12 @@ export default function SessionTranscriptPage() {
                         darkMode ? 'text-gray-100' : 'text-gray-800'
                       }`}
                       style={{ fontSize: `${fontSize[0]}px` }}
-                      dangerouslySetInnerHTML={{ __html: showTranslation && selectedLanguage !== 'en' 
-                        ? (translatedSummary || summary) 
-                        : summary 
-                      }}
-                    />
+                    >
+                      {showTranslation && selectedLanguage !== 'en' 
+                        ? <span dangerouslySetInnerHTML={{ __html: translatedSummary || summary }} />
+                        : <span dangerouslySetInnerHTML={{ __html: summary }} />
+                      }
+                    </div>
                     
                     {/* Summary Actions */}
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
