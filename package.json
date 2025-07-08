@@ -13,6 +13,7 @@
     "@ai-sdk/openai": "^1.3.22",
     "@auth/supabase-adapter": "^1.10.0",
     "@deepgram/sdk": "^4.7.0",
+    "@nanostores/react": "git+https://github.com/ai/react.git",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-separator": "^1.1.7",
