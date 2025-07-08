@@ -829,8 +829,8 @@ export default function SessionTranscriptPage() {
                       style={{ fontSize: `${fontSize[0]}px` }}
                     >
                       {showTranslation && selectedLanguage !== 'en' 
-                        ? (translatedSummary || summary)
-                        : summary
+                        ? <span dangerouslySetInnerHTML={{ __html: translatedSummary || summary }} />
+                        : <span dangerouslySetInnerHTML={{ __html: summary }} />
                       }
                     </div>
                     

@@ -98,17 +98,62 @@ export async function POST(
     const categoryPrompt = CATEGORY_PROMPTS[session.category as keyof typeof CATEGORY_PROMPTS] || CATEGORY_PROMPTS.general
 
     // Generate English summary using GPT
-    const summaryPrompt = `${categoryPrompt}
+    const summaryPrompt = `
+**C – Context:**  
+You are a large language model tasked with summarizing spoken content that has been transcribed using the WebSpeech API. The source may be lectures, discussions, or events with a few speakers and many listeners. These transcripts often contain transcription errors (e.g., "My Combinator" instead of "Y Combinator") that must be corrected using contextual understanding.
 
-Here is the lecture content:
+**O – Objective:**  
+Your goal is to produce an accurate and concise summary by:  
+1. Correcting transcription errors based on context.  
+2. Following a specific HTML-based structure for clarity and usability.  
+3. Including five relevant tags at the end.
 
+**S – Style:**  
+Concise, clear, and professional. Avoid repetition or filler.
+
+**T – Tone:**  
+Neutral, informative, and user-friendly.
+
+**A – Audience:**  
+Users who want a brief but accurate overview of the spoken content. Including, but not limited to, students, professionals, and event attendees.
+
+**R – Response:**  
+Use the following structure:
+
+${categoryPrompt}
+Here is the transcript which may contain transcription errors:
 ${truncatedTranscript}
 
-Please consider the following when summarizing:
-1. Write in 300-500 characters
-2. Include key content and main points
-3. Apply professional perspective suitable for the category (${session.category})
-4. Use clear and easy-to-understand writing style`
+Please follow these instructions:
+1. Carefully analyze the transcript and fix any transcription errors using context clues.
+2. Organize the summary into 2-4 key sections, each with a clear heading using HTML <b> tags (e.g., <b>Section Title</b>).
+3. Under each heading, list 1-3 concise bullet points with the most important facts, insights, or conclusions.
+4. Use <br/> for line breaks between sections and bullet points.
+5. Be clear and detailed, grouping related information together.
+6. Use professional, easy-to-understand language.
+7. Do not exceed 500 characters total.
+8. End the summary with 5 relevant tags in the following format:
+<b>Important tags</b><br/>
+- tag 1<br/>
+- tag 2<br/>
+- tag 3<br/>
+- tag 4<br/>
+- tag 5<br/>
+9. Example format:
+
+<b>1. Section Title</b><br/>
+- Key point one<br/>
+- Key point two<br/><br/>
+<b>2. Next Section</b><br/>
+- Key point one<br/>
+- Key point two<br/><br/>
+<b>Important tags</b><br/>
+- topic<br/>
+- keyword<br/>
+- theme<br/>
+- event<br/>
+- takeaway<br/>
+`
 
     console.log(`🤖 Generating English summary for session ${sessionId} (category: ${session.category})`)
     
