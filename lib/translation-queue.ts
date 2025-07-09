@@ -11,6 +11,41 @@ const GOOGLE_LANGUAGE_MAP: Record<string, string> = {
   'el': 'el', 'tr': 'tr', 'ar': 'ar', 'id': 'id', 'uk': 'uk'
 }
 
+// Gemini 언어 이름 매핑 (더 정확한 번역을 위해)
+const GEMINI_LANGUAGE_NAMES: Record<string, string> = {
+  'ko': 'Korean',
+  'ja': 'Japanese', 
+  'zh': 'Chinese',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'it': 'Italian',
+  'pl': 'Polish',
+  'nl': 'Dutch',
+  'da': 'Danish',
+  'sv': 'Swedish',
+  'no': 'Norwegian',
+  'fi': 'Finnish',
+  'cs': 'Czech',
+  'sk': 'Slovak',
+  'sl': 'Slovenian',
+  'et': 'Estonian',
+  'lv': 'Latvian',
+  'lt': 'Lithuanian',
+  'hu': 'Hungarian',
+  'bg': 'Bulgarian',
+  'ro': 'Romanian',
+  'el': 'Greek',
+  'tr': 'Turkish',
+  'ar': 'Arabic',
+  'id': 'Indonesian',
+  'uk': 'Ukrainian',
+  'hi': 'Hindi',
+  'en': 'English'
+}
+
 // GPT 언어 이름 매핑 (더 정확한 번역을 위해)
 const GPT_LANGUAGE_NAMES: Record<string, string> = {
   'ko': 'Korean',
@@ -46,7 +81,233 @@ const GPT_LANGUAGE_NAMES: Record<string, string> = {
   'en': 'English'
 }
 
-// GPT-4 번역 (최고 품질)
+// 🆕 Gemini 2.5 Flash 번역 (최고 품질 + 최적 비용)
+async function translateWithGemini(text: string, targetLanguage: string): Promise<{ text: string; quality: number } | null> {
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY
+    if (!geminiApiKey) {
+      console.log('Gemini API key not found, skipping Gemini translation')
+      return null
+    }
+
+    const targetLangName = GEMINI_LANGUAGE_NAMES[targetLanguage]
+    if (!targetLangName) {
+      console.log(`Unsupported language for Gemini: ${targetLanguage}`)
+      return null
+    }
+
+    // 간단한 프롬프트로 토큰 사용량 최적화
+    const prompt = `Translate to ${targetLangName}: "${text}"`
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: Math.max(Math.ceil(text.length * 4), 800), // 토큰 제한 증가
+        },
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Gemini API error:', response.status, errorText)
+      return null
+    }
+
+    const data = await response.json()
+    
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      const candidate = data.candidates[0]
+      
+      // MAX_TOKENS로 잘린 경우 처리
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        console.log('⚠️ Gemini individual response was truncated due to MAX_TOKENS')
+        return null
+      }
+      
+      // content.parts가 있는지 확인
+      if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
+        let translatedText = candidate.content.parts[0].text.trim()
+        
+        // 마크다운 코드 블록 제거 (```로 감싸진 경우)
+        if (translatedText.startsWith('```') && translatedText.endsWith('```')) {
+          translatedText = translatedText.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim()
+        }
+        
+        // JSON 형태로 응답이 온 경우 파싱 시도
+        if (translatedText.startsWith('{') && translatedText.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(translatedText)
+            // 대상 언어의 번역 찾기
+            if (parsed[targetLanguage]) {
+              translatedText = parsed[targetLanguage]
+            }
+          } catch (e) {
+            // JSON 파싱 실패 시 원본 텍스트 사용
+            console.log('Individual Gemini response is not valid JSON, using as-is')
+          }
+        }
+        
+        console.log('✅ Gemini translation successful')
+        return {
+          text: translatedText,
+          quality: 0.96 // Gemini는 최고 품질 점수
+        }
+      } else {
+        console.log('❌ Gemini individual response missing content.parts:', candidate.content)
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('Gemini translation error:', error)
+    return null
+  }
+}
+
+// 🆕 Gemini 통합 번역 (비용 최적화)
+async function translateWithGeminiBatch(text: string, targetLanguages: string[]): Promise<Record<string, { text: string; quality: number }> | null> {
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY
+    if (!geminiApiKey) {
+      console.log('Gemini API key not found, skipping Gemini batch translation')
+      return null
+    }
+
+    console.log(`🔑 Gemini API key found (${geminiApiKey.substring(0, 10)}...)`)
+
+    // 지원되는 언어만 필터링
+    const supportedLanguages = targetLanguages.filter(lang => GEMINI_LANGUAGE_NAMES[lang])
+    console.log(`🌍 Supported languages for Gemini: ${supportedLanguages.join(', ')} (from ${targetLanguages.join(', ')})`)
+    
+    if (supportedLanguages.length === 0) {
+      console.log('❌ No supported languages found for Gemini batch translation')
+      return null
+    }
+
+    // 언어 리스트 생성
+    const languageList = supportedLanguages.map(lang => `${lang}: ${GEMINI_LANGUAGE_NAMES[lang]}`).join(', ')
+    
+    const prompt = `Translate the following text to these languages: ${languageList}
+
+Text: "${text}"
+
+Return only a JSON object with language codes as keys and translations as values:
+${JSON.stringify(Object.fromEntries(supportedLanguages.map(lang => [lang, `translation in ${GEMINI_LANGUAGE_NAMES[lang]}`])), null, 2)}`
+
+    console.log(`📝 Gemini batch prompt prepared (${prompt.length} chars)`)
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: Math.max(Math.ceil(text.length * supportedLanguages.length * 4), 1500), // 토큰 제한 증가
+        },
+      }),
+    })
+
+    console.log(`🌐 Gemini API response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Gemini Batch API error:', response.status, errorText)
+      return null
+    }
+
+    const data = await response.json()
+    console.log(`📦 Gemini API response received:`, JSON.stringify(data, null, 2))
+    
+    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+      const content = data.candidates[0].content.parts[0].text
+      console.log(`🎯 Gemini raw response: ${content}`)
+      
+      try {
+        // JSON 파싱 시도 (markdown 코드 블록 처리)
+        let jsonContent = content.trim()
+        
+        // ```json ... ``` 형태의 마크다운 코드 블록 제거
+        if (jsonContent.startsWith('```json')) {
+          jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+        } else if (jsonContent.startsWith('```')) {
+          jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '')
+        }
+        
+        const translations = JSON.parse(jsonContent)
+        const result: Record<string, { text: string; quality: number }> = {}
+        
+        for (const [lang, translation] of Object.entries(translations)) {
+          if (typeof translation === 'string' && supportedLanguages.includes(lang)) {
+            result[lang] = {
+              text: translation,
+              quality: 0.92 // Gemini 품질 점수
+            }
+          }
+        }
+        
+        if (Object.keys(result).length > 0) {
+          console.log(`✅ Gemini batch translation parsed successfully: ${Object.keys(result).join(', ')}`)
+          return result
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Gemini batch response:', parseError)
+        console.error('Raw response:', content)
+        
+        // 정규식으로 JSON 추출 시도 (폴백)
+        try {
+          const jsonMatch = content.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const extractedJson = jsonMatch[0]
+            const translations = JSON.parse(extractedJson)
+            const result: Record<string, { text: string; quality: number }> = {}
+            
+            for (const [lang, translation] of Object.entries(translations)) {
+              if (typeof translation === 'string' && supportedLanguages.includes(lang)) {
+                result[lang] = {
+                  text: translation,
+                  quality: 0.92
+                }
+              }
+            }
+            
+            if (Object.keys(result).length > 0) {
+              console.log(`✅ Gemini batch translation extracted via regex: ${Object.keys(result).join(', ')}`)
+              return result
+            }
+          }
+        } catch (regexError) {
+          console.error('Regex extraction also failed:', regexError)
+        }
+      }
+    } else {
+      console.log('❌ Gemini response structure invalid:', data)
+    }
+
+    return null
+  } catch (error) {
+    console.error('Gemini batch translation error:', error)
+    return null
+  }
+}
+
+// GPT-4 번역 (폴백)
 async function translateWithGPT(text: string, targetLanguage: string): Promise<{ text: string; quality: number } | null> {
   try {
     const openaiApiKey = process.env.OPENAI_API_KEY
@@ -114,131 +375,6 @@ Provide ONLY the translation without any explanation.`
     return null
   } catch (error) {
     console.error('GPT translation error:', error)
-    return null
-  }
-}
-
-// 🆕 GPT 통합 번역 (비용 최적화)
-async function translateWithGPTBatch(text: string, targetLanguages: string[]): Promise<Record<string, { text: string; quality: number }> | null> {
-  try {
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    if (!openaiApiKey) {
-      console.log('OpenAI API key not found, skipping GPT batch translation')
-      return null
-    }
-
-    // 지원되는 언어만 필터링
-    const supportedLanguages = targetLanguages.filter(lang => GPT_LANGUAGE_NAMES[lang])
-    if (supportedLanguages.length === 0) {
-      return null
-    }
-
-    // 언어 리스트 생성
-    const languageList = supportedLanguages.map(lang => `${lang}: ${GPT_LANGUAGE_NAMES[lang]}`).join(', ')
-    
-    const prompt = `You are a professional translator specializing in live lecture and presentation content.
-
-Please translate the following text to ALL these languages: ${languageList}
-
-Guidelines:
-- Maintain the speaker's tone and intent
-- Fix any obvious speech recognition errors naturally  
-- Use appropriate formal/informal register for academic context
-- Keep technical terms accurate
-- Make it sound natural in each target language
-
-Text to translate: "${text}"
-
-Return ONLY a JSON object with language codes as keys:
-${JSON.stringify(Object.fromEntries(supportedLanguages.map(lang => [lang, `[${GPT_LANGUAGE_NAMES[lang]} translation here]`])), null, 2)}`
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: Math.min(Math.ceil(text.length * supportedLanguages.length * 2), 1000),
-        temperature: 0.3,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('GPT Batch API error:', response.status, errorText)
-      return null
-    }
-
-    const data = await response.json()
-    
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      const content = data.choices[0].message.content.trim()
-      
-      // GPT 응답을 안전하게 파싱
-      try {
-        // JSON 파싱 시도
-        const translations = JSON.parse(content)
-        const result: Record<string, { text: string; quality: number }> = {}
-        
-        for (const [lang, translation] of Object.entries(translations)) {
-            result[lang] = {
-            text: translation as string,
-              quality: 0.95
-          }
-        }
-        
-        return result
-      } catch (parseError) {
-        console.error('Failed to parse GPT batch response:', parseError)
-        console.log('Raw response:', content)
-        
-        // JSON이 불완전한 경우 정규식으로 파싱 시도
-        const result: Record<string, { text: string; quality: number }> = {}
-        
-        // 각 언어별로 패턴 매칭
-        const patterns = [
-          { lang: 'ko', regex: /"ko":\s*"([^"]*)"/ },
-          { lang: 'zh', regex: /"zh":\s*"([^"]*)"/ },
-          { lang: 'hi', regex: /"hi":\s*"([^"]*)"/ },
-          { lang: 'ja', regex: /"ja":\s*"([^"]*)"/ },
-          { lang: 'es', regex: /"es":\s*"([^"]*)"/ },
-          { lang: 'fr', regex: /"fr":\s*"([^"]*)"/ },
-          { lang: 'de', regex: /"de":\s*"([^"]*)"/ },
-          { lang: 'ar', regex: /"ar":\s*"([^"]*)"/ }
-        ]
-        
-        let foundAny = false
-        for (const { lang, regex } of patterns) {
-          const match = content.match(regex)
-          if (match && match[1]) {
-            result[lang] = {
-              text: match[1],
-              quality: 0.9 // 약간 낮은 품질 점수
-            }
-            foundAny = true
-          }
-        }
-        
-        if (foundAny) {
-          console.log('Successfully extracted translations using regex:', Object.keys(result))
-          return result
-        }
-        
-        throw new Error('Could not parse GPT response')
-      }
-    }
-
-    return null
-  } catch (error) {
-    console.error('GPT batch translation error:', error)
     return null
   }
 }
@@ -317,7 +453,17 @@ function getLocalTranslation(text: string, targetLang: string): { text: string; 
 
 // 번역 수행 (GPT → Google → Local 순서)
 async function performTranslation(text: string, targetLanguage: string): Promise<{ text: string; engine: string; quality: number }> {
-  // 1단계: GPT-4 시도 (최고 품질)
+  // 1단계: Gemini 시도 (최고 품질)
+  const geminiResult = await translateWithGemini(text, targetLanguage)
+  if (geminiResult) {
+    return {
+      text: geminiResult.text,
+      engine: 'gemini',
+      quality: geminiResult.quality
+    }
+  }
+
+  // 2단계: GPT-4 시도 (최고 품질)
   const gptResult = await translateWithGPT(text, targetLanguage)
   if (gptResult) {
     return {
@@ -327,7 +473,7 @@ async function performTranslation(text: string, targetLanguage: string): Promise
     }
   }
 
-  // 2단계: Google Translate 시도  
+  // 3단계: Google Translate 시도  
   const googleResult = await translateWithGoogle(text, targetLanguage)
   if (googleResult) {
     return {
@@ -337,7 +483,7 @@ async function performTranslation(text: string, targetLanguage: string): Promise
     }
   }
 
-  // 3단계: 로컬 번역
+  // 4단계: 로컬 번역
   const localResult = getLocalTranslation(text, targetLanguage)
   return {
     text: localResult.text,
@@ -353,23 +499,26 @@ export async function performBatchTranslation(
 ): Promise<Record<string, { text: string; engine: string; quality: number }>> {
   const results: Record<string, { text: string; engine: string; quality: number }> = {}
   
-  // 1단계: GPT 배치 번역 시도 (55% 비용 절약)
+  // 1단계: Gemini 배치 번역 시도 (55% 비용 절약)
   try {
-    const batchResult = await translateWithGPTBatch(text, targetLanguages)
+    console.log(`🎯 Attempting Gemini batch translation for: "${text.substring(0, 50)}..." → [${targetLanguages.join(', ')}]`)
+    const batchResult = await translateWithGeminiBatch(text, targetLanguages)
     if (batchResult && Object.keys(batchResult).length > 0) {
-      console.log(`🚀 GPT batch translation succeeded for ${Object.keys(batchResult).length}/${targetLanguages.length} languages`)
+      console.log(`🚀 Gemini batch translation succeeded for ${Object.keys(batchResult).length}/${targetLanguages.length} languages`)
       
       // 성공한 번역 저장
       for (const [lang, translation] of Object.entries(batchResult)) {
         results[lang] = {
           text: translation.text,
-          engine: 'gpt-batch',
+          engine: 'gemini-batch',
           quality: translation.quality
         }
       }
+    } else {
+      console.log(`❌ Gemini batch translation returned empty result`)
     }
   } catch (error) {
-    console.error('GPT batch translation failed:', error)
+    console.error('Gemini batch translation failed:', error)
   }
   
   // 2단계: 실패한 언어들에 대해 개별 처리
