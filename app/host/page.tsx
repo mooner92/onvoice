@@ -270,15 +270,21 @@ export default function HostDashboard() {
       // Update partial text display
       setCurrentPartialText(data.original_text)
     } else {
-      // Add final transcript to list
+      // Add final transcript to list with guaranteed unique ID
+      const uniqueId = `${data.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const newLine: TranscriptLine = {
-        id: data.id,
+        id: uniqueId,
         timestamp: new Date(data.timestamp).toLocaleTimeString(),
         text: data.original_text.trim(),
         confidence: data.confidence
       }
       
-      setTranscript(prev => [...prev, newLine])
+      // Remove any existing partial text and add new final transcript
+      setTranscript(prev => {
+        // Filter out any partial entries and add the new final one
+        const withoutPartials = prev.filter(line => !line.id.includes('partial'))
+        return [...withoutPartials, newLine]
+      })
       setCurrentPartialText("") // Clear partial text
       
       // Reset inactivity timer when new transcript is received
@@ -702,6 +708,7 @@ export default function HostDashboard() {
                         userId={user.id}
                         userName={user.user_metadata?.full_name || user.email || 'Host'}
                         userType="speaker"
+                        isRecording={joined && micPermission === 'granted'}
                         onTranscriptUpdate={handleTranscriptUpdate}
                         onError={handleSTTError}
                         onSessionStatsUpdate={handleSessionStatsUpdate}

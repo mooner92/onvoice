@@ -479,6 +479,11 @@ export default function PublicSessionPage() {
         }
 
         // Load existing transcripts - 번역이 완료된 것만 표시
+        if (!sessionData.id) {
+          console.error('❌ Session ID is null, cannot load transcripts')
+          throw new Error('Session ID is missing')
+        }
+        
         const { data: transcripts } = await supabase
           .from('transcripts')
           .select('*')
@@ -488,10 +493,45 @@ export default function PublicSessionPage() {
         if (transcripts && transcripts.length > 0) {
           console.log(`📚 Loading ${transcripts.length} transcripts...`)
           
+          // 🆕 데모/샘플 텍스트 필터링
+          const demoTexts = [
+            'Welcome to the OnVoice real-time translation service',
+            'Thank you for using our live transcription service',
+            'Real-time speech to text with multilingual translation',
+            'This is a demonstration of Gemini Live API integration',
+            'so far',
+            'Welcome to OnVoice',
+            'demonstration',
+            'Gemini Live',
+            'API integration'
+          ]
+          
+          const filteredTranscripts = transcripts.filter(t => {
+            if (!t.original_text || typeof t.original_text !== 'string') return false
+            
+            const text = t.original_text.trim().toLowerCase()
+            
+            // 데모 텍스트 패턴 필터링
+            const isDemoText = demoTexts.some(demo => 
+              text.includes(demo.toLowerCase()) || 
+              text === demo.toLowerCase()
+            )
+            
+            // 너무 짧은 텍스트 필터링 (3글자 미만)
+            const isTooShort = text.length < 3
+            
+            // 반복되는 패턴 필터링
+            const isRepeated = text.includes('welcome') && text.includes('service')
+            
+            return !isDemoText && !isTooShort && !isRepeated
+          })
+          
+          console.log(`📝 Filtered ${transcripts.length - filteredTranscripts.length} demo/sample texts`)
+          
           // 초기 로딩 시에는 기존 transcript를 모두 지우고 새로 로드
           const formattedTranscripts: TranscriptLine[] = []
           
-          for (const t of transcripts) {
+          for (const t of filteredTranscripts) {
             let translatedText = t.original_text
             
             // 번역이 활성화된 경우에만 번역 로드
@@ -670,9 +710,44 @@ export default function PublicSessionPage() {
         if (transcripts && transcripts.length > 0) {
           console.log(`🔄 Reloading ${transcripts.length} transcripts for ${selectedLanguage}`)
           
+          // 🆕 데모/샘플 텍스트 필터링 (언어 변경 시에도 적용)
+          const demoTexts = [
+            'Welcome to the OnVoice real-time translation service',
+            'Thank you for using our live transcription service',
+            'Real-time speech to text with multilingual translation',
+            'This is a demonstration of Gemini Live API integration',
+            'so far',
+            'Welcome to OnVoice',
+            'demonstration',
+            'Gemini Live',
+            'API integration'
+          ]
+          
+          const filteredTranscripts = transcripts.filter(t => {
+            if (!t.original_text || typeof t.original_text !== 'string') return false
+            
+            const text = t.original_text.trim().toLowerCase()
+            
+            // 데모 텍스트 패턴 필터링
+            const isDemoText = demoTexts.some(demo => 
+              text.includes(demo.toLowerCase()) || 
+              text === demo.toLowerCase()
+            )
+            
+            // 너무 짧은 텍스트 필터링 (3글자 미만)
+            const isTooShort = text.length < 3
+            
+            // 반복되는 패턴 필터링
+            const isRepeated = text.includes('welcome') && text.includes('service')
+            
+            return !isDemoText && !isTooShort && !isRepeated
+          })
+          
+          console.log(`📝 Language reload: Filtered ${transcripts.length - filteredTranscripts.length} demo/sample texts`)
+          
           const formattedTranscripts: TranscriptLine[] = []
           
-          for (const t of transcripts) {
+          for (const t of filteredTranscripts) {
             let translatedText = t.original_text
             let isTranslating = false
             
@@ -729,6 +804,38 @@ export default function PublicSessionPage() {
   const handleTranscriptUpdate = useCallback(async (newText: string, isPartial: boolean = false) => {
     if (!newText || newText.trim().length === 0) {
       console.warn('⚠️ Skipping empty transcript update')
+      return
+    }
+    
+    // 🆕 데모/샘플 텍스트 필터링
+    const demoTexts = [
+      'Welcome to the OnVoice real-time translation service',
+      'Thank you for using our live transcription service',
+      'Real-time speech to text with multilingual translation',
+      'This is a demonstration of Gemini Live API integration',
+      'so far',
+      'Welcome to OnVoice',
+      'demonstration',
+      'Gemini Live',
+      'API integration'
+    ]
+    
+    const text = newText.trim().toLowerCase()
+    
+    // 데모 텍스트 패턴 필터링
+    const isDemoText = demoTexts.some(demo => 
+      text.includes(demo.toLowerCase()) || 
+      text === demo.toLowerCase()
+    )
+    
+    // 너무 짧은 텍스트 필터링 (3글자 미만)
+    const isTooShort = text.length < 3
+    
+    // 반복되는 패턴 필터링
+    const isRepeated = text.includes('welcome') && text.includes('service')
+    
+    if (isDemoText || isTooShort || isRepeated) {
+      console.log(`🚫 Filtering out demo/sample text: "${newText}"`)
       return
     }
     
