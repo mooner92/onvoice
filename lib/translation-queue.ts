@@ -151,7 +151,7 @@ async function translateWithGemini(text: string, targetLanguage: string): Promis
             if (parsed[targetLanguage]) {
               translatedText = parsed[targetLanguage]
             }
-          } catch (e) {
+          } catch {
             // JSON 파싱 실패 시 원본 텍스트 사용
             console.log('Individual Gemini response is not valid JSON, using as-is')
           }
