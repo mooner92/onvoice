@@ -429,6 +429,7 @@ export function RealtimeSTT({
                 })
               }
             }, 600) // 0.6 second timeout - reduced from 3 seconds for better real-time response
+
           }
         }
       }
