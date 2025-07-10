@@ -36,6 +36,10 @@ export function RealtimeSTT({
   const mountedRef = useRef(true)
   const finalizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const accumulatedTextRef = useRef<string>('')
+  
+  // 5분 제한 방지를 위한 주기적 재시작 타이머
+  const restartTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const recognitionStartTimeRef = useRef<number>(0)
 
   // Track props changes for debugging
   useEffect(() => {
@@ -64,6 +68,12 @@ export function RealtimeSTT({
     if (finalizeTimeoutRef.current) {
       clearTimeout(finalizeTimeoutRef.current)
       finalizeTimeoutRef.current = null
+    }
+    
+    // 재시작 타이머도 정리
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
     }
     
     accumulatedTextRef.current = ''
@@ -211,6 +221,36 @@ export function RealtimeSTT({
     }
   }
 
+  // 5분 제한 방지를 위한 주기적 재시작 함수
+  const scheduleRecognitionRestart = () => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+    }
+    
+    // 4분 30초 후에 재시작 (5분 제한보다 30초 일찍)
+    restartTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+        console.log('🔄 Preventive restart to avoid 5-minute timeout')
+        
+        // 현재 인식 중지하고 즉시 재시작
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop()
+          } catch (error) {
+            console.warn('Error stopping recognition for restart:', error)
+          }
+        }
+        
+        // 짧은 지연 후 재시작
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+            startSpeechRecognition()
+          }
+        }, 100)
+      }
+    }, 4.5 * 60 * 1000) // 4분 30초
+  }
+
   // Start speech recognition
   const startSpeechRecognition = async () => {
     if (!mountedRef.current || !isSupported) {
@@ -231,6 +271,7 @@ export function RealtimeSTT({
 
     try {
       console.log('🚀 Starting new recognition instance...')
+      recognitionStartTimeRef.current = Date.now()
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       const recognition = new SpeechRecognition()
@@ -244,6 +285,9 @@ export function RealtimeSTT({
         console.log('🎤 Recognition started')
         setIsListening(true)
         setStatus('Listening...')
+        
+        // 5분 제한 방지를 위한 재시작 스케줄링
+        scheduleRecognitionRestart()
       }
 
       recognition.onend = () => {
@@ -252,9 +296,14 @@ export function RealtimeSTT({
         setIsListening(false)
         recognitionRef.current = null
         
+        // 재시작 타이머 정리
+        if (restartTimerRef.current) {
+          clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = null
+        }
+        
         // Auto-restart only if still active and not in error state
         if (isActiveRef.current && currentSessionRef.current) {
-          // Remove retry limit for natural speech flow
           console.log('🔄 Auto-restarting recognition...')
           setStatus('Listening...') // Keep showing "Listening" during restart
           setTimeout(() => {
@@ -264,7 +313,6 @@ export function RealtimeSTT({
           }, 100) // Reduced delay from 1000ms to 100ms
         } else {
           setStatus('Ready to start')
-          ;(window as any).__retryCount = 0
         }
       }
 
@@ -274,14 +322,20 @@ export function RealtimeSTT({
         console.log('⚠️ Recognition error details:', {
           error: event.error,
           message: event.message,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          duration: Date.now() - recognitionStartTimeRef.current
         })
         setIsListening(false)
         recognitionRef.current = null
         
+        // 재시작 타이머 정리
+        if (restartTimerRef.current) {
+          clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = null
+        }
+        
         // Reset retry count on critical errors
         if (event.error === 'not-allowed' || event.error === 'aborted') {
-          ;(window as any).__retryCount = 0
           setHasPermission(false)
           isActiveRef.current = false
           
@@ -300,10 +354,22 @@ export function RealtimeSTT({
           onError(errorMessage)
           
         } else if (event.error === 'network') {
-          setStatus('Network error')
-          isActiveRef.current = false
-          ;(window as any).__retryCount = 0
-          onError('Network connection lost. Please check your internet connection and try again.')
+          // 네트워크 에러 시 자동 재시작 (5분 제한 포함)
+          console.log('🌐 Network error detected - attempting automatic restart...')
+          setStatus('Reconnecting...')
+          
+          if (isActiveRef.current && currentSessionRef.current) {
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                console.log('🔄 Restarting after network error...')
+                startSpeechRecognition()
+              }
+            }, 1000) // 1초 후 재시작
+          } else {
+            setStatus('Network error')
+            isActiveRef.current = false
+            onError('Network connection lost. Please check your internet connection and try again.')
+          }
         } else if (event.error === 'no-speech') {
           // This is normal during natural pauses, just continue seamlessly
           console.log('⏸️ No speech detected (natural pause), continuing...')
@@ -318,7 +384,6 @@ export function RealtimeSTT({
         } else if (event.error === 'audio-capture') {
           setStatus('Audio capture error')
           isActiveRef.current = false
-          ;(window as any).__retryCount = 0
           onError('Audio capture failed. Please check your microphone connection and try again.')
         } else {
           // For other errors, restart immediately without retry limits
@@ -462,9 +527,6 @@ export function RealtimeSTT({
         
         console.log('🚀 Initializing NEW session:', sessionId)
         
-        // Reset retry count for new session
-        ;(window as any).__retryCount = 0
-        
         // Initialize session in database
         fetch('/api/stt-stream', {
           method: 'POST',
@@ -486,49 +548,44 @@ export function RealtimeSTT({
         console.log('⚠️ Session already active:', sessionId)
       }
       
-    } else if (!isRecording) {
+    } else if (!isRecording && currentSessionRef.current) {
       // Stopping session - this should ALWAYS run when isRecording becomes false
       console.log('🛑 isRecording is now FALSE')
       
-      if (currentSessionRef.current) {
-        const sessionToEnd = currentSessionRef.current
-        console.log('🛑 Stopping session:', sessionToEnd)
-        console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
-        
-        // Immediately call STT stream end
-        console.log('🛑 IMMEDIATELY calling STT stream end')
-        
-        fetch('/api/stt-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'end',
-            sessionId: sessionToEnd
-          })
-        }).then(response => {
-          console.log('🛑 STT stream end response status:', response.status)
-          return response.json()
+      const sessionToEnd = currentSessionRef.current
+      console.log('🛑 Stopping session:', sessionToEnd)
+      console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
+      
+      // Immediately call STT stream end
+      console.log('🛑 IMMEDIATELY calling STT stream end')
+      
+      fetch('/api/stt-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'end',
+          sessionId: sessionToEnd
         })
-          .then(data => {
-            console.log('✅ STT stream ended successfully:', data)
-            if (data.saved) {
-              console.log(`📝 Transcript saved with record ID: ${data.recordId}`)
-            } else {
-              console.log(`⚠️ No transcript content was saved: ${data.message || 'No message'}`)
-            }
-          })
-          .catch(error => {
-            console.error('❌ Failed to end STT stream:', error)
-          })
-        
-        // Then cleanup
-        cleanup()
-        currentSessionRef.current = null
-        setStatus('Ready to start')
-        
-      } else {
-        console.log('⚠️ No active session to stop')
-      }
+      }).then(response => {
+        console.log('🛑 STT stream end response status:', response.status)
+        return response.json()
+      })
+        .then(data => {
+          console.log('✅ STT stream ended successfully:', data)
+          if (data.saved) {
+            console.log(`📝 Transcript saved with record ID: ${data.recordId}`)
+          } else {
+            console.log(`⚠️ No transcript content was saved: ${data.message || 'No message'}`)
+          }
+        })
+        .catch(error => {
+          console.error('❌ Failed to end STT stream:', error)
+        })
+      
+      // Then cleanup
+      cleanup()
+      currentSessionRef.current = null
+      setStatus('Ready to start')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, sessionId])
@@ -571,7 +628,7 @@ export function RealtimeSTT({
           🎤 Grant Microphone Permission
         </button>
           
-          {status.includes('denied') || status.includes('aborted') || status.includes('busy') && (
+          {(status.includes('denied') || status.includes('aborted') || status.includes('busy')) && (
             <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
               <p className="font-medium text-yellow-800">💡 Troubleshooting:</p>
               <ul className="mt-1 space-y-1 text-yellow-700">
@@ -584,36 +641,26 @@ export function RealtimeSTT({
           )}
         </div>
       )}
-      
-      {hasPermission && !isListening && isRecording && (
-        <button
-          onClick={startSpeechRecognition}
-          className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
-        >
-          ▶️ Start Recognition
-        </button>
+
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && isListening && (
+        <div className="text-xs bg-gray-50 p-2 rounded border">
+          <p className="text-gray-600">
+            🔍 Debug: Recognition active for {Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000)}s
+          </p>
+          <p className="text-gray-600">
+            🔄 Next restart in {Math.max(0, Math.floor((270 - (Date.now() - recognitionStartTimeRef.current) / 1000)))}s
+          </p>
+        </div>
       )}
 
-      {/* Debug Info (simplified) */}
-      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-        <div>Session: {currentSessionRef.current ? 'Active' : 'None'}</div>
-        <div>Status: {status}</div>
-        <div>Listening: {isListening ? 'Yes' : 'No'}</div>
-        <div>Permission: {hasPermission ? 'Granted' : 'Denied'}</div>
-        <div>Supported: {isSupported ? 'Yes' : 'No'}</div>
-        {status.includes('Error') || status.includes('denied') || status.includes('aborted') ? (
-          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-            <p className="font-medium text-red-700">🚨 Error Details:</p>
-            <p className="text-red-600">{status}</p>
-            <button
-              onClick={checkMicrophoneStatus}
-              className="mt-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded"
-            >
-              🔍 Check Microphone Status
-            </button>
-          </div>
-        ) : null}
-      </div>
+      {/* Network Error Status */}
+      {status === 'Reconnecting...' && (
+        <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
+          <p className="text-blue-800 font-medium">🌐 Network Reconnecting</p>
+          <p className="text-blue-700">Automatically restarting speech recognition...</p>
+        </div>
+      )}
     </div>
   )
 } 

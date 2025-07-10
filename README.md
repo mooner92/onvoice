@@ -172,6 +172,14 @@ onvoice/
 - **Session Persistence**: Automatic session recovery and state management
 - **Guest Access**: Support for unauthenticated guest participation
 
+### Speech Recognition System
+- **Real-Time STT**: Web Speech API for instant transcription
+- **High Accuracy**: Optimized recognition settings for lecture content
+- **Multi-Language Support**: Auto-detection and manual language selection
+- **Continuous Recognition**: Seamless speech-to-text conversion
+- **5-Minute Timeout Prevention**: Automatic restart every 4.5 minutes to prevent Web Speech API timeout
+- **Network Error Recovery**: Automatic reconnection on network issues
+
 ## 🚀 Deployment
 
 ### Vercel Deployment

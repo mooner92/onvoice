@@ -709,6 +709,19 @@ export default function HostDashboard() {
                     </div>
                   )}
                   
+                  {/* Web Speech API Info */}
+                  {isRecording && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2 text-blue-800">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium">Live Speech Recognition Active</span>
+                      </div>
+                      <p className="text-blue-700 text-xs mt-1">
+                        🔄 Automatically restarts every 4.5 minutes to prevent timeout
+                      </p>
+                    </div>
+                  )}
+                  
                   {/* STT Error Display */}
                   {sttError && (
                     <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
