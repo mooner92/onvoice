@@ -438,7 +438,7 @@ export function RealtimeSTT({
                 accumulatedTextRef.current = ''
                 })
               }
-            }, 3000) // 3 second timeout
+            }, 800) // 0.8 second timeout - reduced from 3 seconds for better real-time response
           }
         }
       }

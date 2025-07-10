@@ -825,12 +825,10 @@ export default function PublicSessionSummaryPage() {
                        style={{ fontSize: `${fontSize[0]}px` }}
                      >
                        {(() => {
-                         // 번역 토글이 켜져 있으면 translatedSummary 사용
                          if (showTranslation && selectedLanguage !== 'en') {
-                           return translatedSummary || session.summary
+                           return <span dangerouslySetInnerHTML={{ __html: translatedSummary || session.summary || '' }} />
                          }
-                         // 번역 토글이 꺼져 있으면 자동 언어 감지 summary 사용
-                         return summary || session.summary
+                         return <span dangerouslySetInnerHTML={{ __html: summary || session.summary || '' }} />
                        })()}
                      </div>
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">

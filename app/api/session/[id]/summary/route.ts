@@ -7,16 +7,16 @@ const openai = new OpenAI({
 })
 
 const CATEGORY_PROMPTS = {
-  general: "Summarize the following lecture content in 300-500 characters. Include key points and main content.",
-  sports: "Summarize the following sports-related content in 300-500 characters. Focus on game results, player information, strategic analysis, and sports-specific content.",
-  economics: "Summarize the following economics-related content in 300-500 characters. Include market trends, economic indicators, investment information, and economic terminology and analysis.",
-  technology: "Summarize the following technology-related content in 300-500 characters. Focus on technical concepts, implementation methods, innovations, and technical content.",
-  education: "Summarize the following education-related content in 300-500 characters. Focus on learning objectives, key concepts, educational methodologies, and educational value.",
-  business: "Summarize the following business-related content in 300-500 characters. Focus on business strategies, market analysis, management insights from a business perspective.",
-  medical: "Summarize the following medical-related content in 300-500 characters. Focus on medical information, treatment methods, health management, and medical expertise.",
-  legal: "Summarize the following legal-related content in 300-500 characters. Focus on legal issues, precedents, regulations, and legal expertise.",
-  entertainment: "Summarize the following entertainment-related content in 300-500 characters. Focus on work analysis, cultural significance, trends from an entertainment perspective.",
-  science: "Summarize the following science-related content in 300-500 characters. Focus on scientific principles, research results, experimental methods, and scientific expertise."
+  general: "Summarize the following lecture content as a list of clear, concise bullet points. Focus on key ideas, facts, and conclusions.",
+  sports: "Summarize the following sports-related content as bullet points. Highlight game results, player info, strategies, and key moments.",
+  economics: "Summarize the following economics-related content as bullet points. Include market trends, economic indicators, investment info, and key analysis.",
+  technology: "Summarize the following technology-related content as bullet points. Focus on technical concepts, innovations, and main takeaways.",
+  education: "Summarize the following education-related content as bullet points. Highlight learning objectives, key concepts, and educational value.",
+  business: "Summarize the following business-related content as bullet points. Focus on business strategies, market analysis, and management insights.",
+  medical: "Summarize the following medical-related content as bullet points. Highlight medical info, treatment methods, and health management.",
+  legal: "Summarize the following legal-related content as bullet points. Focus on legal issues, precedents, regulations, and main points.",
+  entertainment: "Summarize the following entertainment-related content as bullet points. Highlight work analysis, cultural significance, and trends.",
+  science: "Summarize the following science-related content as bullet points. Focus on scientific principles, research results, and key findings."
 }
 
 export async function POST(
@@ -32,6 +32,15 @@ export async function POST(
         { error: "Missing session ID" },
         { status: 400 }
       )
+    }
+
+    // Parse force flag from request body
+    let force = false
+    try {
+      const body = await req.json()
+      force = !!body.force
+    } catch {
+      // ignore if no body or invalid JSON
     }
 
     const supabase = createClient(
@@ -53,8 +62,8 @@ export async function POST(
       )
     }
 
-    // Check if summary already exists
-    if (session.summary) {
+    // Check if summary already exists, unless force is true
+    if (session.summary && !force) {
       return NextResponse.json({
         summary: session.summary,
         fromCache: true
@@ -98,17 +107,62 @@ export async function POST(
     const categoryPrompt = CATEGORY_PROMPTS[session.category as keyof typeof CATEGORY_PROMPTS] || CATEGORY_PROMPTS.general
 
     // Generate English summary using GPT
-    const summaryPrompt = `${categoryPrompt}
+    const summaryPrompt = `
+**C – Context:**  
+You are a large language model tasked with summarizing spoken content that has been transcribed using the WebSpeech API. The source may be lectures, discussions, or events with a few speakers and many listeners. These transcripts often contain transcription errors (e.g., "My Combinator" instead of "Y Combinator") that must be corrected using contextual understanding.
 
-Here is the lecture content:
+**O – Objective:**  
+Your goal is to produce an accurate and concise summary by:  
+1. Correcting transcription errors based on context.  
+2. Following a specific HTML-based structure for clarity and usability.  
+3. Including five relevant tags at the end.
 
+**S – Style:**  
+Concise, clear, and professional. Avoid repetition or filler.
+
+**T – Tone:**  
+Neutral, informative, and user-friendly.
+
+**A – Audience:**  
+Users who want a brief but accurate overview of the spoken content. Including, but not limited to, students, professionals, and event attendees.
+
+**R – Response:**  
+Use the following structure:
+
+${categoryPrompt}
+Here is the transcript which may contain transcription errors:
 ${truncatedTranscript}
 
-Please consider the following when summarizing:
-1. Write in 300-500 characters
-2. Include key content and main points
-3. Apply professional perspective suitable for the category (${session.category})
-4. Use clear and easy-to-understand writing style`
+Please follow these instructions:
+1. Carefully analyze the transcript and fix any transcription errors using context clues.
+2. Organize the summary into 2-4 key sections, each with a clear heading using HTML <b> tags (e.g., <b>Section Title</b>).
+3. Under each heading, list 1-3 concise bullet points with the most important facts, insights, or conclusions.
+4. Use <br/> for line breaks between sections and bullet points.
+5. Be clear and detailed, grouping related information together.
+6. Use professional, easy-to-understand language.
+7. Do not exceed 500 characters total.
+8. End the summary with 5 relevant tags in the following format:
+<b>Important tags</b><br/>
+- tag 1<br/>
+- tag 2<br/>
+- tag 3<br/>
+- tag 4<br/>
+- tag 5<br/>
+9. Example format:
+
+<b>1. Section Title</b><br/>
+- Key point one<br/>
+- Key point two<br/><br/>
+<b>2. Next Section</b><br/>
+- Key point one<br/>
+- Key point two<br/><br/>
+<b>Important tags</b><br/>
+- topic<br/>
+- keyword<br/>
+- theme<br/>
+- event<br/>
+- takeaway<br/>
+`
 
     console.log(`🤖 Generating English summary for session ${sessionId} (category: ${session.category})`)
     
