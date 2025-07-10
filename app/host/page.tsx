@@ -215,9 +215,9 @@ export default function HostDashboard() {
         }
         
         inactivityTimerRef.current = setTimeout(() => {
-          console.log('Auto-stopping session after 5 minutes of inactivity')
+          console.log('Auto-stopping session after 30 minutes of inactivity')
           handleStopSession()
-        }, 5 * 60 * 1000) // 5 minutes
+        }, 30 * 60 * 1000) // 30 minutes
       }
 
       // Initialize inactivity timer
@@ -302,9 +302,9 @@ export default function HostDashboard() {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current)
         inactivityTimerRef.current = setTimeout(() => {
-          console.log('Auto-stopping session after 5 minutes of inactivity')
+          console.log('Auto-stopping session after 30 minutes of inactivity')
           handleStopSession()
-        }, 5 * 60 * 1000) // 5 minutes
+        }, 30 * 60 * 1000) // 30 minutes
       }
     }
   }
@@ -594,7 +594,7 @@ export default function HostDashboard() {
                   Configure your lecture session. Attendees can join via QR code with or without authentication.
                   Perfect for both local and online/remote sessions.
                   <br />
-                  <span className="text-amber-600 font-medium">⏰ Sessions auto-stop after 1 hour or 5 minutes of inactivity to prevent unexpected charges.</span>
+                  <span className="text-amber-600 font-medium">⏰ Sessions auto-stop after 1 hour or 30 minutes of inactivity to prevent unexpected charges.</span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
