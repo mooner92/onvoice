@@ -127,7 +127,12 @@ export function RealtimeSTT({
         const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName })
         console.log('🎤 Permission status:', permission.state)
         
-        if (permission.state === 'denied') {
+        if (permission.state === 'granted') {
+          setHasPermission(true)
+          setStatus('Permission granted')
+          console.log('✅ Microphone permission already granted')
+          return true
+        } else if (permission.state === 'denied') {
           setHasPermission(false)
           setStatus('Permission denied')
           return false
@@ -143,8 +148,24 @@ export function RealtimeSTT({
 
   // Check microphone status on component mount
   useEffect(() => {
-    checkMicrophoneStatus()
-  }, [checkMicrophoneStatus])
+    const initializePermission = async () => {
+      const hasPermissionAlready = await checkMicrophoneStatus()
+      console.log('🔍 Initial permission check result:', hasPermissionAlready)
+      
+      // 권한이 이미 있고, 녹음 중이며, 세션이 활성화되어 있다면 자동 시작
+      if (hasPermissionAlready && isRecording && sessionId && isActiveRef.current && !isListening) {
+        console.log('🚀 Auto-starting recognition on mount (permission already granted)')
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current && !isListening) {
+            startSpeechRecognition()
+          }
+        }, 200)
+      }
+    }
+    
+    initializePermission()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkMicrophoneStatus, isRecording, sessionId, isListening])
 
   // Request microphone permission
   const requestMicrophonePermission = async () => {
@@ -187,6 +208,17 @@ export function RealtimeSTT({
       setHasPermission(true)
       setStatus('Permission granted')
       console.log('✅ Microphone permission granted')
+      
+      // 권한이 부여된 후 즉시 음성 인식 시작 시도
+      if (isRecording && sessionId && isActiveRef.current) {
+        console.log('🚀 Auto-starting recognition after permission granted')
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+            startSpeechRecognition()
+          }
+        }, 100)
+      }
+      
       return true
       
     } catch (error) {
@@ -531,6 +563,7 @@ export function RealtimeSTT({
         isActiveRef.current = true
         
         console.log('🚀 Initializing NEW session:', sessionId)
+        console.log('🔧 Setting isActiveRef to true:', isActiveRef.current)
         
         // Initialize session in database
         fetch('/api/stt-stream', {
@@ -543,9 +576,16 @@ export function RealtimeSTT({
         }).then(() => {
           console.log('✅ Session initialized in DB')
           if (mountedRef.current && isActiveRef.current) {
-            // 자동으로 음성 인식 시작 시도
             console.log('🎯 Attempting to start speech recognition automatically...')
-            startSpeechRecognition()
+            console.log('🔍 Current state:', { hasPermission, isListening, isActiveRef: isActiveRef.current })
+            
+            // 권한이 있으면 즉시 시작, 없으면 권한 요청
+            if (hasPermission) {
+              startSpeechRecognition()
+            } else {
+              console.log('🎤 No permission yet, will start after permission granted')
+              requestMicrophonePermission()
+            }
           }
         }).catch(error => {
           console.error('❌ Failed to initialize session:', error)
@@ -553,12 +593,27 @@ export function RealtimeSTT({
         })
       } else {
         console.log('⚠️ Session already active:', sessionId)
+        console.log('🔧 Ensuring isActiveRef is true:', isActiveRef.current)
+        
+        // 세션이 이미 활성화되어 있다면 isActiveRef도 true로 설정
+        if (!isActiveRef.current) {
+          isActiveRef.current = true
+          console.log('🔧 Set isActiveRef to true for existing session')
+        }
+        
         // 이미 활성화된 세션이지만 인식이 시작되지 않은 경우 재시도
         if (!isListening && isActiveRef.current) {
           console.log('🔄 Session active but not listening, restarting...')
+          console.log('🔍 Current state:', { hasPermission, isListening, isActiveRef: isActiveRef.current })
+          
           setTimeout(() => {
             if (mountedRef.current && isActiveRef.current) {
-              startSpeechRecognition()
+              if (hasPermission) {
+                startSpeechRecognition()
+              } else {
+                console.log('🎤 No permission, requesting...')
+                requestMicrophonePermission()
+              }
             }
           }, 500)
         }
