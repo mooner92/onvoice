@@ -254,22 +254,14 @@ export function RealtimeSTT({
         
         // Auto-restart only if still active and not in error state
         if (isActiveRef.current && currentSessionRef.current) {
-          // Add a retry limit to prevent infinite loops
-          const retryCount = (window as any).__retryCount || 0
-          if (retryCount < 3) {
-            (window as any).__retryCount = retryCount + 1
-          setStatus('Restarting...')
+          // Remove retry limit for natural speech flow
+          console.log('🔄 Auto-restarting recognition...')
+          setStatus('Listening...') // Keep showing "Listening" during restart
           setTimeout(() => {
             if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
               startSpeechRecognition()
             }
-            }, 1000) // Increased delay
-          } else {
-            console.log('⚠️ Max retries reached, stopping auto-restart')
-            setStatus('Connection lost - please refresh')
-            isActiveRef.current = false
-            ;(window as any).__retryCount = 0
-          }
+          }, 100) // Reduced delay from 1000ms to 100ms
         } else {
           setStatus('Ready to start')
           ;(window as any).__retryCount = 0
@@ -313,14 +305,15 @@ export function RealtimeSTT({
           ;(window as any).__retryCount = 0
           onError('Network connection lost. Please check your internet connection and try again.')
         } else if (event.error === 'no-speech') {
-          // This is normal, just continue
-          console.log('No speech detected, continuing...')
+          // This is normal during natural pauses, just continue seamlessly
+          console.log('⏸️ No speech detected (natural pause), continuing...')
+          setStatus('Listening...') // Keep showing "Listening"
           if (isActiveRef.current && currentSessionRef.current) {
             setTimeout(() => {
               if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
                 startSpeechRecognition()
               }
-            }, 100)
+            }, 50) // Very quick restart for natural speech flow
           }
         } else if (event.error === 'audio-capture') {
           setStatus('Audio capture error')
@@ -328,21 +321,18 @@ export function RealtimeSTT({
           ;(window as any).__retryCount = 0
           onError('Audio capture failed. Please check your microphone connection and try again.')
         } else {
-          // For other errors, try limited restart
-          const retryCount = (window as any).__retryCount || 0
-          if (isActiveRef.current && currentSessionRef.current && retryCount < 3) {
-            (window as any).__retryCount = retryCount + 1
-            setStatus('Reconnecting...')
+          // For other errors, restart immediately without retry limits
+          console.log('🔄 Other error, restarting recognition:', event.error)
+          setStatus('Listening...') // Keep showing "Listening"
+          if (isActiveRef.current && currentSessionRef.current) {
             setTimeout(() => {
               if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
                 startSpeechRecognition()
               }
-            }, 2000)
+            }, 200) // Quick restart for other errors
           } else {
-            console.log('⚠️ Unrecoverable error or max retries')
             setStatus('Error - please refresh')
             isActiveRef.current = false
-            ;(window as any).__retryCount = 0
             onError(`Speech recognition error: ${event.error}. Please refresh the page and try again.`)
           }
         }
@@ -438,7 +428,8 @@ export function RealtimeSTT({
                 accumulatedTextRef.current = ''
                 })
               }
-            }, 600) // 0.8 second timeout - reduced from 3 seconds for better real-time response
+            }, 600) // 0.6 second timeout - reduced from 3 seconds for better real-time response
+
           }
         }
       }

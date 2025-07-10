@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import OpenAI from "openai"
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
 
 const CATEGORY_PROMPTS = {
   general: "Summarize the following lecture content as a list of clear, concise bullet points. Focus on key ideas, facts, and conclusions.",
@@ -166,23 +161,57 @@ Please follow these instructions:
 
     console.log(`🤖 Generating English summary for session ${sessionId} (category: ${session.category})`)
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional lecture summary expert. Provide professional and accurate summaries suitable for the given category."
+    // Generate summary using Gemini
+    const geminiApiKey = process.env.GEMINI_API_KEY
+    if (!geminiApiKey) {
+      console.error('Gemini API key not found')
+      return NextResponse.json(
+        { error: "Gemini API key not configured" },
+        { status: 500 }
+      )
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: summaryPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 800,
         },
-        {
-          role: "user",
-          content: summaryPrompt
-        }
-      ],
-      max_tokens: 800,
-      temperature: 0.3,
+      }),
     })
 
-    const englishSummary = completion.choices[0]?.message?.content?.trim()
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Gemini API error:', response.status, errorText)
+      return NextResponse.json(
+        { error: "Failed to generate summary with Gemini" },
+        { status: 500 }
+      )
+    }
+
+    const data = await response.json()
+    
+    let englishSummary = null
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      const candidate = data.candidates[0]
+      
+      if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
+        englishSummary = candidate.content.parts[0].text.trim()
+      } else {
+        console.error('❌ Gemini response missing content.parts:', candidate.content)
+      }
+    } else {
+      console.error('❌ Invalid Gemini response structure:', data)
+    }
 
     if (!englishSummary) {
       return NextResponse.json(
@@ -222,23 +251,39 @@ Please follow these instructions:
 
 ${englishSummary}`
 
-        const translationCompletion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `You are a professional translator. Translate accurately while maintaining the original meaning and professional tone.`
+        const translationResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: translationPrompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 800,
             },
-            {
-              role: "user",
-              content: translationPrompt
-            }
-          ],
-          max_tokens: 800,
-          temperature: 0.1,
+          }),
         })
 
-        const translatedSummary = translationCompletion.choices[0]?.message?.content?.trim()
+        if (!translationResponse.ok) {
+          console.error(`Gemini translation API error for ${lang}:`, translationResponse.status)
+          continue
+        }
+
+        const translationData = await translationResponse.json()
+        
+        let translatedSummary = null
+        if (translationData.candidates && translationData.candidates[0] && translationData.candidates[0].content) {
+          const candidate = translationData.candidates[0]
+          
+          if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
+            translatedSummary = candidate.content.parts[0].text.trim()
+          }
+        }
 
         if (translatedSummary) {
           // 🆕 Save to session_summary_cache instead of translation_cache
