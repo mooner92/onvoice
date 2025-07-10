@@ -311,6 +311,14 @@ export default function HostDashboard() {
 
   const handleSTTError = (error: string) => {
     console.error('STT Error:', error)
+    
+    // 네트워크 연결 에러는 5분 제한으로 인한 정상적인 재시작이므로 사용자에게 표시하지 않음
+    if (error.includes('Network connection lost') || error.includes('network')) {
+      console.log('🌐 Network error detected - this is expected due to 5-minute timeout, ignoring...')
+      return
+    }
+    
+    // 다른 에러만 사용자에게 표시
     setSTTError(error)
   }
 
@@ -717,7 +725,7 @@ export default function HostDashboard() {
                         <span className="text-sm font-medium">Live Speech Recognition Active</span>
                       </div>
                       <p className="text-blue-700 text-xs mt-1">
-                        🔄 Automatically restarts every 4.5 minutes to prevent timeout
+                        🔄 Automatically restarts every 4 minutes to prevent timeout
                       </p>
                     </div>
                   )}

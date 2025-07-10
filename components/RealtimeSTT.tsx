@@ -227,10 +227,10 @@ export function RealtimeSTT({
       clearTimeout(restartTimerRef.current)
     }
     
-    // 4분 30초 후에 재시작 (5분 제한보다 30초 일찍)
+    // 4분 후에 재시작 (5분 제한보다 1분 일찍)
     restartTimerRef.current = setTimeout(() => {
       if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
-        console.log('🔄 Preventive restart to avoid 5-minute timeout')
+        console.log('🔄 Preventive restart to avoid 5-minute timeout (4 minutes elapsed)')
         
         // 현재 인식 중지하고 즉시 재시작
         if (recognitionRef.current) {
@@ -244,11 +244,12 @@ export function RealtimeSTT({
         // 짧은 지연 후 재시작
         setTimeout(() => {
           if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+            console.log('🚀 Restarting recognition after preventive stop')
             startSpeechRecognition()
           }
-        }, 100)
+        }, 200) // 200ms 지연
       }
-    }, 4.5 * 60 * 1000) // 4분 30초
+    }, 4 * 60 * 1000) // 4분으로 단축
   }
 
   // Start speech recognition
@@ -355,20 +356,21 @@ export function RealtimeSTT({
           
         } else if (event.error === 'network') {
           // 네트워크 에러 시 자동 재시작 (5분 제한 포함)
-          console.log('🌐 Network error detected - attempting automatic restart...')
+          console.log('🌐 Network error detected (likely 5-minute timeout) - restarting silently...')
           setStatus('Reconnecting...')
           
+          // 항상 자동으로 재시작 (세션이 활성화되어 있으면)
           if (isActiveRef.current && currentSessionRef.current) {
             setTimeout(() => {
               if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
                 console.log('🔄 Restarting after network error...')
                 startSpeechRecognition()
               }
-            }, 1000) // 1초 후 재시작
+            }, 500) // 0.5초 후 재시작 (더 빠르게)
           } else {
-            setStatus('Network error')
-            isActiveRef.current = false
-            onError('Network connection lost. Please check your internet connection and try again.')
+            // 세션이 비활성화된 경우에만 에러 처리
+            setStatus('Session ended')
+            console.log('🛑 Session ended, not restarting')
           }
         } else if (event.error === 'no-speech') {
           // This is normal during natural pauses, just continue seamlessly
@@ -516,7 +518,10 @@ export function RealtimeSTT({
       sessionId, 
       currentSession: currentSessionRef.current,
       isActive: isActiveRef.current,
-      mounted: mountedRef.current 
+      mounted: mountedRef.current,
+      hasPermission,
+      isSupported,
+      status
     })
     
     if (isRecording && sessionId) {
@@ -538,6 +543,8 @@ export function RealtimeSTT({
         }).then(() => {
           console.log('✅ Session initialized in DB')
           if (mountedRef.current && isActiveRef.current) {
+            // 자동으로 음성 인식 시작 시도
+            console.log('🎯 Attempting to start speech recognition automatically...')
             startSpeechRecognition()
           }
         }).catch(error => {
@@ -546,6 +553,15 @@ export function RealtimeSTT({
         })
       } else {
         console.log('⚠️ Session already active:', sessionId)
+        // 이미 활성화된 세션이지만 인식이 시작되지 않은 경우 재시도
+        if (!isListening && isActiveRef.current) {
+          console.log('🔄 Session active but not listening, restarting...')
+          setTimeout(() => {
+            if (mountedRef.current && isActiveRef.current) {
+              startSpeechRecognition()
+            }
+          }, 500)
+        }
       }
       
     } else if (!isRecording && currentSessionRef.current) {
@@ -642,15 +658,39 @@ export function RealtimeSTT({
         </div>
       )}
 
+      {/* Manual Start Button for Debugging */}
+      {hasPermission && !isListening && isRecording && (
+        <div className="space-y-2">
+          <button
+            onClick={startSpeechRecognition}
+            className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
+          >
+            🎯 Start Speech Recognition
+          </button>
+          <div className="text-xs bg-yellow-50 p-2 rounded border border-yellow-200">
+            <p className="text-yellow-800">
+              ⚠️ Recognition should start automatically. If you see this button, click it to start manually.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Debug Info */}
-      {process.env.NODE_ENV === 'development' && isListening && (
+      {process.env.NODE_ENV === 'development' && (
         <div className="text-xs bg-gray-50 p-2 rounded border">
-          <p className="text-gray-600">
-            🔍 Debug: Recognition active for {Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000)}s
-          </p>
-          <p className="text-gray-600">
-            🔄 Next restart in {Math.max(0, Math.floor((270 - (Date.now() - recognitionStartTimeRef.current) / 1000)))}s
-          </p>
+          <p className="text-gray-600">🔍 Debug Info:</p>
+          <p className="text-gray-600">• Permission: {hasPermission ? 'Granted' : 'Not granted'}</p>
+          <p className="text-gray-600">• Listening: {isListening ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Recording: {isRecording ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Session: {currentSessionRef.current || 'None'}</p>
+          <p className="text-gray-600">• Active: {isActiveRef.current ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Status: {status}</p>
+          {isListening && (
+            <>
+              <p className="text-gray-600">• Duration: {Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000)}s</p>
+              <p className="text-gray-600">• Next restart: {Math.max(0, Math.floor((240 - (Date.now() - recognitionStartTimeRef.current) / 1000)))}s</p>
+            </>
+          )}
         </div>
       )}
 
