@@ -1192,7 +1192,7 @@ export default function PublicSessionSummaryPage() {
                   {session?.status === 'ended' && (
                     <div className={`text-xs p-3 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
                       <p className="font-medium mb-1">🔍 Troubleshooting:</p>
-                      <p>• Check if you have permission to view this session's transcript</p>
+                      <p>• Check if you have permission to view this session&apos;s transcript</p>
                       <p>• Database access policies may prevent viewing transcripts from ended sessions</p>
                       <p>• Contact the session host if you believe you should have access</p>
                     </div>
