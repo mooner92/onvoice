@@ -20,7 +20,7 @@ export function SaveSessionModal({
   sessionId, 
   sessionTitle
 }: SaveSessionModalProps) {
-  const { signInWithGoogle } = useAuth()
+  const { signInWithGoogleToSummary } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleGoogleLogin = async () => {
@@ -28,6 +28,7 @@ export function SaveSessionModal({
       setIsLoading(true)
       
       // Store session info in localStorage for after login (sessionStorage는 도메인 변경시 사라질 수 있음)
+      const currentSummaryPath = `/summary/${sessionId}`
       const sessionData = {
         sessionId,
         sessionTitle,
@@ -39,12 +40,12 @@ export function SaveSessionModal({
       sessionStorage.setItem('pendingSessionSave', JSON.stringify(sessionData)) // 백업용
       
       console.log('💾 Storing session save data:', sessionData)
-      
       console.log('🔐 Initiating Google login for session save')
       console.log('📍 Current URL:', window.location.href)
+      console.log('🎯 Target return path:', currentSummaryPath)
       
-      // Redirect to Google login
-      await signInWithGoogle()
+      // Redirect to Google login with specific return path
+      await signInWithGoogleToSummary(currentSummaryPath)
       
       // Modal will close after successful login via useEffect in parent
     } catch (error) {

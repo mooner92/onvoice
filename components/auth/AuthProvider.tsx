@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithGoogleToSummary: (summaryPath: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -107,12 +108,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signInWithGoogleToSummary = async (summaryPath: string) => {
+    // Use smart callback URL with specific summary path
+    const redirectUrl = getSmartCallbackUrl(summaryPath)
+    
+    // Debug information
+    logAuthDebugInfo()
+    console.log('🔐 Google OAuth 시작 (Summary 전용)')
+    console.log('📍 Summary 경로:', summaryPath)
+    console.log('🔗 콜백 URL:', redirectUrl)
+    console.log('🌐 현재 Origin:', window.location.origin)
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      })
+      
+      if (error) {
+        console.error('OAuth error:', error)
+        throw error
+      }
+      
+      console.log('OAuth initiated successfully:', data)
+    } catch (error) {
+      console.error('Failed to initiate OAuth:', error)
+      throw error
+    }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithGoogleToSummary, signOut }}>
       {children}
     </AuthContext.Provider>
   )

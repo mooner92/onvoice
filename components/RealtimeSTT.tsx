@@ -36,7 +36,7 @@ export function RealtimeSTT({
   const mountedRef = useRef(true)
   const finalizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const accumulatedTextRef = useRef<string>('')
-  
+
   // 5분 제한 방지를 위한 주기적 재시작 타이머
   const restartTimerRef = useRef<NodeJS.Timeout | null>(null)
   const recognitionStartTimeRef = useRef<number>(0)
@@ -581,7 +581,7 @@ export function RealtimeSTT({
             
             // 권한이 있으면 즉시 시작, 없으면 권한 요청
             if (hasPermission) {
-              startSpeechRecognition()
+            startSpeechRecognition()
             } else {
               console.log('🎤 No permission yet, will start after permission granted')
               requestMicrophonePermission()
@@ -623,40 +623,40 @@ export function RealtimeSTT({
       // Stopping session - this should ALWAYS run when isRecording becomes false
       console.log('🛑 isRecording is now FALSE')
       
-      const sessionToEnd = currentSessionRef.current
-      console.log('🛑 Stopping session:', sessionToEnd)
-      console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
-      
-      // Immediately call STT stream end
-      console.log('🛑 IMMEDIATELY calling STT stream end')
-      
-      fetch('/api/stt-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'end',
-          sessionId: sessionToEnd
+        const sessionToEnd = currentSessionRef.current
+        console.log('🛑 Stopping session:', sessionToEnd)
+        console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
+        
+        // Immediately call STT stream end
+        console.log('🛑 IMMEDIATELY calling STT stream end')
+        
+        fetch('/api/stt-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'end',
+            sessionId: sessionToEnd
+          })
+        }).then(response => {
+          console.log('🛑 STT stream end response status:', response.status)
+          return response.json()
         })
-      }).then(response => {
-        console.log('🛑 STT stream end response status:', response.status)
-        return response.json()
-      })
-        .then(data => {
-          console.log('✅ STT stream ended successfully:', data)
-          if (data.saved) {
-            console.log(`📝 Transcript saved with record ID: ${data.recordId}`)
-          } else {
-            console.log(`⚠️ No transcript content was saved: ${data.message || 'No message'}`)
-          }
-        })
-        .catch(error => {
-          console.error('❌ Failed to end STT stream:', error)
-        })
-      
-      // Then cleanup
-      cleanup()
-      currentSessionRef.current = null
-      setStatus('Ready to start')
+          .then(data => {
+            console.log('✅ STT stream ended successfully:', data)
+            if (data.saved) {
+              console.log(`📝 Transcript saved with record ID: ${data.recordId}`)
+            } else {
+              console.log(`⚠️ No transcript content was saved: ${data.message || 'No message'}`)
+            }
+          })
+          .catch(error => {
+            console.error('❌ Failed to end STT stream:', error)
+          })
+        
+        // Then cleanup
+        cleanup()
+        currentSessionRef.current = null
+        setStatus('Ready to start')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, sessionId])
@@ -712,16 +712,16 @@ export function RealtimeSTT({
           )}
         </div>
       )}
-
+      
       {/* Manual Start Button for Debugging */}
       {hasPermission && !isListening && isRecording && (
         <div className="space-y-2">
-          <button
-            onClick={startSpeechRecognition}
-            className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
-          >
+        <button
+          onClick={startSpeechRecognition}
+          className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
+        >
             🎯 Start Speech Recognition
-          </button>
+        </button>
           <div className="text-xs bg-yellow-50 p-2 rounded border border-yellow-200">
             <p className="text-yellow-800">
               ⚠️ Recognition should start automatically. If you see this button, click it to start manually.
@@ -746,7 +746,7 @@ export function RealtimeSTT({
               <p className="text-gray-600">• Next restart: {Math.max(0, Math.floor((240 - (Date.now() - recognitionStartTimeRef.current) / 1000)))}s</p>
             </>
           )}
-        </div>
+          </div>
       )}
 
       {/* Network Error Status */}
@@ -754,7 +754,7 @@ export function RealtimeSTT({
         <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
           <p className="text-blue-800 font-medium">🌐 Network Reconnecting</p>
           <p className="text-blue-700">Automatically restarting speech recognition...</p>
-        </div>
+      </div>
       )}
     </div>
   )
