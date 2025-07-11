@@ -237,13 +237,23 @@ Please follow these instructions:
     console.log(`🌍 Generating translations for summary...`)
     
     // Save English summary to cache first
-    await supabase
-      .from('session_summary_cache')
-      .upsert({
-        session_id: sessionId,
-        language_code: 'en',
-        summary_text: englishSummary
-      })
+    try {
+      const { error: cacheError } = await supabase
+        .from('session_summary_cache')
+        .upsert({
+          session_id: sessionId,
+          language_code: 'en',
+          summary_text: englishSummary
+        })
+
+      if (cacheError) {
+        console.error('Error caching English summary:', cacheError)
+      } else {
+        console.log(`✅ English summary cached for session ${sessionId}`)
+      }
+    } catch (cacheException) {
+      console.error('Exception while caching English summary:', cacheException)
+    }
 
     for (const lang of supportedLanguages) {
       try {

@@ -99,7 +99,16 @@ NEXTAUTH_URL=http://localhost:3000
    - Create API key
 
 ### 4. Database Schema Setup
-Execute the contents of `supabase-schema.sql` file in Supabase SQL Editor to create tables and policies.
+Execute the SQL files in the `sqls/` directory in Supabase SQL Editor in the following order:
+
+1. **Initial Schema**: `supabase-schema.sql` - Creates all tables and policies
+2. **Session Migration**: `migrate-sessions-table.sql` - Adds category and summary columns
+3. **Category & Summary**: `add-session-category-summary.sql` - Adds category constraints
+4. **Summary Cache**: `create-session-summary-cache.sql` - Creates summary translation cache
+5. **Fix Schema**: `fix-db-schema.sql` - Fixes translation cache structure
+6. **Fix Summary Cache**: `fix-session-summary-cache.sql` - Fixes summary cache structure
+
+**Important**: Execute these SQL files in order to ensure proper database structure.
 
 ### 5. Start Development Server
 ```bash

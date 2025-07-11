@@ -99,18 +99,11 @@ ${fullText}`
       return null
     }
 
-    // Save summary to database
-    const { data: savedSummary, error: saveError } = await supabase
-      .from('session_summaries')
-      .upsert({
-        session_id: sessionId,
-        summary_en: summary,
-        summary_ko: '', // Will be translated later
-        summary_zh: '', // Will be translated later
-        summary_hi: '', // Will be translated later
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+    // Save summary to sessions table
+    const { data: updatedSession, error: saveError } = await supabase
+      .from('sessions')
+      .update({ summary: summary })
+      .eq('id', sessionId)
       .select()
       .single()
 
@@ -121,8 +114,98 @@ ${fullText}`
       return null
     }
 
+    // Also save to session_summary_cache for translations
+    try {
+      const { error: cacheError } = await supabase
+        .from('session_summary_cache')
+        .upsert({
+          session_id: sessionId,
+          language_code: 'en',
+          summary_text: summary
+        })
+
+      if (cacheError) {
+        console.error('Error caching English summary:', cacheError)
+        console.error('Cache error details:', {
+          sessionId,
+          summaryLength: summary.length,
+          error: cacheError
+        })
+      } else {
+        console.log(`✅ English summary cached for session ${sessionId}`)
+      }
+    } catch (cacheException) {
+      console.error('Exception while caching English summary:', cacheException)
+    }
+
+    // 🆕 Generate translations for supported languages
+    const supportedLanguages = ['ko', 'zh', 'hi']
+    
+    console.log(`🌍 Generating translations for summary...`)
+    
+    for (const lang of supportedLanguages) {
+      try {
+        const translationPrompt = `Translate the following English summary to ${lang === 'ko' ? 'Korean' : lang === 'zh' ? 'Chinese' : 'Hindi'}. Maintain the professional tone and technical accuracy. Keep the same HTML formatting:
+
+${summary}`
+
+        const translationResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: translationPrompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 800,
+            },
+          }),
+        })
+
+        if (!translationResponse.ok) {
+          console.error(`Gemini translation API error for ${lang}:`, translationResponse.status)
+          continue
+        }
+
+        const translationData = await translationResponse.json()
+        
+        let translatedSummary = null
+        if (translationData.candidates && translationData.candidates[0] && translationData.candidates[0].content) {
+          const candidate = translationData.candidates[0]
+          
+          if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
+            translatedSummary = candidate.content.parts[0].text.trim()
+          }
+        }
+
+        if (translatedSummary) {
+          // Save to session_summary_cache
+          const { error: cacheError } = await supabase
+            .from('session_summary_cache')
+            .upsert({
+              session_id: sessionId,
+              language_code: lang,
+              summary_text: translatedSummary
+            })
+
+          if (cacheError) {
+            console.error(`Error caching ${lang} summary translation:`, cacheError)
+          } else {
+            console.log(`✅ Cached ${lang} summary translation`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error translating summary to ${lang}:`, error)
+      }
+    }
+
     console.log(`✅ Summary generated and saved for session ${sessionId}`)
-    return savedSummary
+    return updatedSession
 
   } catch (error) {
     console.error('Error in generateSessionSummary:', error)
@@ -216,7 +299,7 @@ export async function POST(
         const summaryData = await generateSessionSummary(sessionId)
         
         if (summaryData) {
-          console.log(`✅ Summary generated: ${summaryData.summary_en?.substring(0, 50)}...`)
+          console.log(`✅ Summary generated: ${summaryData.summary?.substring(0, 50)}...`)
           summaryGenerated = true
         } else {
           console.error('Failed to generate summary')

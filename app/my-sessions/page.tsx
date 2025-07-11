@@ -142,6 +142,59 @@ export default function MySessionsPage() {
     return "Free"
   }
 
+  // 🆕 D-day 계산 함수
+  const getDaysRemaining = (session: SavedSession) => {
+    if (session.role === 'speaker' || session.is_premium || !session.expires_at) {
+      return null // 만료되지 않는 세션
+    }
+    
+    const now = new Date()
+    const expiryDate = new Date(session.expires_at)
+    const diffTime = expiryDate.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    return diffDays
+  }
+
+  // 🆕 D-day 표시 컴포넌트
+  const renderDaysBadge = (session: SavedSession) => {
+    const daysRemaining = getDaysRemaining(session)
+    
+    if (daysRemaining === null) {
+      return null // 만료되지 않는 세션
+    }
+    
+    if (daysRemaining <= 0) {
+      return (
+        <Badge className="bg-red-100 text-red-800 text-xs">
+          Expired
+        </Badge>
+      )
+    }
+    
+    if (daysRemaining <= 3) {
+      return (
+        <Badge className="bg-orange-100 text-orange-800 text-xs">
+          D-{daysRemaining}
+        </Badge>
+      )
+    }
+    
+    if (daysRemaining <= 7) {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+          D-{daysRemaining}
+        </Badge>
+      )
+    }
+    
+    return (
+      <Badge className="bg-green-100 text-green-800 text-xs">
+        D-{daysRemaining}
+      </Badge>
+    )
+  }
+
   const getStatusIcon = (session: SavedSession) => {
     if (session.role === 'speaker') {
       return <Mic className="h-3 w-3" />
@@ -341,6 +394,8 @@ export default function MySessionsPage() {
                             <span>{getStatusText(session)}</span>
                         </div>
                       </Badge>
+                      {/* 🆕 D-day 배지 */}
+                      {renderDaysBadge(session)}
                     </div>
 
                       <p className="text-gray-600 mb-3">
@@ -362,10 +417,14 @@ export default function MySessionsPage() {
                         {session.role === 'audience' && session.expires_at && (
                           <div className="flex items-center space-x-1">
                             <span>
-                              {new Date(session.expires_at) > new Date() 
-                                ? `Expires ${new Date(session.expires_at).toLocaleDateString()}`
-                                : 'Expired'
-                              }
+                              {(() => {
+                                const daysRemaining = getDaysRemaining(session)
+                                if (daysRemaining === null) return null
+                                if (daysRemaining <= 0) return 'Expired'
+                                if (daysRemaining === 1) return 'Expires tomorrow'
+                                if (daysRemaining <= 7) return `Expires in ${daysRemaining} days`
+                                return `Expires ${new Date(session.expires_at).toLocaleDateString()}`
+                              })()}
                             </span>
                       </div>
                         )}
@@ -381,16 +440,30 @@ export default function MySessionsPage() {
                       </Button>
                     ) : (
                         <>
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/session/${session.original_id || session.id}/transcript`}>
-                              <FileText className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/summary/${session.original_id || session.id}`}>
-                              <Share2 className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          {/* 🆕 만료된 세션 접근 제한 */}
+                          {getDaysRemaining(session) !== null && getDaysRemaining(session)! <= 0 ? (
+                            <>
+                              <Button size="sm" variant="outline" disabled className="opacity-50">
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="outline" disabled className="opacity-50">
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={`/session/${session.original_id || session.id}/transcript`}>
+                                  <FileText className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={`/summary/${session.original_id || session.id}`}>
+                                  <Share2 className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </>
+                          )}
                         </>
                       )}
                       {session.role === 'audience' && (

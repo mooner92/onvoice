@@ -470,33 +470,14 @@ export default function HostDashboard() {
   const getSessionUrl = () => {
     if (!sessionId) return ""
     
-    // For development: use local network IP instead of localhost for mobile access
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    const baseUrl = isDevelopment && typeof window !== 'undefined' 
-      ? window.location.hostname === 'localhost' 
-        ? `http://172.16.3.235:${window.location.port || '3001'}`  // Dynamic port
-        : window.location.origin
-      : window.location.origin
-    
-    return `${baseUrl}/session/${sessionId}`
+    return `${window.location.origin}/session/${sessionId}`
   }
 
   const getPublicSessionUrl = () => {
     if (!sessionId) return ""
     
-    // For development: use local network IP instead of localhost for mobile access
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    let baseUrl = window.location.origin
-    
-    if (isDevelopment && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      // Get current port
-      const currentPort = window.location.port || '3000'
-      // Use localhost for same-device access, will be replaced by actual network IP in QR display
-      baseUrl = `http://localhost:${currentPort}`
-    }
-    
     // Public access URL (no auth required)
-    return `${baseUrl}/s/${sessionId}`
+    return `${window.location.origin}/s/${sessionId}`
   }
 
   if (!user) {
