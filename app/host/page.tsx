@@ -311,6 +311,14 @@ export default function HostDashboard() {
 
   const handleSTTError = (error: string) => {
     console.error('STT Error:', error)
+    
+    // 네트워크 연결 에러는 5분 제한으로 인한 정상적인 재시작이므로 사용자에게 표시하지 않음
+    if (error.includes('Network connection lost') || error.includes('network')) {
+      console.log('🌐 Network error detected - this is expected due to 5-minute timeout, ignoring...')
+      return
+    }
+    
+    // 다른 에러만 사용자에게 표시
     setSTTError(error)
   }
 
@@ -462,33 +470,14 @@ export default function HostDashboard() {
   const getSessionUrl = () => {
     if (!sessionId) return ""
     
-    // For development: use local network IP instead of localhost for mobile access
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    const baseUrl = isDevelopment && typeof window !== 'undefined' 
-      ? window.location.hostname === 'localhost' 
-        ? `http://172.16.3.235:${window.location.port || '3001'}`  // Dynamic port
-        : window.location.origin
-      : window.location.origin
-    
-    return `${baseUrl}/session/${sessionId}`
+    return `${window.location.origin}/session/${sessionId}`
   }
 
   const getPublicSessionUrl = () => {
     if (!sessionId) return ""
     
-    // For development: use local network IP instead of localhost for mobile access
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    let baseUrl = window.location.origin
-    
-    if (isDevelopment && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      // Get current port
-      const currentPort = window.location.port || '3000'
-      // Use localhost for same-device access, will be replaced by actual network IP in QR display
-      baseUrl = `http://localhost:${currentPort}`
-    }
-    
     // Public access URL (no auth required)
-    return `${baseUrl}/s/${sessionId}`
+    return `${window.location.origin}/s/${sessionId}`
   }
 
   if (!user) {
@@ -706,6 +695,19 @@ export default function HostDashboard() {
                         onError={handleSTTError}
                         lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
                       />
+                    </div>
+                  )}
+                  
+                  {/* Web Speech API Info */}
+                  {isRecording && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2 text-blue-800">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium">Live Speech Recognition Active</span>
+                      </div>
+                      <p className="text-blue-700 text-xs mt-1">
+                        🔄 Automatically restarts every 4 minutes to prevent timeout
+                      </p>
                     </div>
                   )}
                   

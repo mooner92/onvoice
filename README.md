@@ -99,7 +99,16 @@ NEXTAUTH_URL=http://localhost:3000
    - Create API key
 
 ### 4. Database Schema Setup
-Execute the contents of `supabase-schema.sql` file in Supabase SQL Editor to create tables and policies.
+Execute the SQL files in the `sqls/` directory in Supabase SQL Editor in the following order:
+
+1. **Initial Schema**: `supabase-schema.sql` - Creates all tables and policies
+2. **Session Migration**: `migrate-sessions-table.sql` - Adds category and summary columns
+3. **Category & Summary**: `add-session-category-summary.sql` - Adds category constraints
+4. **Summary Cache**: `create-session-summary-cache.sql` - Creates summary translation cache
+5. **Fix Schema**: `fix-db-schema.sql` - Fixes translation cache structure
+6. **Fix Summary Cache**: `fix-session-summary-cache.sql` - Fixes summary cache structure
+
+**Important**: Execute these SQL files in order to ensure proper database structure.
 
 ### 5. Start Development Server
 ```bash
@@ -172,6 +181,14 @@ onvoice/
 - **Session Persistence**: Automatic session recovery and state management
 - **Guest Access**: Support for unauthenticated guest participation
 
+### Speech Recognition System
+- **Real-Time STT**: Web Speech API for instant transcription
+- **High Accuracy**: Optimized recognition settings for lecture content
+- **Multi-Language Support**: Auto-detection and manual language selection
+- **Continuous Recognition**: Seamless speech-to-text conversion
+- **5-Minute Timeout Prevention**: Automatic restart every 4.5 minutes to prevent Web Speech API timeout
+- **Network Error Recovery**: Automatic reconnection on network issues
+
 ## 🚀 Deployment
 
 ### Vercel Deployment
@@ -205,11 +222,59 @@ After deployment, verify these environment variables are correctly set:
 2. **QR Code Not Generating**: Verify network connectivity and IP detection
 3. **Translation Failing**: Ensure Google Translate API key is set
 4. **Session Not Saving**: Check Supabase connection and permissions
+5. **Transcript Not Showing on Summary Page**: Database access policy issue for ended sessions
+
+### 🔧 Fix for Transcript Access Issue
+
+**Problem**: After a session ends, audience members cannot view transcripts on the summary page, even though the summary appears correctly.
+
+**Root Cause**: Supabase RLS (Row Level Security) policies only allow transcript access for:
+- Active sessions (anyone can view)
+- Session hosts (can always view their own sessions)
+
+**Solution**: Execute the following SQL in your Supabase SQL Editor:
+
+```sql
+-- Fix transcript access policy for ended sessions
+-- File: sqls/fix-transcript-access-policy.sql
+
+-- Add new policy for users who have saved sessions
+CREATE POLICY "Users can view transcripts for saved sessions" ON transcripts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM user_sessions 
+      WHERE user_sessions.session_id = transcripts.session_id 
+      AND user_sessions.user_id = auth.uid()
+    )
+  );
+
+-- Add new policy for public summary pages (anyone can view transcripts for ended sessions)
+CREATE POLICY "Anyone can view transcripts for ended sessions on summary pages" ON transcripts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM sessions 
+      WHERE sessions.id = transcripts.session_id 
+      AND sessions.status = 'ended'
+    )
+  );
+
+-- Update sessions policy to allow viewing ended sessions for summary pages
+DROP POLICY IF EXISTS "Anyone can view ended sessions" ON sessions;
+CREATE POLICY "Anyone can view ended sessions" ON sessions
+  FOR SELECT USING (status = 'ended');
+```
+
+**Steps to Fix**:
+1. Go to your Supabase Dashboard
+2. Navigate to SQL Editor
+3. Execute the SQL commands above
+4. Test by accessing a completed session's summary page
 
 ### Development Tips
 - Use browser developer tools to monitor WebSocket connections
 - Check Supabase logs for database errors
 - Monitor API usage to optimize costs
+- Check browser console for detailed transcript loading logs
 
 ## 📄 License
 
