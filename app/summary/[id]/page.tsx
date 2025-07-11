@@ -447,10 +447,10 @@ export default function PublicSessionSummaryPage() {
 
         setSession(sessionData)
 
-        // transcript 로드 (공개 접근)
+        // transcript 로드 (공개 접근) - transcript 페이지와 동일한 쿼리 사용
         const { data: transcripts, error: transcriptError } = await supabase
           .from('transcripts')
-          .select('id, original_text, created_at')
+          .select('*')
           .eq('session_id', sessionId)
           .order('created_at', { ascending: true })
 
