@@ -454,11 +454,19 @@ export default function PublicSessionSummaryPage() {
           .eq('session_id', sessionId)
           .order('created_at', { ascending: true })
 
+        console.log('📝 Transcript loading result:', {
+          sessionId,
+          transcripts: transcripts?.length || 0,
+          error: transcriptError,
+          sampleData: transcripts?.slice(0, 2)
+        })
+
         if (transcriptError) {
           console.error('Transcript loading error:', transcriptError)
           // transcript 에러는 무시하고 계속 진행
         } else {
           setTranscript(transcripts || [])
+          console.log('✅ Transcript set:', transcripts?.length || 0, 'items')
         }
 
         // 요약 번역 로드
@@ -481,6 +489,15 @@ export default function PublicSessionSummaryPage() {
       loadSummaryTranslation(session.summary, userLanguage)
     }
   }, [userLanguage, session?.summary])
+
+  // 🆕 Transcript 상태 디버깅
+  useEffect(() => {
+    console.log('🔍 Transcript state changed:', {
+      length: transcript.length,
+      sessionId,
+      sampleItems: transcript.slice(0, 2).map(t => ({ id: t.id, text: t.original_text.substring(0, 50) }))
+    })
+  }, [transcript, sessionId])
 
   // 🆕 자동 모달 표시 제거 - 사용자가 버튼 클릭 시에만 표시
   
