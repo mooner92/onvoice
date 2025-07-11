@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase"
 import Chatbot from '@/components/Chatbot'
 import { SaveSessionModal } from '@/components/SaveSessionModal'
 import { useAuth } from '@/components/auth/AuthProvider'
+import { loadSessionTranscripts, type Transcript } from '@/lib/transcript-loader'
 
 interface Session {
   id: string
@@ -25,11 +26,7 @@ interface Session {
   ended_at?: string
 }
 
-interface Transcript {
-  id: string
-  original_text: string
-  created_at: string
-}
+// Transcript 인터페이스는 lib/transcript-loader.ts에서 import
 
 export default function PublicSessionSummaryPage() {
   const params = useParams()
@@ -447,26 +444,15 @@ export default function PublicSessionSummaryPage() {
 
         setSession(sessionData)
 
-        // transcript 로드 (공개 접근) - transcript 페이지와 동일한 쿼리 사용
-        const { data: transcripts, error: transcriptError } = await supabase
-          .from('transcripts')
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('created_at', { ascending: true })
-
-        console.log('📝 Transcript loading result:', {
-          sessionId,
-          transcripts: transcripts?.length || 0,
-          error: transcriptError,
-          sampleData: transcripts?.slice(0, 2)
-        })
-
-        if (transcriptError) {
+        // transcript 로드 (모듈화된 함수 사용)
+        try {
+          const transcripts = await loadSessionTranscripts(sessionId)
+          setTranscript(transcripts)
+          console.log('✅ Transcript set:', transcripts.length, 'items')
+        } catch (transcriptError) {
           console.error('Transcript loading error:', transcriptError)
           // transcript 에러는 무시하고 계속 진행
-        } else {
-          setTranscript(transcripts || [])
-          console.log('✅ Transcript set:', transcripts?.length || 0, 'items')
+          setTranscript([])
         }
 
         // 요약 번역 로드
