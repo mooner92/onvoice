@@ -99,19 +99,16 @@ export function getNetworkAccessibleUrl(): string {
 export function getSmartCallbackUrl(returnPath?: string): string {
   if (typeof window !== 'undefined') {
     const currentOrigin = window.location.origin
-    const isDev = currentOrigin.includes('localhost') || currentOrigin.includes('172.31.249.137')
     const isProduction = currentOrigin.includes('vercel.app') || process.env.NODE_ENV === 'production'
     
     let baseUrl: string
     if (isProduction) {
       // 배포 환경: 항상 vercel URL 사용
       baseUrl = 'https://onvoice.vercel.app'
-    } else if (isDev) {
-      // 개발 환경: 현재 접속 URL 사용
-      baseUrl = currentOrigin
     } else {
-      // 기타 환경: 현재 URL 사용
-      baseUrl = currentOrigin
+      // 개발 환경: 항상 localhost 사용 (0.0.0.0 방지)
+      const port = window.location.port || '3000'
+      baseUrl = `http://localhost:${port}`
     }
     
     const callbackUrl = `${baseUrl}/auth/callback`

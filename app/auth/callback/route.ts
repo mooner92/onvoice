@@ -10,7 +10,15 @@ export async function GET(request: NextRequest) {
 
   // 배포 환경에서는 올바른 도메인 사용
   const isProduction = process.env.NODE_ENV === 'production' || origin.includes('vercel.app')
-  const baseUrl = isProduction ? 'https://onvoice.vercel.app' : origin
+  
+  // 로컬 환경에서 0.0.0.0으로 들어온 경우 localhost로 변환
+  let baseUrl: string
+  if (isProduction) {
+    baseUrl = 'https://onvoice.vercel.app'
+  } else {
+    // 로컬 환경에서는 항상 localhost 사용
+    baseUrl = origin.replace('0.0.0.0', 'localhost')
+  }
 
   console.log('🔐 Auth callback received:', { 
     code: code ? 'present' : 'missing', 
