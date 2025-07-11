@@ -482,17 +482,7 @@ export default function PublicSessionSummaryPage() {
     }
   }, [userLanguage, session?.summary])
 
-  // 🆕 페이지 로드 시 세션 저장 모달 표시 (익명 사용자만)
-  useEffect(() => {
-    if (session && !user && !sessionSaved) {
-      // 2초 후에 모달 표시
-      const timer = setTimeout(() => {
-        setShowSaveModal(true)
-      }, 2000)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [session, user, sessionSaved])
+  // 🆕 자동 모달 표시 제거 - 사용자가 버튼 클릭 시에만 표시
   
   // 🆕 호스트인 경우 저장 모달 자동 닫기
   useEffect(() => {
@@ -844,8 +834,8 @@ export default function PublicSessionSummaryPage() {
                </div>
              </div>
              <div className="flex items-center space-x-2">
-               {/* 🆕 세션 저장 버튼 (로그인한 사용자만, 호스트 제외) */}
-               {user && !sessionSaved && session?.host_id !== user.id && (
+               {/* 🆕 세션 저장 버튼 (호스트가 아닌 모든 사용자에게 표시) */}
+               {!sessionSaved && (!user || session?.host_id !== user.id) && (
                  <Button
                    onClick={() => setShowSaveModal(true)}
                    variant="outline"
@@ -1184,7 +1174,7 @@ export default function PublicSessionSummaryPage() {
       </div>
 
       {/* 🆕 세션 저장 모달 (호스트가 아닌 경우만) */}
-      {session?.host_id !== user?.id && (
+      {(!user || session?.host_id !== user?.id) && (
         <SaveSessionModal
           isOpen={showSaveModal}
           onClose={() => setShowSaveModal(false)}
