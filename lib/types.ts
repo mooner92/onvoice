@@ -75,7 +75,7 @@ export interface TranslationCache {
   original_text: string
   target_language: string
   translated_text: string
-  translation_engine: 'gpt' | 'google' | 'local' | 'mock'
+  translation_engine: 'gpt' | 'google' | 'local' | 'mock' | 'gemini-live'
   quality_score: number
   usage_count: number
   created_at: string

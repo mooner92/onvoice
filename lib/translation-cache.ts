@@ -244,6 +244,7 @@ export function generateSmartMockTranslation(
 export function getEngineQuality(engine: string): number {
   switch (engine) {
     case 'gpt': return 0.95
+    case 'gemini-live': return 0.95  // Gemini Live는 GPT와 동등한 품질
     case 'google': return 0.75
     case 'local': return 0.3
     default: return 0.5

@@ -11,7 +11,7 @@ CREATE TABLE translation_cache (
   original_text TEXT NOT NULL,
   target_language TEXT NOT NULL,
   translated_text TEXT NOT NULL,
-  translation_engine TEXT NOT NULL CHECK (translation_engine IN ('gpt', 'google', 'local', 'mock')),
+  translation_engine TEXT NOT NULL CHECK (translation_engine IN ('gpt', 'google', 'local', 'mock', 'gemini-live')),
   quality_score FLOAT DEFAULT 0.5,
   usage_count INTEGER DEFAULT 1,
   created_at TIMESTAMP DEFAULT NOW(),

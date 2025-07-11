@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClient } from "@/lib/supabase"
 import { QRCodeDisplay } from "@/components/ui/qr-code"
-import { RealtimeSTT } from "@/components/RealtimeSTT"
+import { VadGeminiLive } from "@/components/VadGeminiLive"
 import type { Session } from "@/lib/types"
 
 interface TranscriptLine {
@@ -241,25 +241,23 @@ export default function HostDashboard() {
     }
   }, [supabase])
 
-  // Handle real-time transcript updates
-  const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
-    console.log('Transcript update:', { text, isPartial })
+  // Handle real-time transcript updates from Gemini Live
+  const handleTranscriptUpdate = (text: string, translations: Record<string, string>) => {
+    console.log('Gemini Live transcript update:', { text, translations })
     
-    if (isPartial) {
-      // Update partial text display
-      setCurrentPartialText(text)
-    } else {
-      // Add final transcript to list
-      const newLine: TranscriptLine = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleTimeString(),
-        text: text.trim(),
-        confidence: 0.9
-      }
-      
-      setTranscript(prev => [...prev, newLine])
-      setCurrentPartialText("") // Clear partial text
+    // Add final transcript to list with unique ID
+    const newLine: TranscriptLine = {
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique ID
+      timestamp: new Date().toLocaleTimeString(),
+      text: text.trim(),
+      confidence: 0.95 // Gemini Live has high confidence
     }
+    
+    setTranscript(prev => [...prev, newLine])
+    setCurrentPartialText("") // Clear partial text
+    
+    console.log('📝 Added transcript line:', newLine)
+    console.log('🌍 Available translations:', Object.keys(translations))
   }
 
   const handleSTTError = (error: string) => {
@@ -318,10 +316,10 @@ export default function HostDashboard() {
       // First, immediately set recording to false to stop STT
       setIsRecording(false)
       
-      // Immediately call STT stream end API to persist transcript
+      // End Gemini Live session
     if (sessionId) {
         try {
-          const sttEndResp = await fetch('/api/stt-stream', {
+          const geminiEndResp = await fetch('/api/gemini-live', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -329,10 +327,10 @@ export default function HostDashboard() {
               sessionId
             })
           })
-          const sttEndData = await sttEndResp.json()
-          console.log('STT stream end result:', sttEndData)
-        } catch (sttErr) {
-          console.error('Failed to end STT stream:', sttErr)
+          const geminiEndData = await geminiEndResp.json()
+          console.log('Gemini Live session end result:', geminiEndData)
+        } catch (geminiErr) {
+          console.error('Failed to end Gemini Live session:', geminiErr)
         }
       }
 
@@ -342,7 +340,7 @@ export default function HostDashboard() {
         autoStopTimerRef.current = null
       }
 
-      // Wait a moment for RealtimeSTT to cleanup
+      // Wait a moment for GeminiLiveSTT to cleanup
       await new Promise(resolve => setTimeout(resolve, 1000))
 
       // End session via API
@@ -418,8 +416,8 @@ export default function HostDashboard() {
     if (isDevelopment && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       // Get current port
       const currentPort = window.location.port || '3000'
-      // Use localhost for same-device access, will be replaced by actual network IP in QR display
-      baseUrl = `http://localhost:${currentPort}`
+      // Use the actual network IP for mobile access
+      baseUrl = `http://192.168.1.142:${currentPort}`
     }
     
     // Public access URL (no auth required)
@@ -471,7 +469,7 @@ export default function HostDashboard() {
               </div>
               <div className="text-blue-700 text-sm mt-1 space-y-1">
                 <p>• Mobile access: QR code auto-detects network IP</p>
-                <p>• STT: 🔄 Auto-configured (Whisper API)</p>
+                <p>• STT: 🤖 Gemini Live (Real-time + Translation)</p>
                 <p>• Auth: Google login required for all users</p>
                 <p>• Dev tip: Same account can be host + audience</p>
               </div>
@@ -609,15 +607,13 @@ export default function HostDashboard() {
                     </Button>
                   </CardTitle>
                   
-                  {/* Real-time STT Status */}
+                  {/* Gemini Live STT Status */}
                   {sessionId && (
                     <div className="mt-2">
-                      <RealtimeSTT
+                      <VadGeminiLive
                         sessionId={sessionId}
-                        isRecording={isRecording}
                         onTranscriptUpdate={handleTranscriptUpdate}
-                        onError={handleSTTError}
-                        lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
+                        onPartialUpdate={(text) => setCurrentPartialText(text)}
                       />
                     </div>
                   )}

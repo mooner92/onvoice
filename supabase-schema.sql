@@ -50,7 +50,9 @@ CREATE TABLE transcripts (
   target_language TEXT,
   speaker_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  is_final BOOLEAN DEFAULT false
+  is_final BOOLEAN DEFAULT false,
+  confidence FLOAT DEFAULT 0.8,
+  translation_status TEXT DEFAULT 'pending' CHECK (translation_status IN ('pending', 'processing', 'completed'))
 );
 
 -- Create user_sessions table (for saved sessions)
