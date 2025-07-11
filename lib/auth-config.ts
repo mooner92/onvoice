@@ -103,12 +103,11 @@ export function getSmartCallbackUrl(returnPath?: string): string {
     
     let baseUrl: string
     if (isProduction) {
-      // 배포 환경: 항상 vercel URL 사용
-      baseUrl = 'https://onvoice.vercel.app'
+      // 배포 환경: 현재 접속한 vercel URL 사용 (브랜치별 배포 지원)
+      baseUrl = currentOrigin
     } else {
-      // 개발 환경: 항상 localhost 사용 (0.0.0.0 방지)
-      const port = window.location.port || '3000'
-      baseUrl = `http://localhost:${port}`
+      // 개발 환경: 현재 접속 URL 사용 (localhost 또는 IP)
+      baseUrl = currentOrigin
     }
     
     const callbackUrl = `${baseUrl}/auth/callback`
