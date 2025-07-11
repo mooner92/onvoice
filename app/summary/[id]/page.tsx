@@ -448,9 +448,23 @@ export default function PublicSessionSummaryPage() {
         try {
           const transcripts = await loadSessionTranscripts(sessionId)
           setTranscript(transcripts)
-          console.log('✅ Transcript set:', transcripts.length, 'items')
+          console.log('✅ Transcript loaded successfully:', {
+            count: transcripts.length,
+            sessionId,
+            sessionStatus: sessionData.status,
+            samples: transcripts.slice(0, 2).map(t => ({
+              id: t.id,
+              textPreview: t.original_text.substring(0, 50) + '...',
+              createdAt: t.created_at
+            }))
+          })
         } catch (transcriptError) {
-          console.error('Transcript loading error:', transcriptError)
+          console.error('❌ Transcript loading failed:', {
+            error: transcriptError,
+            sessionId,
+            sessionStatus: sessionData.status,
+            errorMessage: transcriptError instanceof Error ? transcriptError.message : 'Unknown error'
+          })
           // transcript 에러는 무시하고 계속 진행
           setTranscript([])
         }
@@ -1084,82 +1098,109 @@ export default function PublicSessionSummaryPage() {
             </Card>
           )}
 
-          {/* Transcript Section */}
-          {transcript.length > 0 && (
-            <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                                  <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>
+                    {/* Transcript Section */}
+          <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>
                   {t('fullTranscript')}
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFullTranscript(!showFullTranscript)}
-                >
-                  {showFullTranscript ? t('collapse') : t('expand')}
-                </Button>
-                </div>
-                <CardDescription className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-                  {transcript.length}{t('items')} • {t('realTimeResults')}
-                </CardDescription>
-              </CardHeader>
-              {showFullTranscript && (
-                <CardContent>
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {transcript.map((item, index) => (
-                      <div key={item.id} className={`p-3 rounded-lg ${
-                        darkMode ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}>
-                        <div className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          #{index + 1} • {new Date(item.created_at).toLocaleTimeString()}
-                        </div>
-                        <div 
-                          className={`${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
-                          style={{ fontSize: `${fontSize[0]}px` }}
-                        >
-                          {item.original_text}
-                        </div>
-                        
-                        {/* 🆕 Translation Display */}
-                        {showTranslation && (
-                          <div 
-                            className={`mt-2 leading-relaxed italic pl-4 border-l-2 ${
-                              darkMode 
-                                ? 'text-gray-300 border-gray-600' 
-                                : 'text-gray-700 border-gray-300'
-                            }`}
-                            style={{ fontSize: `${fontSize[0] - 1}px` }}
-                          >
-                            {translatingIds.has(item.id) ? (
-                              <span className="text-gray-400 flex items-center">
-                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                [AI 번역 중...]
-                              </span>
-                            ) : (
-                              translatedTexts[item.id] || `[${languages.find(l => l.code === selectedLanguage)?.name}] ${item.original_text}`
-                            )}
+                {transcript.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFullTranscript(!showFullTranscript)}
+                  >
+                    {showFullTranscript ? t('collapse') : t('expand')}
+                  </Button>
+                )}
+              </div>
+              <CardDescription className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+                {transcript.length}{t('items')} • {t('realTimeResults')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {transcript.length > 0 ? (
+                <>
+                  {showFullTranscript && (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {transcript.map((item, index) => (
+                        <div key={item.id} className={`p-3 rounded-lg ${
+                          darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                        }`}>
+                          <div className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            #{index + 1} • {new Date(item.created_at).toLocaleTimeString()}
                           </div>
+                          <div 
+                            className={`${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
+                            style={{ fontSize: `${fontSize[0]}px` }}
+                          >
+                            {item.original_text}
+                          </div>
+                          
+                          {/* 🆕 Translation Display */}
+                          {showTranslation && (
+                            <div 
+                              className={`mt-2 leading-relaxed italic pl-4 border-l-2 ${
+                                darkMode 
+                                  ? 'text-gray-300 border-gray-600' 
+                                  : 'text-gray-700 border-gray-300'
+                              }`}
+                              style={{ fontSize: `${fontSize[0] - 1}px` }}
+                            >
+                              {translatingIds.has(item.id) ? (
+                                <span className="text-gray-400 flex items-center">
+                                  <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                  [AI 번역 중...]
+                                </span>
+                              ) : (
+                                translatedTexts[item.id] || `[${languages.find(l => l.code === selectedLanguage)?.name}] ${item.original_text}`
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {transcript.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyText(
+                          transcript.map((t, i) => `${i + 1}. ${t.original_text}`).join('\n\n'),
+                          t('copyAllTranscript')
                         )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyText(
-                        transcript.map((t, i) => `${i + 1}. ${t.original_text}`).join('\n\n'),
-                        t('copyAllTranscript')
-                      )}
-                    >
-                      📋 {t('copyAllTranscript')}
-                    </Button>
-                  </div>
-                </CardContent>
+                      >
+                        📋 {t('copyAllTranscript')}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">
+                    {session?.status === 'ended' ? 'Transcript not available' : 'No transcript yet'}
+                  </p>
+                  <p className="text-sm mb-4">
+                    {session?.status === 'ended' 
+                      ? 'The transcript for this session may not be accessible due to database permissions.'
+                      : 'Transcript will appear here as the session progresses.'
+                    }
+                  </p>
+                  {session?.status === 'ended' && (
+                    <div className={`text-xs p-3 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
+                      <p className="font-medium mb-1">🔍 Troubleshooting:</p>
+                      <p>• Check if you have permission to view this session's transcript</p>
+                      <p>• Database access policies may prevent viewing transcripts from ended sessions</p>
+                      <p>• Contact the session host if you believe you should have access</p>
+                    </div>
+                  )}
+                </div>
               )}
-            </Card>
-          )}
+            </CardContent>
+          </Card>
 
           {/* Chatbot for past session */}
           <Chatbot transcript={transcript.map(line => line.original_text).join('\n')} sessionId={sessionId} />

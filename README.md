@@ -222,11 +222,59 @@ After deployment, verify these environment variables are correctly set:
 2. **QR Code Not Generating**: Verify network connectivity and IP detection
 3. **Translation Failing**: Ensure Google Translate API key is set
 4. **Session Not Saving**: Check Supabase connection and permissions
+5. **Transcript Not Showing on Summary Page**: Database access policy issue for ended sessions
+
+### 🔧 Fix for Transcript Access Issue
+
+**Problem**: After a session ends, audience members cannot view transcripts on the summary page, even though the summary appears correctly.
+
+**Root Cause**: Supabase RLS (Row Level Security) policies only allow transcript access for:
+- Active sessions (anyone can view)
+- Session hosts (can always view their own sessions)
+
+**Solution**: Execute the following SQL in your Supabase SQL Editor:
+
+```sql
+-- Fix transcript access policy for ended sessions
+-- File: sqls/fix-transcript-access-policy.sql
+
+-- Add new policy for users who have saved sessions
+CREATE POLICY "Users can view transcripts for saved sessions" ON transcripts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM user_sessions 
+      WHERE user_sessions.session_id = transcripts.session_id 
+      AND user_sessions.user_id = auth.uid()
+    )
+  );
+
+-- Add new policy for public summary pages (anyone can view transcripts for ended sessions)
+CREATE POLICY "Anyone can view transcripts for ended sessions on summary pages" ON transcripts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM sessions 
+      WHERE sessions.id = transcripts.session_id 
+      AND sessions.status = 'ended'
+    )
+  );
+
+-- Update sessions policy to allow viewing ended sessions for summary pages
+DROP POLICY IF EXISTS "Anyone can view ended sessions" ON sessions;
+CREATE POLICY "Anyone can view ended sessions" ON sessions
+  FOR SELECT USING (status = 'ended');
+```
+
+**Steps to Fix**:
+1. Go to your Supabase Dashboard
+2. Navigate to SQL Editor
+3. Execute the SQL commands above
+4. Test by accessing a completed session's summary page
 
 ### Development Tips
 - Use browser developer tools to monitor WebSocket connections
 - Check Supabase logs for database errors
 - Monitor API usage to optimize costs
+- Check browser console for detailed transcript loading logs
 
 ## 📄 License
 
