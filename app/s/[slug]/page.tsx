@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useId } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
@@ -35,6 +35,7 @@ export default function PublicSessionPage() {
   const supabase = createClient()
   const slug = params.slug as string
   const { toasts, addToast, removeToast } = useToast()
+  const componentId = useId()
 
   // Get user's preferred language from browser or profile
   const getUserPreferredLanguage = () => {
@@ -687,7 +688,7 @@ export default function PublicSessionPage() {
     
     const now = new Date()
     const timestamp = now.toLocaleTimeString()
-    const newId = `${now.getTime()}-${Math.random()}`
+    const newId = `${componentId}-${now.getTime()}-${transcript.length}`
     
     const newLine: TranscriptLine = {
       id: newId,
@@ -1316,9 +1317,9 @@ export default function PublicSessionPage() {
                 
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                   <div className="space-y-2">
-                    <div>🚀 <strong>GPT-Powered Translation System:</strong></div>
+                    <div>🚀 <strong>Gemini 2.0-Powered Translation System:</strong></div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>• GPT-4o-mini for natural translation</div>
+                      <div>• Gemini 2.0 Flash for natural translation</div>
                       <div>• Smart caching reduces costs 90%+</div>
                       <div>• Instant placeholder responses</div>
                       <div>• Google Translate as fallback</div>

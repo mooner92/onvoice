@@ -37,6 +37,10 @@ export function RealtimeSTT({
   const finalizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const accumulatedTextRef = useRef<string>('')
 
+  // 5분 제한 방지를 위한 주기적 재시작 타이머
+  const restartTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const recognitionStartTimeRef = useRef<number>(0)
+
   // Track props changes for debugging
   useEffect(() => {
     console.log('🎯 RealtimeSTT Props Update:', {
@@ -64,6 +68,12 @@ export function RealtimeSTT({
     if (finalizeTimeoutRef.current) {
       clearTimeout(finalizeTimeoutRef.current)
       finalizeTimeoutRef.current = null
+    }
+    
+    // 재시작 타이머도 정리
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
     }
     
     accumulatedTextRef.current = ''
@@ -117,7 +127,12 @@ export function RealtimeSTT({
         const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName })
         console.log('🎤 Permission status:', permission.state)
         
-        if (permission.state === 'denied') {
+        if (permission.state === 'granted') {
+          setHasPermission(true)
+          setStatus('Permission granted')
+          console.log('✅ Microphone permission already granted')
+          return true
+        } else if (permission.state === 'denied') {
           setHasPermission(false)
           setStatus('Permission denied')
           return false
@@ -133,8 +148,24 @@ export function RealtimeSTT({
 
   // Check microphone status on component mount
   useEffect(() => {
-    checkMicrophoneStatus()
-  }, [checkMicrophoneStatus])
+    const initializePermission = async () => {
+      const hasPermissionAlready = await checkMicrophoneStatus()
+      console.log('🔍 Initial permission check result:', hasPermissionAlready)
+      
+      // 권한이 이미 있고, 녹음 중이며, 세션이 활성화되어 있다면 자동 시작
+      if (hasPermissionAlready && isRecording && sessionId && isActiveRef.current && !isListening) {
+        console.log('🚀 Auto-starting recognition on mount (permission already granted)')
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current && !isListening) {
+            startSpeechRecognition()
+          }
+        }, 200)
+      }
+    }
+    
+    initializePermission()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkMicrophoneStatus, isRecording, sessionId, isListening])
 
   // Request microphone permission
   const requestMicrophonePermission = async () => {
@@ -177,6 +208,17 @@ export function RealtimeSTT({
       setHasPermission(true)
       setStatus('Permission granted')
       console.log('✅ Microphone permission granted')
+      
+      // 권한이 부여된 후 즉시 음성 인식 시작 시도
+      if (isRecording && sessionId && isActiveRef.current) {
+        console.log('🚀 Auto-starting recognition after permission granted')
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+            startSpeechRecognition()
+          }
+        }, 100)
+      }
+      
       return true
       
     } catch (error) {
@@ -211,6 +253,37 @@ export function RealtimeSTT({
     }
   }
 
+  // 5분 제한 방지를 위한 주기적 재시작 함수
+  const scheduleRecognitionRestart = () => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+    }
+    
+    // 4분 후에 재시작 (5분 제한보다 1분 일찍)
+    restartTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+        console.log('🔄 Preventive restart to avoid 5-minute timeout (4 minutes elapsed)')
+        
+        // 현재 인식 중지하고 즉시 재시작
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop()
+          } catch (error) {
+            console.warn('Error stopping recognition for restart:', error)
+          }
+        }
+        
+        // 짧은 지연 후 재시작
+        setTimeout(() => {
+          if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+            console.log('🚀 Restarting recognition after preventive stop')
+            startSpeechRecognition()
+          }
+        }, 200) // 200ms 지연
+      }
+    }, 4 * 60 * 1000) // 4분으로 단축
+  }
+
   // Start speech recognition
   const startSpeechRecognition = async () => {
     if (!mountedRef.current || !isSupported) {
@@ -231,6 +304,7 @@ export function RealtimeSTT({
 
     try {
       console.log('🚀 Starting new recognition instance...')
+      recognitionStartTimeRef.current = Date.now()
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       const recognition = new SpeechRecognition()
@@ -244,6 +318,9 @@ export function RealtimeSTT({
         console.log('🎤 Recognition started')
         setIsListening(true)
         setStatus('Listening...')
+        
+        // 5분 제한 방지를 위한 재시작 스케줄링
+        scheduleRecognitionRestart()
       }
 
       recognition.onend = () => {
@@ -252,9 +329,14 @@ export function RealtimeSTT({
         setIsListening(false)
         recognitionRef.current = null
         
+        // 재시작 타이머 정리
+        if (restartTimerRef.current) {
+          clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = null
+        }
+        
         // Auto-restart only if still active and not in error state
         if (isActiveRef.current && currentSessionRef.current) {
-          // Remove retry limit for natural speech flow
           console.log('🔄 Auto-restarting recognition...')
           setStatus('Listening...') // Keep showing "Listening" during restart
           setTimeout(() => {
@@ -264,7 +346,6 @@ export function RealtimeSTT({
           }, 100) // Reduced delay from 1000ms to 100ms
         } else {
           setStatus('Ready to start')
-          ;(window as any).__retryCount = 0
         }
       }
 
@@ -274,14 +355,20 @@ export function RealtimeSTT({
         console.log('⚠️ Recognition error details:', {
           error: event.error,
           message: event.message,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          duration: Date.now() - recognitionStartTimeRef.current
         })
         setIsListening(false)
         recognitionRef.current = null
         
+        // 재시작 타이머 정리
+        if (restartTimerRef.current) {
+          clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = null
+        }
+        
         // Reset retry count on critical errors
         if (event.error === 'not-allowed' || event.error === 'aborted') {
-          ;(window as any).__retryCount = 0
           setHasPermission(false)
           isActiveRef.current = false
           
@@ -300,10 +387,23 @@ export function RealtimeSTT({
           onError(errorMessage)
           
         } else if (event.error === 'network') {
-          setStatus('Network error')
-          isActiveRef.current = false
-          ;(window as any).__retryCount = 0
-          onError('Network connection lost. Please check your internet connection and try again.')
+          // 네트워크 에러 시 자동 재시작 (5분 제한 포함)
+          console.log('🌐 Network error detected (likely 5-minute timeout) - restarting silently...')
+          setStatus('Reconnecting...')
+          
+          // 항상 자동으로 재시작 (세션이 활성화되어 있으면)
+          if (isActiveRef.current && currentSessionRef.current) {
+            setTimeout(() => {
+              if (mountedRef.current && isActiveRef.current && currentSessionRef.current) {
+                console.log('🔄 Restarting after network error...')
+                startSpeechRecognition()
+              }
+            }, 500) // 0.5초 후 재시작 (더 빠르게)
+          } else {
+            // 세션이 비활성화된 경우에만 에러 처리
+            setStatus('Session ended')
+            console.log('🛑 Session ended, not restarting')
+          }
         } else if (event.error === 'no-speech') {
           // This is normal during natural pauses, just continue seamlessly
           console.log('⏸️ No speech detected (natural pause), continuing...')
@@ -318,7 +418,6 @@ export function RealtimeSTT({
         } else if (event.error === 'audio-capture') {
           setStatus('Audio capture error')
           isActiveRef.current = false
-          ;(window as any).__retryCount = 0
           onError('Audio capture failed. Please check your microphone connection and try again.')
         } else {
           // For other errors, restart immediately without retry limits
@@ -451,7 +550,10 @@ export function RealtimeSTT({
       sessionId, 
       currentSession: currentSessionRef.current,
       isActive: isActiveRef.current,
-      mounted: mountedRef.current 
+      mounted: mountedRef.current,
+      hasPermission,
+      isSupported,
+      status
     })
     
     if (isRecording && sessionId) {
@@ -461,9 +563,7 @@ export function RealtimeSTT({
         isActiveRef.current = true
         
         console.log('🚀 Initializing NEW session:', sessionId)
-        
-        // Reset retry count for new session
-        ;(window as any).__retryCount = 0
+        console.log('🔧 Setting isActiveRef to true:', isActiveRef.current)
         
         // Initialize session in database
         fetch('/api/stt-stream', {
@@ -476,7 +576,16 @@ export function RealtimeSTT({
         }).then(() => {
           console.log('✅ Session initialized in DB')
           if (mountedRef.current && isActiveRef.current) {
+            console.log('🎯 Attempting to start speech recognition automatically...')
+            console.log('🔍 Current state:', { hasPermission, isListening, isActiveRef: isActiveRef.current })
+            
+            // 권한이 있으면 즉시 시작, 없으면 권한 요청
+            if (hasPermission) {
             startSpeechRecognition()
+            } else {
+              console.log('🎤 No permission yet, will start after permission granted')
+              requestMicrophonePermission()
+            }
           }
         }).catch(error => {
           console.error('❌ Failed to initialize session:', error)
@@ -484,13 +593,36 @@ export function RealtimeSTT({
         })
       } else {
         console.log('⚠️ Session already active:', sessionId)
+        console.log('🔧 Ensuring isActiveRef is true:', isActiveRef.current)
+        
+        // 세션이 이미 활성화되어 있다면 isActiveRef도 true로 설정
+        if (!isActiveRef.current) {
+          isActiveRef.current = true
+          console.log('🔧 Set isActiveRef to true for existing session')
+        }
+        
+        // 이미 활성화된 세션이지만 인식이 시작되지 않은 경우 재시도
+        if (!isListening && isActiveRef.current) {
+          console.log('🔄 Session active but not listening, restarting...')
+          console.log('🔍 Current state:', { hasPermission, isListening, isActiveRef: isActiveRef.current })
+          
+          setTimeout(() => {
+            if (mountedRef.current && isActiveRef.current) {
+              if (hasPermission) {
+                startSpeechRecognition()
+              } else {
+                console.log('🎤 No permission, requesting...')
+                requestMicrophonePermission()
+              }
+            }
+          }, 500)
+        }
       }
       
-    } else if (!isRecording) {
+    } else if (!isRecording && currentSessionRef.current) {
       // Stopping session - this should ALWAYS run when isRecording becomes false
       console.log('🛑 isRecording is now FALSE')
       
-      if (currentSessionRef.current) {
         const sessionToEnd = currentSessionRef.current
         console.log('🛑 Stopping session:', sessionToEnd)
         console.log('🛑 Before cleanup - isActive:', isActiveRef.current)
@@ -525,10 +657,6 @@ export function RealtimeSTT({
         cleanup()
         currentSessionRef.current = null
         setStatus('Ready to start')
-        
-      } else {
-        console.log('⚠️ No active session to stop')
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, sessionId])
@@ -571,7 +699,7 @@ export function RealtimeSTT({
           🎤 Grant Microphone Permission
         </button>
           
-          {status.includes('denied') || status.includes('aborted') || status.includes('busy') && (
+          {(status.includes('denied') || status.includes('aborted') || status.includes('busy')) && (
             <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
               <p className="font-medium text-yellow-800">💡 Troubleshooting:</p>
               <ul className="mt-1 space-y-1 text-yellow-700">
@@ -585,35 +713,49 @@ export function RealtimeSTT({
         </div>
       )}
       
+      {/* Manual Start Button for Debugging */}
       {hasPermission && !isListening && isRecording && (
+        <div className="space-y-2">
         <button
           onClick={startSpeechRecognition}
           className="text-sm bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded-lg w-full"
         >
-          ▶️ Start Recognition
+            🎯 Start Speech Recognition
         </button>
+          <div className="text-xs bg-yellow-50 p-2 rounded border border-yellow-200">
+            <p className="text-yellow-800">
+              ⚠️ Recognition should start automatically. If you see this button, click it to start manually.
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* Debug Info (simplified) */}
-      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-        <div>Session: {currentSessionRef.current ? 'Active' : 'None'}</div>
-        <div>Status: {status}</div>
-        <div>Listening: {isListening ? 'Yes' : 'No'}</div>
-        <div>Permission: {hasPermission ? 'Granted' : 'Denied'}</div>
-        <div>Supported: {isSupported ? 'Yes' : 'No'}</div>
-        {status.includes('Error') || status.includes('denied') || status.includes('aborted') ? (
-          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-            <p className="font-medium text-red-700">🚨 Error Details:</p>
-            <p className="text-red-600">{status}</p>
-            <button
-              onClick={checkMicrophoneStatus}
-              className="mt-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded"
-            >
-              🔍 Check Microphone Status
-            </button>
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="text-xs bg-gray-50 p-2 rounded border">
+          <p className="text-gray-600">🔍 Debug Info:</p>
+          <p className="text-gray-600">• Permission: {hasPermission ? 'Granted' : 'Not granted'}</p>
+          <p className="text-gray-600">• Listening: {isListening ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Recording: {isRecording ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Session: {currentSessionRef.current || 'None'}</p>
+          <p className="text-gray-600">• Active: {isActiveRef.current ? 'Yes' : 'No'}</p>
+          <p className="text-gray-600">• Status: {status}</p>
+          {isListening && (
+            <>
+              <p className="text-gray-600">• Duration: {Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000)}s</p>
+              <p className="text-gray-600">• Next restart: {Math.max(0, Math.floor((240 - (Date.now() - recognitionStartTimeRef.current) / 1000)))}s</p>
+            </>
+          )}
           </div>
-        ) : null}
+      )}
+
+      {/* Network Error Status */}
+      {status === 'Reconnecting...' && (
+        <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
+          <p className="text-blue-800 font-medium">🌐 Network Reconnecting</p>
+          <p className="text-blue-700">Automatically restarting speech recognition...</p>
       </div>
+      )}
     </div>
   )
 } 

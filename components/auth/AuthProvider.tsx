@@ -1,22 +1,27 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
+import { logAuthDebugInfo, getSmartCallbackUrl } from '@/lib/auth-config'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithGoogleToSummary: (summaryPath: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
+  
+  // Supabase client를 useEffect 안에서 초기화
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
     // Get initial session
@@ -66,12 +71,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get current URL to redirect back after login
     const currentUrl = window.location.pathname + window.location.search
     
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(currentUrl)}`
+    // Use smart callback URL that works in both dev and production
+    const redirectUrl = getSmartCallbackUrl(currentUrl)
+    
+    // Debug information
+    logAuthDebugInfo()
+    console.log('🔐 Google OAuth 시작')
+    console.log('📍 현재 페이지:', currentUrl)
+    console.log('🔗 콜백 URL:', redirectUrl)
+    console.log('🌐 현재 Origin:', window.location.origin)
+    console.log('💾 Summary 페이지인지 확인:', currentUrl.includes('/summary/'))
+    
+    // Summary 페이지에서 로그인하는 경우 특별 처리
+    if (currentUrl.includes('/summary/')) {
+      console.log('📋 Summary 페이지에서 로그인 시도')
+    }
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      })
+      
+      if (error) {
+        console.error('OAuth error:', error)
+        throw error
       }
-    })
+      
+      console.log('OAuth initiated successfully:', data)
+    } catch (error) {
+      console.error('Failed to initiate OAuth:', error)
+      throw error
+    }
+  }
+
+  const signInWithGoogleToSummary = async (summaryPath: string) => {
+    // Use smart callback URL with specific summary path
+    const redirectUrl = getSmartCallbackUrl(summaryPath)
+    
+    // Debug information
+    logAuthDebugInfo()
+    console.log('🔐 Google OAuth 시작 (Summary 전용)')
+    console.log('📍 Summary 경로:', summaryPath)
+    console.log('🔗 콜백 URL:', redirectUrl)
+    console.log('🌐 현재 Origin:', window.location.origin)
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      })
+      
+      if (error) {
+        console.error('OAuth error:', error)
+        throw error
+      }
+      
+      console.log('OAuth initiated successfully:', data)
+    } catch (error) {
+      console.error('Failed to initiate OAuth:', error)
+      throw error
+    }
   }
 
   const signOut = async () => {
@@ -79,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithGoogleToSummary, signOut }}>
       {children}
     </AuthContext.Provider>
   )
