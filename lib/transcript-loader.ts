@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/client'
-import { useSession } from '@clerk/nextjs'
 
 export interface Transcript {
   id: string

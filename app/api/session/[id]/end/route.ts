@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 import { generateSessionSummary } from "@/lib/summary-generator"
 
 export async function POST(
@@ -28,10 +28,7 @@ export async function POST(
       )
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = await createClient()
 
     // If hostId is provided, verify host ownership
     if (hostId) {
