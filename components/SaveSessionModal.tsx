@@ -51,7 +51,9 @@ export function SaveSessionModal({
 
       // Redirect to Google login with specific return path
       router.push(
-        `/auth/sign-in?redirect_url=${window.location.origin}${currentSummaryPath}`
+        `/auth/sign-in?redirect_url=${encodeURIComponent(
+          window.location.origin + currentSummaryPath
+        )}`
       );
 
       // Modal will close after successful login via useEffect in parent

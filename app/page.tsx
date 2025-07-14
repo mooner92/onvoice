@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Mic, Globe, QrCode, Zap, Download, Menu, X } from "lucide-react";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { PricingTable, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useState } from "react";
 import { NavAuthButtons } from "@/components/navAuthButtons";
@@ -368,7 +368,10 @@ export default function HomePage() {
             transcription, Gemini 2.0 translation, and smart AI-powered
             summaries.
           </p>
-          <Button
+          <div className="flex justify-center max-w-screen-md mx-auto">
+            <PricingTable newSubscriptionRedirectUrl="/host" />
+          </div>
+          {/* <Button
             size="lg"
             variant="secondary"
             asChild
@@ -378,7 +381,7 @@ export default function HomePage() {
               <Mic className="mr-2 h-5 w-5" />
               Start Your First Session
             </Link>
-          </Button>
+          </Button> */}
         </div>
       </section>
 
