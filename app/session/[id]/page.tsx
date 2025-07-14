@@ -7,7 +7,7 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Bookmark, Menu, Mic, Users, Clock } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useAuth } from "@/components/auth/AuthProvider"
+import { useUser } from "@clerk/nextjs"
 import { createClient } from "@/lib/supabase"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
@@ -18,7 +18,7 @@ import ChatbotWidget from '@/components/ChatbotWidget'
 export default function SessionPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user } = useUser()
   const supabase = createClient()
   const sessionId = params.id as string
 
@@ -76,7 +76,7 @@ export default function SessionPage() {
           .insert({
             session_id: sessionId,
             user_id: user?.id,
-            user_name: user?.user_metadata?.full_name || user?.email,
+            user_name: user?.fullName || user?.primaryEmailAddress?.emailAddress,
             role: 'audience',
             joined_at: new Date().toISOString()
           })
