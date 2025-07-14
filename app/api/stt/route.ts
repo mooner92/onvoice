@@ -1,17 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const audio = formData.get('audio') as File;
-    const sessionId = formData.get('sessionId') as string;
-    const language = (formData.get('language') as string) || 'auto';
-    const model = (formData.get('model') as string) || 'whisper-1';
-    const responseFormat =
-      (formData.get('response_format') as string) || 'verbose_json';
-    const temperature = (formData.get('temperature') as string) || '0';
-    const prompt = (formData.get('prompt') as string) || '';
+    const formData = await req.formData()
+    const audio = formData.get('audio') as File
+    const sessionId = formData.get('sessionId') as string
+    const language = (formData.get('language') as string) || 'auto'
+    const model = (formData.get('model') as string) || 'whisper-1'
+    const responseFormat = (formData.get('response_format') as string) || 'verbose_json'
+    const temperature = (formData.get('temperature') as string) || '0'
+    const prompt = (formData.get('prompt') as string) || ''
 
     console.log('🎯 Enhanced STT API called with:', {
       audioSize: audio?.size,
@@ -23,26 +22,20 @@ export async function POST(req: NextRequest) {
       temperature,
       hasPrompt: !!prompt,
       timestamp: new Date().toLocaleTimeString(),
-    });
+    })
 
     if (!audio || !sessionId) {
       console.error('Missing required data:', {
         audio: !!audio,
         sessionId: !!sessionId,
-      });
-      return NextResponse.json(
-        { error: 'Audio file and session ID are required' },
-        { status: 400 },
-      );
+      })
+      return NextResponse.json({ error: 'Audio file and session ID are required' }, { status: 400 })
     }
 
     // Check if audio file has content
     if (audio.size === 0) {
-      console.log('Empty audio file received');
-      return NextResponse.json(
-        { transcript: '', confidence: 0 },
-        { status: 200 },
-      );
+      console.log('Empty audio file received')
+      return NextResponse.json({ transcript: '', confidence: 0 }, { status: 200 })
     }
 
     console.log('Processing audio file:', {
@@ -50,11 +43,11 @@ export async function POST(req: NextRequest) {
       type: audio.type,
       name: audio.name,
       targetLanguage: language,
-    });
+    })
 
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
-      console.log('OpenAI API key not configured, using placeholder');
+      console.log('OpenAI API key not configured, using placeholder')
 
       // Generate realistic placeholder text that varies
       const placeholderTexts = [
@@ -68,75 +61,71 @@ export async function POST(req: NextRequest) {
         'Data preprocessing is crucial for model performance.',
         'Feature engineering can significantly improve results.',
         'Cross-validation helps prevent overfitting in models.',
-      ];
+      ]
 
       // Use timestamp to create some variation but consistency within same session
-      const textIndex =
-        Math.floor(Date.now() / 10000) % placeholderTexts.length;
-      const randomText = placeholderTexts[textIndex];
+      const textIndex = Math.floor(Date.now() / 10000) % placeholderTexts.length
+      const randomText = placeholderTexts[textIndex]
 
       return NextResponse.json({
         transcript: randomText,
         confidence: 0.9,
         isPlaceholder: true,
         message: 'Using placeholder - configure OPENAI_API_KEY for real STT',
-      });
+      })
     }
 
-    let transcript = '';
-    let confidence = 0;
+    let transcript = ''
+    let confidence = 0
 
     try {
       // Call Whisper API with enhanced settings for maximum accuracy
-      const whisperFormData = new FormData();
-      whisperFormData.append('file', audio, 'audio.webm');
-      whisperFormData.append('model', model); // Use specified model
+      const whisperFormData = new FormData()
+      whisperFormData.append('file', audio, 'audio.webm')
+      whisperFormData.append('model', model) // Use specified model
 
       // Add language parameter if specified (helps with accuracy for known languages)
       if (language && language !== 'auto') {
-        whisperFormData.append('language', language);
-        console.log(`🌍 Using language hint: ${language}`);
+        whisperFormData.append('language', language)
+        console.log(`🌍 Using language hint: ${language}`)
       } else {
-        console.log('🔍 Using auto language detection for best results');
+        console.log('🔍 Using auto language detection for best results')
       }
 
-      whisperFormData.append('response_format', responseFormat);
-      whisperFormData.append('temperature', temperature); // Use specified temperature
+      whisperFormData.append('response_format', responseFormat)
+      whisperFormData.append('temperature', temperature) // Use specified temperature
 
       // Add context prompt for better transcription quality
       if (prompt) {
-        whisperFormData.append('prompt', prompt);
-        console.log('📝 Using context prompt for better accuracy');
+        whisperFormData.append('prompt', prompt)
+        console.log('📝 Using context prompt for better accuracy')
       }
 
-      const whisperResponse = await fetch(
-        'https://api.openai.com/v1/audio/transcriptions',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          },
-          body: whisperFormData,
+      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
-      );
+        body: whisperFormData,
+      })
 
       if (!whisperResponse.ok) {
-        const errorText = await whisperResponse.text();
-        console.error('Whisper API error:', errorText);
+        const errorText = await whisperResponse.text()
+        console.error('Whisper API error:', errorText)
 
         // Fallback: return placeholder text for testing
-        transcript = `[Audio received at ${new Date().toLocaleTimeString()}]`;
-        confidence = 0.5;
+        transcript = `[Audio received at ${new Date().toLocaleTimeString()}]`
+        confidence = 0.5
       } else {
-        const whisperData = await whisperResponse.json();
-        transcript = whisperData.text?.trim() || '';
-        confidence = whisperData.avg_logprob || 0.9;
+        const whisperData = await whisperResponse.json()
+        transcript = whisperData.text?.trim() || ''
+        confidence = whisperData.avg_logprob || 0.9
       }
     } catch (whisperError) {
-      console.error('Whisper API request failed:', whisperError);
+      console.error('Whisper API request failed:', whisperError)
       // Fallback: return placeholder text for testing
-      transcript = `[STT Error - Audio at ${new Date().toLocaleTimeString()}]`;
-      confidence = 0.1;
+      transcript = `[STT Error - Audio at ${new Date().toLocaleTimeString()}]`
+      confidence = 0.1
     }
 
     // Only save non-empty transcripts
@@ -145,7 +134,7 @@ export async function POST(req: NextRequest) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!, // Use service role key for server-side operations
-      );
+      )
 
       const { error: dbError } = await supabase.from('transcripts').insert([
         {
@@ -154,10 +143,10 @@ export async function POST(req: NextRequest) {
           original_text: transcript,
           created_at: new Date().toISOString(),
         },
-      ]);
+      ])
 
       if (dbError) {
-        console.error('Database error:', dbError);
+        console.error('Database error:', dbError)
         // Still return the transcript even if DB save fails
       }
     }
@@ -166,12 +155,9 @@ export async function POST(req: NextRequest) {
       transcript,
       confidence,
       duration: 0,
-    });
+    })
   } catch (error) {
-    console.error('STT API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 },
-    );
+    console.error('STT API error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

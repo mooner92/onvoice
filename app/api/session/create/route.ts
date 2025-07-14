@@ -1,19 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, category, hostId, hostName, primaryLanguage } =
-      await req.json();
+    const { title, description, category, hostId, hostName, primaryLanguage } = await req.json()
 
     if (!title || !hostId || !hostName || !primaryLanguage) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const supabase = await createClient();
+    const supabase = await createClient()
 
     // Create session
     const { data: session, error } = await supabase
@@ -29,20 +25,17 @@ export async function POST(req: NextRequest) {
         created_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .single()
 
     if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 },
-      );
+      console.error('Database error:', error)
+      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
     // Generate session URLs
-    const baseUrl = req.headers.get('origin') || 'http://localhost:3001';
-    const publicUrl = `${baseUrl}/s/${session.id}`;
-    const authUrl = `${baseUrl}/session/${session.id}`;
+    const baseUrl = req.headers.get('origin') || 'http://localhost:3001'
+    const publicUrl = `${baseUrl}/s/${session.id}`
+    const authUrl = `${baseUrl}/session/${session.id}`
 
     // Update session with URLs
     await supabase
@@ -51,7 +44,7 @@ export async function POST(req: NextRequest) {
         session_url: authUrl,
         qr_code_url: publicUrl,
       })
-      .eq('id', session.id);
+      .eq('id', session.id)
 
     return NextResponse.json({
       session: {
@@ -60,12 +53,9 @@ export async function POST(req: NextRequest) {
         qr_code_url: publicUrl,
         public_url: publicUrl,
       },
-    });
+    })
   } catch (error) {
-    console.error('Session creation error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 },
-    );
+    console.error('Session creation error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,101 +1,81 @@
-'use client';
+'use client'
 
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Mic, Globe, QrCode, Zap, Download, Menu, X } from 'lucide-react';
-import { PricingTable, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
-import Link from 'next/link';
-import { useState } from 'react';
-import { NavAuthButtons } from '@/components/navAuthButtons';
-import { LandingCTA } from '@/components/landingCTA';
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Mic, Globe, QrCode, Zap, Download, Menu, X } from 'lucide-react'
+import { PricingTable, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import Link from 'next/link'
+import { useState } from 'react'
+import { NavAuthButtons } from '@/components/navAuthButtons'
+import { LandingCTA } from '@/components/landingCTA'
 
 export default function HomePage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100'>
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Mic className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">OnVoice</span>
+      <header className='sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm'>
+        <div className='container mx-auto px-4 py-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center space-x-2'>
+              <Mic className='h-8 w-8 text-blue-600' />
+              <span className='text-2xl font-bold text-gray-900'>OnVoice</span>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden items-center space-x-6 md:flex">
-              <Link
-                href="#features"
-                className="text-nowrap text-gray-600 hover:text-blue-600"
-              >
+            <nav className='hidden items-center space-x-6 md:flex'>
+              <Link href='#features' className='text-nowrap text-gray-600 hover:text-blue-600'>
                 Features
               </Link>
-              <Link
-                href="#how-it-works"
-                className="text-nowrap text-gray-600 hover:text-blue-600"
-              >
+              <Link href='#how-it-works' className='text-nowrap text-gray-600 hover:text-blue-600'>
                 How It Works
               </Link>
               <NavAuthButtons />
             </nav>
 
             {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
+            <div className='md:hidden'>
+              <Button variant='ghost' size='sm' onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                {mobileMenuOpen ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
               </Button>
             </div>
           </div>
 
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
-            <div className="mt-4 border-t pb-4 md:hidden">
-              <nav className="flex min-w-0 flex-col space-y-2 pt-4 text-base font-medium text-gray-700">
+            <div className='mt-4 border-t pb-4 md:hidden'>
+              <nav className='flex min-w-0 flex-col space-y-2 pt-4 text-base font-medium text-gray-700'>
                 <Link
-                  href="#features"
-                  className="inline-block whitespace-nowrap text-gray-600 hover:text-blue-600"
+                  href='#features'
+                  className='inline-block whitespace-nowrap text-gray-600 hover:text-blue-600'
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Features
                 </Link>
                 <Link
-                  href="#how-it-works"
-                  className="inline-block whitespace-nowrap text-gray-600 hover:text-blue-600"
+                  href='#how-it-works'
+                  className='inline-block whitespace-nowrap text-gray-600 hover:text-blue-600'
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   How It Works
                 </Link>
                 <SignedIn>
                   <Link
-                    href="/my-sessions"
-                    className="py-2 font-medium text-gray-600 hover:text-blue-600"
+                    href='/my-sessions'
+                    className='py-2 font-medium text-gray-600 hover:text-blue-600'
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     📋 My Sessions
                   </Link>
                   <Link
-                    href="/host"
-                    className="py-2 font-medium text-gray-600 hover:text-blue-600"
+                    href='/host'
+                    className='py-2 font-medium text-gray-600 hover:text-blue-600'
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     🎤 Host Session
                   </Link>
-                  <div className="flex items-center space-x-3 border-t p-2"></div>
+                  <div className='flex items-center space-x-3 border-t p-2'></div>
                   <UserButton
                     showName
                     appearance={{
@@ -117,26 +97,23 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="flex min-h-screen items-center py-32">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="mb-6 text-5xl font-bold text-gray-900">
+      <section className='flex min-h-screen items-center py-32'>
+        <div className='container mx-auto px-4 text-center'>
+          <h1 className='mb-6 text-5xl font-bold text-gray-900'>
             From spoken words to shared knowledge
-            <span className="mt-4 block text-blue-600">
-              Instantly, Intelligently, & Inclusively
-            </span>
+            <span className='mt-4 block text-blue-600'>Instantly, Intelligently, & Inclusively</span>
           </h1>
-          <p className="mx-auto mb-4 max-w-6xl text-xl text-gray-600">
-            Real-time speech transcription, accurate context-aware summaries, &
-            seamless session sharing
+          <p className='mx-auto mb-4 max-w-6xl text-xl text-gray-600'>
+            Real-time speech transcription, accurate context-aware summaries, & seamless session sharing
           </p>
-          <p className="mx-auto mb-8 max-w-3xl text-xl text-gray-600">
+          <p className='mx-auto mb-8 max-w-3xl text-xl text-gray-600'>
             Transform your talks into accessible, searchable content instantly
           </p>
-          <div className="flex flex-col justify-center gap-4 sm:flex-row">
+          <div className='flex flex-col justify-center gap-4 sm:flex-row'>
             <LandingCTA />
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/demo">
-                <QrCode className="mr-2 h-5 w-5" />
+            <Button size='lg' variant='outline' asChild>
+              <Link href='/demo'>
+                <QrCode className='mr-2 h-5 w-5' />
                 Try Demo
               </Link>
             </Button>
@@ -145,110 +122,89 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="bg-white py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="mb-12 text-center text-4xl font-bold text-gray-900">
-            Features
-          </h2>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+      <section id='features' className='bg-white py-20'>
+        <div className='container mx-auto px-4'>
+          <h2 className='mb-12 text-center text-4xl font-bold text-gray-900'>Features</h2>
+          <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-3'>
             <Card>
               <CardHeader>
-                <QrCode className="mb-4 h-12 w-12 text-blue-600" />
+                <QrCode className='mb-4 h-12 w-12 text-blue-600' />
                 <CardTitle>QR Code Access</CardTitle>
-                <CardDescription>
-                  Instant access via QR code scan - no app installation required
-                </CardDescription>
+                <CardDescription>Instant access via QR code scan - no app installation required</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Attendees can simply scan the QR code displayed on screen to
-                  instantly join the session from anywhere, on any device.
+                <p className='text-gray-600'>
+                  Attendees can simply scan the QR code displayed on screen to instantly join the session from anywhere,
+                  on any device.
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <Zap className="mb-4 h-12 w-12 text-blue-600" />
+                <Zap className='mb-4 h-12 w-12 text-blue-600' />
                 <CardTitle>Real-Time Transcription</CardTitle>
-                <CardDescription>
-                  Instant & accurate speech-to-text
-                </CardDescription>
+                <CardDescription>Instant & accurate speech-to-text</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Browser-based speech recognition captures your voice in
-                  real-time, providing immediate transcription with automatic
-                  session persistence & recovery.
+                <p className='text-gray-600'>
+                  Browser-based speech recognition captures your voice in real-time, providing immediate transcription
+                  with automatic session persistence & recovery.
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <Globe className="mb-4 h-12 w-12 text-blue-600" />
+                <Globe className='mb-4 h-12 w-12 text-blue-600' />
                 <CardTitle>Translation</CardTitle>
-                <CardDescription>
-                  Multi-language support with intelligent caching
-                </CardDescription>
+                <CardDescription>Multi-language support with intelligent caching</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Currently supports English, Chinese, Korean, & Hindi in beta.
-                  More languages coming soon!
+                <p className='text-gray-600'>
+                  Currently supports English, Chinese, Korean, & Hindi in beta. More languages coming soon!
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <Download className="mb-4 h-12 w-12 text-blue-600" />
+                <Download className='mb-4 h-12 w-12 text-blue-600' />
                 <CardTitle>Save, Share, & Archive</CardTitle>
-                <CardDescription>
-                  Complete session lifecycle management
-                </CardDescription>
+                <CardDescription>Complete session lifecycle management</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Automatically save transcripts, generate shareable links, &
-                  archive sessions. Hosts get unlimited storage, audience
-                  members get 30-day free access to saved sessions.
+                <p className='text-gray-600'>
+                  Automatically save transcripts, generate shareable links, & archive sessions. Hosts get unlimited
+                  storage, audience members get 30-day free access to saved sessions.
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <div className="mb-4 text-4xl">🤖</div>
+                <div className='mb-4 text-4xl'>🤖</div>
                 <CardTitle>AI Summaries</CardTitle>
-                <CardDescription>
-                  Our summary model creates accurate context-aware session
-                  summaries
-                </CardDescription>
+                <CardDescription>Our summary model creates accurate context-aware session summaries</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Transform hours of speech into accurate context-aware
-                  summaries. AI analyzes content by category (education,
-                  business, medical, etc.) & generates multilingual summaries
-                  automatically.
+                <p className='text-gray-600'>
+                  Transform hours of speech into accurate context-aware summaries. AI analyzes content by category
+                  (education, business, medical, etc.) & generates multilingual summaries automatically.
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <div className="mb-4 text-4xl">💬</div>
+                <div className='mb-4 text-4xl'>💬</div>
                 <CardTitle>Interactive Chatbot</CardTitle>
-                <CardDescription>
-                  Chat with your session transcripts using AI
-                </CardDescription>
+                <CardDescription>Chat with your session transcripts using AI</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">
-                  Ask questions about session content, get explanations, &
-                  interact with transcripts using AI-powered chat functionality
-                  for better understanding.
+                <p className='text-gray-600'>
+                  Ask questions about session content, get explanations, & interact with transcripts using AI-powered
+                  chat functionality for better understanding.
                 </p>
               </CardContent>
             </Card>
@@ -257,21 +213,17 @@ export default function HomePage() {
       </section>
 
       {/* How It Works Section */}
-      <section id="how-it-works" className="bg-gray-50 py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-12 text-center text-4xl font-bold text-gray-900">
-            How It Works
-          </h2>
+      <section id='how-it-works' className='bg-gray-50 py-20'>
+        <div className='mx-auto max-w-6xl px-6'>
+          <h2 className='mb-12 text-center text-4xl font-bold text-gray-900'>How It Works</h2>
 
           {/* Two-column grid */}
-          <div className="mx-10 grid gap-8 md:grid-cols-2">
+          <div className='mx-10 grid gap-8 md:grid-cols-2'>
             {/* --------------------------- HOSTS ------------------------- */}
-            <div className="mr-0">
-              <h3 className="mb-6 text-2xl font-bold text-gray-900">
-                For Hosts
-              </h3>
+            <div className='mr-0'>
+              <h3 className='mb-6 text-2xl font-bold text-gray-900'>For Hosts</h3>
 
-              <div className="space-y-6">
+              <div className='space-y-6'>
                 {[
                   'Sign in & create session with a title & category',
                   'Allow microphone access & start recording',
@@ -279,23 +231,21 @@ export default function HomePage() {
                   'Speak normally. Just Speak.',
                   'End the session & receive an accurate context-aware summary',
                 ].map((text, i) => (
-                  <div key={i} className="flex items-start gap-x-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  <div key={i} className='flex items-start gap-x-3'>
+                    <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white'>
                       {i + 1}
                     </span>
-                    <p className="text-gray-600">{text}</p>
+                    <p className='text-gray-600'>{text}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* ------------------------- ATTENDEES ----------------------- */}
-            <div className="ml-12 md:max-w-[34rem] lg:max-w-[38rem]">
-              <h3 className="mb-6 text-2xl font-bold text-gray-900">
-                For Attendees
-              </h3>
+            <div className='ml-12 md:max-w-[34rem] lg:max-w-[38rem]'>
+              <h3 className='mb-6 text-2xl font-bold text-gray-900'>For Attendees</h3>
 
-              <div className="space-y-6">
+              <div className='space-y-6'>
                 {[
                   'Scan the QR code with your smartphone camera',
                   'Access the session instantly – no login required',
@@ -303,11 +253,11 @@ export default function HomePage() {
                   'Follow along with live transcription & AI translations',
                   'Save the session (with Google login) for free 30-day access',
                 ].map((text, i) => (
-                  <div key={i} className="flex items-start gap-x-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white">
+                  <div key={i} className='flex items-start gap-x-3'>
+                    <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white'>
                       {i + 1}
                     </span>
-                    <p className="text-gray-600">{text}</p>
+                    <p className='text-gray-600'>{text}</p>
                   </div>
                 ))}
               </div>
@@ -316,17 +266,15 @@ export default function HomePage() {
         </div>
       </section>
       {/* CTA Section */}
-      <section className="bg-blue-600 py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="mb-6 text-3xl font-bold text-white">
-            Ready to Make Your Content Accessible?
-          </h2>
-          <p className="mx-auto mb-8 max-w-2xl text-xl text-blue-100">
-            Start your first session today & experience Web Speech API
-            transcription, Gemini 2.0 translation, & smart AI-powered summaries.
+      <section className='bg-blue-600 py-20'>
+        <div className='container mx-auto px-4 text-center'>
+          <h2 className='mb-6 text-3xl font-bold text-white'>Ready to Make Your Content Accessible?</h2>
+          <p className='mx-auto mb-8 max-w-2xl text-xl text-blue-100'>
+            Start your first session today & experience Web Speech API transcription, Gemini 2.0 translation, & smart
+            AI-powered summaries.
           </p>
-          <div className="mx-auto flex max-w-screen-md justify-center">
-            <PricingTable newSubscriptionRedirectUrl="/host" />
+          <div className='mx-auto flex max-w-screen-md justify-center'>
+            <PricingTable newSubscriptionRedirectUrl='/host' />
           </div>
           {/* <Button
             size="lg"
@@ -342,11 +290,11 @@ export default function HomePage() {
         </div>
       </section>
       {/* Footer */}
-      <footer className="bg-gray-900 py-12 text-white">
-        <div className="container mx-auto px-4">
-          <div className="mb-8 flex items-center justify-center space-x-2">
-            <Mic className="h-8 w-8 text-blue-400" />
-            <span className="text-2xl font-bold">OnVoice</span>
+      <footer className='bg-gray-900 py-12 text-white'>
+        <div className='container mx-auto px-4'>
+          <div className='mb-8 flex items-center justify-center space-x-2'>
+            <Mic className='h-8 w-8 text-blue-400' />
+            <span className='text-2xl font-bold'>OnVoice</span>
           </div>
 
           {/* Social Links */}
@@ -383,14 +331,12 @@ export default function HomePage() {
             </a>
           </div> */}
 
-          <div className="text-center text-gray-400">
+          <div className='text-center text-gray-400'>
             <p>&copy; 2025 OnVoice </p>
-            <p className="mt-2 text-sm">
-              Powered by Web Speech API • Gemini 2.0 • Real-time Translation
-            </p>
+            <p className='mt-2 text-sm'>Powered by Web Speech API • Gemini 2.0 • Real-time Translation</p>
           </div>
         </div>
       </footer>
     </div>
-  );
+  )
 }
