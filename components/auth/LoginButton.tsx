@@ -11,7 +11,8 @@ export function LoginButton() {
     <Button 
       onClick={signInWithGoogle} 
       disabled={loading}
-      className="w-full"
+      size="sm"
+      className="w-50"
     >
       {loading ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
