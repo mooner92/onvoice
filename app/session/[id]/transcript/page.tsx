@@ -7,13 +7,13 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, FileText, Languages, ChevronRight, Settings, Loader2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import { useToast, ToastContainer } from "@/components/ui/toast"
 import { Session, Transcript } from "@/lib/types"
 import type { TranslationResponse } from "@/lib/types"
 import Link from "next/link"
 import ChatbotWidget from '@/components/ChatbotWidget'
-import { useUser } from "@clerk/nextjs"
+import { useSession, useUser } from "@clerk/nextjs"
 
 
 
@@ -21,7 +21,8 @@ export default function SessionTranscriptPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useUser()
-  const supabase = createClient()
+  const { session: clerkSession } = useSession();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
   const sessionId = params.id as string
   const { toasts, addToast, removeToast } = useToast()
 

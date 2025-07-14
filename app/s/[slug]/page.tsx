@@ -27,8 +27,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
-import { createClient } from "@/lib/supabase";
+import { useSession, useUser } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase/client";
 import { useToast, ToastContainer } from "@/components/ui/toast";
 import { Session } from "@/lib/types";
 import type { TranscriptLine, TranslationResponse } from "@/lib/types";
@@ -38,7 +38,8 @@ export default function PublicSessionPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useUser();
-  const supabase = createClient();
+  const { session: clerkSession } = useSession();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
   const slug = params.slug as string;
   const { toasts, addToast, removeToast } = useToast();
   const componentId = useId();
