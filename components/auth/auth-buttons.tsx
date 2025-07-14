@@ -2,8 +2,6 @@ import { Button } from "@/components/ui/button";
 import {
   ClerkLoaded,
   ClerkLoading,
-  SignInButton as ClerkSignInButton,
-  SignUpButton as ClerkSignUpButton,
   SignOutButton as ClerkSignOutButton,
 } from "@clerk/nextjs";
 import Link from "next/link";

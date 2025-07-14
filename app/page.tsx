@@ -8,27 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Mic,
-  Globe,
-  QrCode,
-  Zap,
-  Download,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react";
-import {
-  ClerkLoading,
-  ClerkLoaded,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
+import { Mic, Globe, QrCode, Zap, Download, Menu, X } from "lucide-react";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { SignInButton, SignUpButton } from "@/components/auth/auth-buttons";
 import { useState } from "react";
-import CustomUserButton from "@/components/auth/customUserButton";
 import { NavAuthButtons } from "@/components/navAuthButtons";
 import { LandingCTA } from "@/components/landingCTA";
 

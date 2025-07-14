@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { X, BookOpen, Clock, Share2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 interface SaveSessionModalProps {
@@ -27,7 +26,6 @@ export function SaveSessionModal({
   sessionId,
   sessionTitle,
 }: SaveSessionModalProps) {
-  const { isSignedIn, user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const handleGoogleLogin = async () => {
