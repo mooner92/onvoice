@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -23,12 +23,13 @@ export const metadata: Metadata = {
   title: "LiveTranscribe - Real-Time Lecture Transcription & Translation",
   description:
     "Make your lectures accessible to everyone with instant transcription and translation. No app installation required - just scan a QR code and start following along in real-time.",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
