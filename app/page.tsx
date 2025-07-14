@@ -26,8 +26,11 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import Link from "next/link";
-import { LoginButton } from "@/components/auth/LoginButton";
+import { SignInButton, SignUpButton } from "@/components/auth/auth-buttons";
 import { useState } from "react";
+import CustomUserButton from "@/components/auth/customUserButton";
+import { NavAuthButtons } from "@/components/navAuthButtons";
+import { LandingCTA } from "@/components/landingCTA";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -57,24 +60,7 @@ export default function HomePage() {
               >
                 How It Works
               </Link>
-              <SignedIn>
-                <Link
-                  href="/my-sessions"
-                  className="text-gray-600 hover:text-blue-600 text-nowrap"
-                >
-                  My Sessions
-                </Link>
-                <Link
-                  href="/host"
-                  className="text-gray-600 hover:text-blue-600 text-nowrap"
-                >
-                  Host Session
-                </Link>
-                <UserButton />
-              </SignedIn>
-              <SignedOut>
-                <LoginButton className="w-24" />
-              </SignedOut>
+              <NavAuthButtons />
             </nav>
 
             {/* Mobile Menu Button */}
@@ -139,7 +125,7 @@ export default function HomePage() {
                   />
                 </SignedIn>
                 <SignedOut>
-                  <LoginButton className="w-24" />
+                  <NavAuthButtons />
                 </SignedOut>
               </nav>
             </div>
@@ -160,33 +146,13 @@ export default function HomePage() {
             your lectures into accessible, searchable content instantly.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <SignedIn>
-              <Button size="lg" asChild className="text-lg px-8 py-3">
-                <Link href="/host">
-                  <Mic className="mr-2 h-5 w-5" />
-                  Start as Host
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                asChild
-                className="text-lg px-8 py-3 bg-white"
-              >
-                <Link href="/demo">
-                  <QrCode className="mr-2 h-5 w-5" />
-                  Try Demo
-                </Link>
-              </Button>
-            </SignedIn>
-            <SignedOut>
-              <div className="flex flex-col items-center space-y-4">
-                <p className="text-lg text-gray-600">
-                  Please sign in to start using OnVoice
-                </p>
-                <LoginButton />
-              </div>
-            </SignedOut>
+            <LandingCTA />
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/demo">
+                <QrCode className="mr-2 h-5 w-5" />
+                Try Demo
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
