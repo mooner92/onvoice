@@ -1,62 +1,71 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { X, BookOpen, Clock, Share2 } from "lucide-react"
-import { useAuth } from "@/components/auth/AuthProvider"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { X, BookOpen, Clock, Share2 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 interface SaveSessionModalProps {
-  isOpen: boolean
-  onClose: () => void
-  sessionId: string
-  sessionTitle: string
-  onSaved?: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  sessionId: string;
+  sessionTitle: string;
+  onSaved?: () => void;
 }
 
-export function SaveSessionModal({ 
-  isOpen, 
-  onClose, 
-  sessionId, 
-  sessionTitle
+export function SaveSessionModal({
+  isOpen,
+  onClose,
+  sessionId,
+  sessionTitle,
 }: SaveSessionModalProps) {
-  const { signInWithGoogleToSummary } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
-
+  const { isSignedIn, user } = useUser();
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   const handleGoogleLogin = async () => {
     try {
-      setIsLoading(true)
-      
+      setIsLoading(true);
+
       // Store session info in localStorage for after login (sessionStorage는 도메인 변경시 사라질 수 있음)
-      const currentSummaryPath = `/summary/${sessionId}`
+      const currentSummaryPath = `/summary/${sessionId}`;
       const sessionData = {
         sessionId,
         sessionTitle,
         timestamp: Date.now(),
-        returnUrl: window.location.href // 현재 전체 URL 저장
-      }
-      
-      localStorage.setItem('pendingSessionSave', JSON.stringify(sessionData))
-      sessionStorage.setItem('pendingSessionSave', JSON.stringify(sessionData)) // 백업용
-      
-      console.log('💾 Storing session save data:', sessionData)
-      console.log('🔐 Initiating Google login for session save')
-      console.log('📍 Current URL:', window.location.href)
-      console.log('🎯 Target return path:', currentSummaryPath)
-      
+        returnUrl: window.location.href, // 현재 전체 URL 저장
+      };
+
+      localStorage.setItem("pendingSessionSave", JSON.stringify(sessionData));
+      sessionStorage.setItem("pendingSessionSave", JSON.stringify(sessionData)); // 백업용
+
+      console.log("💾 Storing session save data:", sessionData);
+      console.log("🔐 Initiating Google login for session save");
+      console.log("📍 Current URL:", window.location.href);
+      console.log("🎯 Target return path:", currentSummaryPath);
+
       // Redirect to Google login with specific return path
-      await signInWithGoogleToSummary(currentSummaryPath)
-      
+      router.push(
+        `/auth/sign-in?redirect_url=${window.location.origin}${currentSummaryPath}`
+      );
+
       // Modal will close after successful login via useEffect in parent
     } catch (error) {
-      console.error('Login failed:', error)
-      alert('로그인에 실패했습니다. 다시 시도해주세요.')
+      console.error("Login failed:", error);
+      alert("Login failed");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -69,10 +78,10 @@ export function SaveSessionModal({
             <X className="h-5 w-5" />
           </button>
           <CardTitle className="text-xl font-semibold text-gray-900">
-            이 세션을 저장하시겠습니까?
+            Save this session?
           </CardTitle>
           <CardDescription>
-            구글 로그인으로 세션을 저장하고 나중에 다시 볼 수 있습니다.
+            Save this session with Google login and access it later.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -82,41 +91,41 @@ export function SaveSessionModal({
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center space-x-2">
                 <BookOpen className="h-4 w-4" />
-                <span>세션 내용 및 요약</span>
+                <span>Session content and summary</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Clock className="h-4 w-4" />
-                <span>14일간 무료 보관</span>
+                <span>14 days free storage</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Share2 className="h-4 w-4" />
-                <span>언제든지 다시 접근 가능</span>
+                <span>Access anytime</span>
               </div>
             </div>
           </div>
 
           {/* Benefits */}
           <div className="space-y-3">
-            <h5 className="font-medium text-gray-900">저장하면 좋은 점:</h5>
+            <h5 className="font-medium text-gray-900">Benefits of saving:</h5>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-start space-x-2">
                 <span className="text-green-600 mt-0.5">•</span>
-                <span>My Sessions에서 언제든지 접근</span>
+                <span>Access My Sessions anytime</span>
               </li>
               <li className="flex items-start space-x-2">
                 <span className="text-green-600 mt-0.5">•</span>
-                <span>AI 요약 및 번역 기능</span>
+                <span>AI summary and translation</span>
               </li>
               <li className="flex items-start space-x-2">
                 <span className="text-green-600 mt-0.5">•</span>
-                <span>모바일에서도 편리하게 확인</span>
+                <span>Convenient access on mobile</span>
               </li>
             </ul>
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <Button 
+            <Button
               onClick={handleGoogleLogin}
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700"
@@ -124,7 +133,7 @@ export function SaveSessionModal({
               {isLoading ? (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>로그인 중...</span>
+                  <span>Logging in...</span>
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
@@ -146,21 +155,17 @@ export function SaveSessionModal({
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                     />
                   </svg>
-                  <span>Google로 로그인하여 저장</span>
+                  <span>Save with Google login</span>
                 </div>
               )}
             </Button>
-            
-            <Button 
-              onClick={onClose}
-              variant="outline"
-              className="w-full"
-            >
-              나중에 하기
+
+            <Button onClick={onClose} variant="outline" className="w-full">
+              Later
             </Button>
           </div>
         </CardContent>
       </Card>
     </div>
-  )
-} 
+  );
+}
