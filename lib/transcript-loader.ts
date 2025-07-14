@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
+import { useSession } from '@clerk/nextjs'
 
 export interface Transcript {
   id: string
@@ -8,8 +9,8 @@ export interface Transcript {
   user_id: string | null
 }
 
-export async function loadSessionTranscripts(sessionId: string) {
-  const supabase = createClient()
+export async function loadSessionTranscripts(sessionId: string, token: Promise<string | null>) {
+  const supabase = createClient(token);
   
   const { data: transcripts, error: transcriptError } = await supabase
     .from('transcripts')

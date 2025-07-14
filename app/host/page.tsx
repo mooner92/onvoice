@@ -30,11 +30,11 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { QRCodeDisplay } from "@/components/ui/qr-code";
 import { RealtimeSTT } from "@/components/RealtimeSTT";
 import type { Session } from "@/lib/types";
-import { useUser } from "@clerk/nextjs";
+import { useSession, useUser } from "@clerk/nextjs";
 
 interface TranscriptLine {
   id: string;
@@ -46,8 +46,9 @@ interface TranscriptLine {
 
 export default function HostDashboard() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { session: clerkSession } = useSession();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
 
   const [sessionTitle, setSessionTitle] = useState("");
   const [sessionDescription, setSessionDescription] = useState("");

@@ -34,9 +34,9 @@ import {
   Share2,
 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { Session } from "@/lib/types";
-import { useUser } from "@clerk/nextjs";
+import { useSession, useUser } from "@clerk/nextjs";
 
 interface SavedSession extends Session {
   role: "speaker" | "audience";
@@ -49,7 +49,8 @@ interface SavedSession extends Session {
 
 export default function MySessionsPage() {
   const { user } = useUser();
-  const supabase = createClient();
+  const { session: clerkSession } = useSession();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");

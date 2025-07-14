@@ -7,8 +7,8 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Bookmark, Menu, Mic, Users, Clock } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
-import { createClient } from "@/lib/supabase"
+import { useSession, useUser } from "@clerk/nextjs"
+import { createClient } from "@/lib/supabase/client"
 import { Session, Transcript } from "@/lib/types"
 import type { TranscriptLine, TranslationResponse } from "@/lib/types"
 import ChatbotWidget from '@/components/ChatbotWidget'
@@ -19,7 +19,8 @@ export default function SessionPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useUser()
-  const supabase = createClient()
+  const { session: clerkSession } = useSession();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
   const sessionId = params.id as string
 
   const [selectedLanguage, setSelectedLanguage] = useState("ko")

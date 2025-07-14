@@ -22,10 +22,10 @@ import {
   Mic,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import Chatbot from "@/components/Chatbot";
 import { SaveSessionModal } from "@/components/SaveSessionModal";
-import { useUser } from "@clerk/nextjs";
+import { useSession, useUser } from "@clerk/nextjs";
 import {
   loadSessionTranscripts,
   type Transcript,
@@ -49,7 +49,8 @@ interface Session {
 export default function PublicSessionSummaryPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const { session: clerkSession } = useSession();
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
   const sessionId = params.id as string;
   const { user } = useUser();
 
@@ -491,7 +492,7 @@ export default function PublicSessionSummaryPage() {
 
         // transcript 로드 (모듈화된 함수 사용)
         try {
-          const transcripts = await loadSessionTranscripts(sessionId);
+          const transcripts = await loadSessionTranscripts(sessionId, clerkSession?.getToken() ?? Promise.resolve(null));
           setTranscript(transcripts);
           console.log("✅ Transcript loaded successfully:", {
             count: transcripts.length,
