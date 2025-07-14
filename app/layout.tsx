@@ -6,12 +6,12 @@ import { ClerkProvider } from "@clerk/nextjs";
 const AdvercaseFontRegular = localFont({
   src: [
     {
-      path: "./fonts/AdvercaseFont-Demo-Regular.otf",
+      path: "../public/fonts/AdvercaseFont-Demo-Regular.otf",
       weight: "400",
       style: "normal",
     },
     {
-      path: "./fonts/AdvercaseFont-Demo-Bold.otf",
+      path: "../public/fonts/AdvercaseFont-Demo-Bold.otf",
       weight: "700",
       style: "normal",
     },
