@@ -1,9 +1,9 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from '@/components/ui/badge';
 // import { Skeleton } from "@/components/ui/skeleton";
-import { ClerkLoaded, ClerkLoading } from "@clerk/nextjs";
-import { Mic } from "lucide-react";
-import Link from "next/link";
-import CustomUserButton from "@/components/auth/customUserButton";
+import { ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
+import { Mic } from 'lucide-react';
+import Link from 'next/link';
+import CustomUserButton from '@/components/auth/customUserButton';
 
 export default function MySessionsLayout({
   children,
@@ -11,7 +11,7 @@ export default function MySessionsLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <header className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -22,7 +22,7 @@ export default function MySessionsLayout({
             <div className="flex items-center gap-4">
               <Badge variant="outline">My Sessions</Badge>
               <ClerkLoading>
-                <div className="h-7 w-7 rounded-full animate-pulse bg-gray-200" />
+                <div className="h-7 w-7 animate-pulse rounded-full bg-gray-200" />
               </ClerkLoading>
               <ClerkLoaded>
                 <div className="h-7 w-7">

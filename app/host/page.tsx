@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Mic,
   MicOff,
@@ -28,13 +28,13 @@ import {
   VolumeX,
   AlertCircle,
   CheckCircle,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { QRCodeDisplay } from "@/components/ui/qr-code";
-import { RealtimeSTT } from "@/components/RealtimeSTT";
-import type { Session } from "@/lib/types";
-import { useSession, useUser } from "@clerk/nextjs";
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { QRCodeDisplay } from '@/components/ui/qr-code';
+import { RealtimeSTT } from '@/components/RealtimeSTT';
+import type { Session } from '@/lib/types';
+import { useSession, useUser } from '@clerk/nextjs';
 
 interface TranscriptLine {
   id: string;
@@ -48,25 +48,27 @@ export default function HostDashboard() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { session: clerkSession } = useSession();
   const router = useRouter();
-  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
+  const supabase = createClient(
+    clerkSession?.getToken() ?? Promise.resolve(null),
+  );
 
-  const [sessionTitle, setSessionTitle] = useState("");
-  const [sessionDescription, setSessionDescription] = useState("");
-  const [sessionCategory, setSessionCategory] = useState("general");
-  const [primaryLanguage, setPrimaryLanguage] = useState("auto");
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [sessionDescription, setSessionDescription] = useState('');
+  const [sessionCategory, setSessionCategory] = useState('general');
+  const [primaryLanguage, setPrimaryLanguage] = useState('auto');
   const [isRecording, setIsRecording] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
-  const [currentPartialText, setCurrentPartialText] = useState("");
+  const [currentPartialText, setCurrentPartialText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [micPermission, setMicPermission] = useState<
-    "granted" | "denied" | "prompt"
-  >("prompt");
+    'granted' | 'denied' | 'prompt'
+  >('prompt');
   const [sttError, setSTTError] = useState<string | null>(null);
 
   // Refs for cleanup
@@ -75,79 +77,79 @@ export default function HostDashboard() {
   const lastTranscriptTimeRef = useRef<number>(Date.now());
 
   const sttLanguages = [
-    { code: "auto", name: "Auto-detect (Recommended)" },
-    { code: "en-US", name: "English" },
-    { code: "es-ES", name: "Spanish" },
-    { code: "fr-FR", name: "French" },
-    { code: "de-DE", name: "German" },
-    { code: "it-IT", name: "Italian" },
-    { code: "pt-PT", name: "Portuguese" },
-    { code: "ru-RU", name: "Russian" },
-    { code: "ja-JP", name: "Japanese" },
-    { code: "ko-KR", name: "Korean" },
-    { code: "zh-CN", name: "Chinese" },
+    { code: 'auto', name: 'Auto-detect (Recommended)' },
+    { code: 'en-US', name: 'English' },
+    { code: 'es-ES', name: 'Spanish' },
+    { code: 'fr-FR', name: 'French' },
+    { code: 'de-DE', name: 'German' },
+    { code: 'it-IT', name: 'Italian' },
+    { code: 'pt-PT', name: 'Portuguese' },
+    { code: 'ru-RU', name: 'Russian' },
+    { code: 'ja-JP', name: 'Japanese' },
+    { code: 'ko-KR', name: 'Korean' },
+    { code: 'zh-CN', name: 'Chinese' },
   ];
 
   const sessionCategories = [
     {
-      code: "general",
-      name: "General",
-      icon: "📋",
-      description: "General content",
+      code: 'general',
+      name: 'General',
+      icon: '📋',
+      description: 'General content',
     },
     {
-      code: "sports",
-      name: "Sports",
-      icon: "⚽",
-      description: "Sports-related content",
+      code: 'sports',
+      name: 'Sports',
+      icon: '⚽',
+      description: 'Sports-related content',
     },
     {
-      code: "economics",
-      name: "Economics",
-      icon: "💰",
-      description: "Economics and finance-related content",
+      code: 'economics',
+      name: 'Economics',
+      icon: '💰',
+      description: 'Economics and finance-related content',
     },
     {
-      code: "technology",
-      name: "Technology",
-      icon: "💻",
-      description: "Technology and IT-related content",
+      code: 'technology',
+      name: 'Technology',
+      icon: '💻',
+      description: 'Technology and IT-related content',
     },
     {
-      code: "education",
-      name: "Education",
-      icon: "📚",
-      description: "Education and learning-related content",
+      code: 'education',
+      name: 'Education',
+      icon: '📚',
+      description: 'Education and learning-related content',
     },
     {
-      code: "business",
-      name: "Business",
-      icon: "🏢",
-      description: "Business and management-related content",
+      code: 'business',
+      name: 'Business',
+      icon: '🏢',
+      description: 'Business and management-related content',
     },
     {
-      code: "medical",
-      name: "Medical",
-      icon: "🏥",
-      description: "Medical and health-related content",
+      code: 'medical',
+      name: 'Medical',
+      icon: '🏥',
+      description: 'Medical and health-related content',
     },
     {
-      code: "legal",
-      name: "Legal",
-      icon: "⚖️",
-      description: "Legal and law-related content",
+      code: 'legal',
+      name: 'Legal',
+      icon: '⚖️',
+      description: 'Legal and law-related content',
     },
     {
-      code: "entertainment",
-      name: "Entertainment",
-      icon: "🎬",
-      description: "Entertainment and culture-related content",
+      code: 'entertainment',
+      name: 'Entertainment',
+      icon: '🎬',
+      description: 'Entertainment and culture-related content',
     },
     {
-      code: "science",
-      name: "Science",
-      icon: "🔬",
-      description: "Science and research-related content",
+      code: 'science',
+      name: 'Science',
+      icon: '🔬',
+      description: 'Science and research-related content',
     },
   ];
 
@@ -158,11 +160,11 @@ export default function HostDashboard() {
 
       try {
         const { data: activeSessions, error } = await supabase
-          .from("sessions")
-          .select("*")
-          .eq("host_id", user.id)
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
+          .from('sessions')
+          .select('*')
+          .eq('host_id', user.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
           .limit(1);
 
         if (error) throw error;
@@ -172,8 +174,8 @@ export default function HostDashboard() {
           setSession(activeSession);
           setSessionId(activeSession.id);
           setSessionTitle(activeSession.title);
-          setSessionDescription(activeSession.description || "");
-          setSessionCategory(activeSession.category || "general");
+          setSessionDescription(activeSession.description || '');
+          setSessionCategory(activeSession.category || 'general');
           setPrimaryLanguage(activeSession.primary_language);
           setHasActiveSession(true);
           setIsRecording(true);
@@ -182,7 +184,7 @@ export default function HostDashboard() {
           await loadExistingTranscripts(activeSession.id);
         }
       } catch (error) {
-        console.error("Error checking existing session:", error);
+        console.error('Error checking existing session:', error);
       } finally {
         setIsInitializing(false);
       }
@@ -196,15 +198,15 @@ export default function HostDashboard() {
     const checkMicPermission = async () => {
       try {
         const permission = await navigator.permissions.query({
-          name: "microphone" as PermissionName,
+          name: 'microphone' as PermissionName,
         });
-        setMicPermission(permission.state as "granted" | "denied" | "prompt");
+        setMicPermission(permission.state as 'granted' | 'denied' | 'prompt');
 
         permission.onchange = () => {
-          setMicPermission(permission.state as "granted" | "denied" | "prompt");
+          setMicPermission(permission.state as 'granted' | 'denied' | 'prompt');
         };
       } catch (error) {
-        console.error("Error checking mic permission:", error);
+        console.error('Error checking mic permission:', error);
       }
     };
 
@@ -218,16 +220,16 @@ export default function HostDashboard() {
     const channel = supabase
       .channel(`session-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "*",
-          schema: "public",
-          table: "session_participants",
+          event: '*',
+          schema: 'public',
+          table: 'session_participants',
           filter: `session_id=eq.${sessionId}`,
         },
         async () => {
           await updateParticipantCount();
-        }
+        },
       )
       .subscribe();
 
@@ -252,7 +254,7 @@ export default function HostDashboard() {
 
         // Auto-stop after 1 hour (3600 seconds)
         if (duration >= 3600) {
-          console.log("Auto-stopping session after 1 hour");
+          console.log('Auto-stopping session after 1 hour');
           handleStopSession();
         }
       }, 1000);
@@ -270,10 +272,13 @@ export default function HostDashboard() {
   useEffect(() => {
     if (isRecording && sessionId) {
       // Set 1-hour auto-stop timer
-      autoStopTimerRef.current = setTimeout(() => {
-        console.log("Auto-stopping session after 1 hour (timer)");
-        handleStopSession();
-      }, 60 * 60 * 1000); // 1 hour
+      autoStopTimerRef.current = setTimeout(
+        () => {
+          console.log('Auto-stopping session after 1 hour (timer)');
+          handleStopSession();
+        },
+        60 * 60 * 1000,
+      ); // 1 hour
 
       // Start inactivity monitoring
       const startInactivityTimer = () => {
@@ -281,10 +286,13 @@ export default function HostDashboard() {
           clearTimeout(inactivityTimerRef.current);
         }
 
-        inactivityTimerRef.current = setTimeout(() => {
-          console.log("Auto-stopping session after 30 minutes of inactivity");
-          handleStopSession();
-        }, 30 * 60 * 1000); // 30 minutes
+        inactivityTimerRef.current = setTimeout(
+          () => {
+            console.log('Auto-stopping session after 30 minutes of inactivity');
+            handleStopSession();
+          },
+          30 * 60 * 1000,
+        ); // 30 minutes
       };
 
       // Initialize inactivity timer
@@ -310,15 +318,15 @@ export default function HostDashboard() {
 
     try {
       const { count, error } = await supabase
-        .from("session_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("session_id", sessionId)
-        .is("left_at", null);
+        .from('session_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .is('left_at', null);
 
       if (error) throw error;
       setParticipantCount(count || 0);
     } catch (error) {
-      console.error("Error updating participant count:", error);
+      console.error('Error updating participant count:', error);
     }
   }, [sessionId, supabase]);
 
@@ -326,10 +334,10 @@ export default function HostDashboard() {
     async (sessionId: string) => {
       try {
         const { data: transcripts, error } = await supabase
-          .from("transcripts")
-          .select("*")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: true });
+          .from('transcripts')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true });
 
         if (error) throw error;
 
@@ -342,15 +350,15 @@ export default function HostDashboard() {
 
         setTranscript(formattedTranscripts);
       } catch (error) {
-        console.error("Error loading existing transcripts:", error);
+        console.error('Error loading existing transcripts:', error);
       }
     },
-    [supabase]
+    [supabase],
   );
 
   // Handle real-time transcript updates
   const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
-    console.log("Transcript update:", { text, isPartial });
+    console.log('Transcript update:', { text, isPartial });
 
     if (isPartial) {
       // Update partial text display
@@ -365,30 +373,33 @@ export default function HostDashboard() {
       };
 
       setTranscript((prev) => [...prev, newLine]);
-      setCurrentPartialText(""); // Clear partial text
+      setCurrentPartialText(''); // Clear partial text
 
       // Reset inactivity timer when new transcript is received
       lastTranscriptTimeRef.current = Date.now();
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
-        inactivityTimerRef.current = setTimeout(() => {
-          console.log("Auto-stopping session after 30 minutes of inactivity");
-          handleStopSession();
-        }, 30 * 60 * 1000); // 30 minutes
+        inactivityTimerRef.current = setTimeout(
+          () => {
+            console.log('Auto-stopping session after 30 minutes of inactivity');
+            handleStopSession();
+          },
+          30 * 60 * 1000,
+        ); // 30 minutes
       }
     }
   };
 
   const handleSTTError = (error: string) => {
-    console.error("STT Error:", error);
+    console.error('STT Error:', error);
 
     // 네트워크 연결 에러는 5분 제한으로 인한 정상적인 재시작이므로 사용자에게 표시하지 않음
     if (
-      error.includes("Network connection lost") ||
-      error.includes("network")
+      error.includes('Network connection lost') ||
+      error.includes('network')
     ) {
       console.log(
-        "🌐 Network error detected - this is expected due to 5-minute timeout, ignoring..."
+        '🌐 Network error detected - this is expected due to 5-minute timeout, ignoring...',
       );
       return;
     }
@@ -405,10 +416,10 @@ export default function HostDashboard() {
 
     try {
       // Create session via API
-      const response = await fetch("/api/session/create", {
-        method: "POST",
+      const response = await fetch('/api/session/create', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           title: sessionTitle,
@@ -421,7 +432,7 @@ export default function HostDashboard() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create session");
+        throw new Error('Failed to create session');
       }
 
       const { session: newSession } = await response.json();
@@ -430,10 +441,10 @@ export default function HostDashboard() {
       setSessionId(newSession.id);
       setIsRecording(true);
       setHasActiveSession(true);
-      setMicPermission("granted");
+      setMicPermission('granted');
     } catch (error) {
-      console.error("Error starting session:", error);
-      setSTTError("Failed to start session");
+      console.error('Error starting session:', error);
+      setSTTError('Failed to start session');
     } finally {
       setIsInitializing(false);
     }
@@ -442,7 +453,7 @@ export default function HostDashboard() {
   const handleStopSession = useCallback(async () => {
     if (!sessionId || !user || !isRecording) return;
 
-    console.log("Stopping session:", sessionId);
+    console.log('Stopping session:', sessionId);
 
     try {
       // First, immediately set recording to false to stop STT
@@ -451,18 +462,18 @@ export default function HostDashboard() {
       // Immediately call STT stream end API to persist transcript
       if (sessionId) {
         try {
-          const sttEndResp = await fetch("/api/stt-stream", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const sttEndResp = await fetch('/api/stt-stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: "end",
+              type: 'end',
               sessionId,
             }),
           });
           const sttEndData = await sttEndResp.json();
-          console.log("STT stream end result:", sttEndData);
+          console.log('STT stream end result:', sttEndData);
         } catch (sttErr) {
-          console.error("Failed to end STT stream:", sttErr);
+          console.error('Failed to end STT stream:', sttErr);
         }
       }
 
@@ -481,9 +492,9 @@ export default function HostDashboard() {
 
       // End session via API
       const response = await fetch(`/api/session/${sessionId}/end`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           hostId: user.id,
@@ -492,18 +503,18 @@ export default function HostDashboard() {
 
       if (response.ok) {
         const { statistics } = await response.json();
-        console.log("Session ended:", statistics);
+        console.log('Session ended:', statistics);
 
         // 세션 종료 후 공개 요약 페이지로 리디렉션
         if (sessionId) {
           const summaryUrl = `${window.location.origin}/summary/${sessionId}`;
 
           // 새 탭에서 공개 요약 페이지 열기
-          window.open(summaryUrl, "_blank");
+          window.open(summaryUrl, '_blank');
 
           // 현재 탭은 홈으로 이동
           setTimeout(() => {
-            router.push("/");
+            router.push('/');
           }, 1000);
         }
       }
@@ -515,10 +526,10 @@ export default function HostDashboard() {
       setParticipantCount(0);
       setHasActiveSession(false);
       setTranscript([]);
-      setCurrentPartialText("");
+      setCurrentPartialText('');
       setSTTError(null);
     } catch (error) {
-      console.error("Error stopping session:", error);
+      console.error('Error stopping session:', error);
       // Still reset state even if API call fails
       setIsRecording(false);
       setSessionId(null);
@@ -537,19 +548,19 @@ export default function HostDashboard() {
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
+    return `${mins.toString().padStart(2, '0')}:${secs
       .toString()
-      .padStart(2, "0")}`;
+      .padStart(2, '0')}`;
   };
 
   const getSessionUrl = () => {
-    if (!sessionId) return "";
+    if (!sessionId) return '';
 
     return `${window.location.origin}/session/${sessionId}`;
   };
 
   const getPublicSessionUrl = () => {
-    if (!sessionId) return "";
+    if (!sessionId) return '';
 
     // Public access URL (no auth required)
     return `${window.location.origin}/s/${sessionId}`;
@@ -557,10 +568,10 @@ export default function HostDashboard() {
 
   if (!isLoaded) {
     return (
-      <div className="flex-1 bg-gray-50 flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center bg-gray-50">
         <Card className="aspect-square w-54">
-          <CardContent className="p-8 flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <CardContent className="flex flex-col items-center gap-4 p-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
             <p className="text-gray-600">Loading...</p>
           </CardContent>
         </Card>
@@ -572,10 +583,10 @@ export default function HostDashboard() {
 
   if (isInitializing) {
     return (
-      <div className="flex-1 bg-gray-50 flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center bg-gray-50">
         <Card className="aspect-square w-54">
-          <CardContent className="p-8 flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <CardContent className="flex flex-col items-center gap-4 p-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
             <p className="text-gray-600">Initializing session...</p>
           </CardContent>
         </Card>
@@ -586,14 +597,14 @@ export default function HostDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Environment Info for Development */}
-      {process.env.NODE_ENV === "development" && (
+      {process.env.NODE_ENV === 'development' && (
         <Card className="mb-6 border-blue-200 bg-blue-50">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2 text-blue-800">
               <AlertCircle className="h-5 w-5" />
               <p className="font-medium">Development Mode</p>
             </div>
-            <div className="text-blue-700 text-sm mt-1 space-y-1">
+            <div className="mt-1 space-y-1 text-sm text-blue-700">
               <p>• Mobile access: QR code auto-detects network IP</p>
               <p>• STT: 🔄 Auto-configured (Whisper API)</p>
               <p>• Auth: Google login required for all users</p>
@@ -604,14 +615,14 @@ export default function HostDashboard() {
       )}
 
       {/* Microphone Permission Alert */}
-      {micPermission === "denied" && (
+      {micPermission === 'denied' && (
         <Card className="mb-6 border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2 text-red-800">
               <AlertCircle className="h-5 w-5" />
               <p className="font-medium">Microphone access required</p>
             </div>
-            <p className="text-red-700 text-sm mt-1">
+            <p className="mt-1 text-sm text-red-700">
               Please enable microphone access in your browser settings to start
               a session.
             </p>
@@ -647,7 +658,7 @@ export default function HostDashboard() {
         </Card>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid gap-8 lg:grid-cols-3">
         {/* Session Setup */}
         <div className="lg:col-span-2">
           <Card>
@@ -661,7 +672,7 @@ export default function HostDashboard() {
                 with or without authentication. Perfect for both local and
                 online/remote sessions.
                 <br />
-                <span className="text-amber-600 font-medium">
+                <span className="font-medium text-amber-600">
                   ⏰ Sessions auto-stop after 1 hour or 30 minutes of inactivity
                   to prevent unexpected charges.
                 </span>
@@ -745,7 +756,7 @@ export default function HostDashboard() {
                     size="lg"
                     onClick={handleStartSession}
                     disabled={
-                      !sessionTitle.trim() || micPermission === "denied"
+                      !sessionTitle.trim() || micPermission === 'denied'
                     }
                     className="px-8"
                   >
@@ -796,7 +807,7 @@ export default function HostDashboard() {
                       onTranscriptUpdate={handleTranscriptUpdate}
                       onError={handleSTTError}
                       lang={
-                        primaryLanguage === "auto" ? undefined : primaryLanguage
+                        primaryLanguage === 'auto' ? undefined : primaryLanguage
                       }
                     />
                   </div>
@@ -804,14 +815,14 @@ export default function HostDashboard() {
 
                 {/* Web Speech API Info */}
                 {isRecording && (
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
                     <div className="flex items-center space-x-2 text-blue-800">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500"></div>
                       <span className="text-sm font-medium">
                         Live Speech Recognition Active
                       </span>
                     </div>
-                    <p className="text-blue-700 text-xs mt-1">
+                    <p className="mt-1 text-xs text-blue-700">
                       🔄 Automatically restarts every 4 minutes to prevent
                       timeout
                     </p>
@@ -820,22 +831,22 @@ export default function HostDashboard() {
 
                 {/* STT Error Display */}
                 {sttError && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3">
                     <div className="flex items-center space-x-2 text-red-800">
                       <AlertCircle className="h-4 w-4" />
                       <span className="text-sm font-medium">STT Error</span>
                     </div>
-                    <p className="text-red-700 text-sm mt-1">{sttError}</p>
+                    <p className="mt-1 text-sm text-red-700">{sttError}</p>
                   </div>
                 )}
               </CardHeader>
               <CardContent>
-                <div className="max-h-64 overflow-y-auto space-y-2">
+                <div className="max-h-64 space-y-2 overflow-y-auto">
                   {/* Current partial text (real-time preview) */}
                   {currentPartialText && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="text-xs text-blue-600 mb-1 flex items-center">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-2"></div>
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <div className="mb-1 flex items-center text-xs text-blue-600">
+                        <div className="mr-2 h-2 w-2 animate-pulse rounded-full bg-blue-500"></div>
                         Speaking... (live preview)
                       </div>
                       <div className="text-gray-700 italic">
@@ -846,8 +857,8 @@ export default function HostDashboard() {
 
                   {/* Final transcripts */}
                   {transcript.map((line) => (
-                    <div key={line.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="text-xs text-gray-500 mb-1">
+                    <div key={line.id} className="rounded-lg bg-gray-50 p-3">
+                      <div className="mb-1 text-xs text-gray-500">
                         {line.timestamp}
                       </div>
                       <div className="text-gray-900">{line.text}</div>
@@ -855,9 +866,9 @@ export default function HostDashboard() {
                   ))}
 
                   {transcript.length === 0 && !currentPartialText && (
-                    <div className="text-center text-gray-500 py-8">
+                    <div className="py-8 text-center text-gray-500">
                       <div className="space-y-2">
-                        <Mic className="h-8 w-8 mx-auto text-gray-400" />
+                        <Mic className="mx-auto h-8 w-8 text-gray-400" />
                         <p>Real-time transcription ready...</p>
                         <p className="text-xs">
                           Start speaking to see live transcript
@@ -883,8 +894,8 @@ export default function HostDashboard() {
             </CardHeader>
             <CardContent>
               {!isRecording ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="py-8 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                     <Mic className="h-8 w-8 text-gray-400" />
                   </div>
                   <p className="text-gray-500">Session not started</p>
@@ -892,8 +903,8 @@ export default function HostDashboard() {
               ) : (
                 <div className="space-y-4">
                   <div className="text-center">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                      <div className="h-4 w-4 animate-pulse rounded-full bg-red-500"></div>
                     </div>
                     <p className="font-medium text-green-600">Session Active</p>
                     <p className="text-sm text-gray-500">ID: {sessionId}</p>
@@ -908,15 +919,15 @@ export default function HostDashboard() {
                       <span className="text-gray-500">Duration:</span>
                       <span
                         className={`font-medium ${
-                          sessionDuration >= 3540 ? "text-red-600" : ""
+                          sessionDuration >= 3540 ? 'text-red-600' : ''
                         }`}
                       >
                         {formatDuration(sessionDuration)} / 60:00
                       </span>
                     </div>
                     {sessionDuration >= 3540 && (
-                      <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                        ⚠️ Session will auto-stop in {3600 - sessionDuration}{" "}
+                      <div className="rounded bg-red-50 p-2 text-xs text-red-600">
+                        ⚠️ Session will auto-stop in {3600 - sessionDuration}{' '}
                         seconds
                       </div>
                     )}
@@ -924,8 +935,8 @@ export default function HostDashboard() {
                       <span className="text-gray-500">Words Transcribed:</span>
                       <span className="font-medium">
                         {transcript.reduce(
-                          (total, line) => total + line.text.split(" ").length,
-                          0
+                          (total, line) => total + line.text.split(' ').length,
+                          0,
                         )}
                       </span>
                     </div>
@@ -958,7 +969,7 @@ export default function HostDashboard() {
                       <div>
                         <span className="text-gray-600">Public Access:</span>
                         <br />
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        <code className="rounded bg-gray-100 px-2 py-1 text-xs">
                           {getPublicSessionUrl()}
                         </code>
                       </div>
@@ -966,7 +977,7 @@ export default function HostDashboard() {
                       <div>
                         <span className="text-gray-600">Auth Required:</span>
                         <br />
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        <code className="rounded bg-gray-100 px-2 py-1 text-xs">
                           {getSessionUrl()}
                         </code>
                       </div>

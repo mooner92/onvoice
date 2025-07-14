@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useRef, useId } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertCircle,
   Globe,
@@ -25,21 +25,23 @@ import {
   X,
   CheckCircle,
   RefreshCw,
-} from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
-import { useSession, useUser } from "@clerk/nextjs";
-import { createClient } from "@/lib/supabase/client";
-import { useToast, ToastContainer } from "@/components/ui/toast";
-import { Session } from "@/lib/types";
-import type { TranscriptLine, TranslationResponse } from "@/lib/types";
-import ChatbotWidget from "@/components/ChatbotWidget";
+} from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useSession, useUser } from '@clerk/nextjs';
+import { createClient } from '@/lib/supabase/client';
+import { useToast, ToastContainer } from '@/components/ui/toast';
+import { Session } from '@/lib/types';
+import type { TranscriptLine, TranslationResponse } from '@/lib/types';
+import ChatbotWidget from '@/components/ChatbotWidget';
 
 export default function PublicSessionPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useUser();
   const { session: clerkSession } = useSession();
-  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
+  const supabase = createClient(
+    clerkSession?.getToken() ?? Promise.resolve(null),
+  );
   const slug = params.slug as string;
   const { toasts, addToast, removeToast } = useToast();
   const componentId = useId();
@@ -52,249 +54,249 @@ export default function PublicSessionPage() {
     }
 
     // Fallback to browser language (only on client side)
-    if (typeof window !== "undefined" && navigator.language) {
-      const browserLang = navigator.language.split("-")[0];
-      const supportedLangs = ["ko", "zh", "hi", "en"]; // 지원하는 3개 언어 + 영어
-      return supportedLangs.includes(browserLang) ? browserLang : "en"; // 영어 기본값
+    if (typeof window !== 'undefined' && navigator.language) {
+      const browserLang = navigator.language.split('-')[0];
+      const supportedLangs = ['ko', 'zh', 'hi', 'en']; // 지원하는 3개 언어 + 영어
+      return supportedLangs.includes(browserLang) ? browserLang : 'en'; // 영어 기본값
     }
 
-    return "en"; // Default fallback to English
+    return 'en'; // Default fallback to English
   };
 
   // Simple i18n for UI text based on browser language
   const getBrowserLanguage = () => {
-    if (typeof window === "undefined") return "en";
-    const browserLang = navigator.language.split("-")[0];
-    return ["ko", "zh", "hi"].includes(browserLang) ? browserLang : "en"; // 지원하는 3개 언어만
+    if (typeof window === 'undefined') return 'en';
+    const browserLang = navigator.language.split('-')[0];
+    return ['ko', 'zh', 'hi'].includes(browserLang) ? browserLang : 'en'; // 지원하는 3개 언어만
   };
 
   const t = (key: string) => {
     const lang = getBrowserLanguage();
     const translations: Record<string, Record<string, string>> = {
       en: {
-        copySuccess: "Text copied to clipboard",
-        copyFail: "Copy failed",
-        noContent: "No content to copy",
-        translation: "Translation",
-        enableTranslation: "Enable Translation",
-        targetLanguage: "Target Language",
-        fontSize: "Font Size",
-        darkMode: "Dark Mode",
-        showTimestamps: "Show Timestamps",
-        textOnlyMode: "Text Only Mode (Copy Friendly)",
-        textCopy: "Text Copy",
-        copyOriginal: "📋 Copy Original",
-        copyTranslation: "🌍 Copy Translation",
+        copySuccess: 'Text copied to clipboard',
+        copyFail: 'Copy failed',
+        noContent: 'No content to copy',
+        translation: 'Translation',
+        enableTranslation: 'Enable Translation',
+        targetLanguage: 'Target Language',
+        fontSize: 'Font Size',
+        darkMode: 'Dark Mode',
+        showTimestamps: 'Show Timestamps',
+        textOnlyMode: 'Text Only Mode (Copy Friendly)',
+        textCopy: 'Text Copy',
+        copyOriginal: '📋 Copy Original',
+        copyTranslation: '🌍 Copy Translation',
         textOnlyModeHint:
-          "💡 Text Only Mode: Copy pure text without numbers and timestamps.",
-        original: "Original",
-        waitingSpeaker: "Waiting for the speaker to start...",
-        noContentTranslate: "No content to translate",
-        liveTranscription: "Live transcription will appear here",
-        originalTranslated: "Original transcript will be translated here",
-        sessionActive: "Session is active",
-        joinSession: "Join Session",
-        viewAsAudience: "View as Audience",
-        realtimeTranscription: "Real-time transcription and translation",
-        liveSession: "Live Session",
-        translationFailed: "Translation Failed",
-        translating: "Translating...",
-        aiTranslating: "AI Translating...",
-        completed: "Completed",
+          '💡 Text Only Mode: Copy pure text without numbers and timestamps.',
+        original: 'Original',
+        waitingSpeaker: 'Waiting for the speaker to start...',
+        noContentTranslate: 'No content to translate',
+        liveTranscription: 'Live transcription will appear here',
+        originalTranslated: 'Original transcript will be translated here',
+        sessionActive: 'Session is active',
+        joinSession: 'Join Session',
+        viewAsAudience: 'View as Audience',
+        realtimeTranscription: 'Real-time transcription and translation',
+        liveSession: 'Live Session',
+        translationFailed: 'Translation Failed',
+        translating: 'Translating...',
+        aiTranslating: 'AI Translating...',
+        completed: 'Completed',
       },
       ko: {
-        copySuccess: "텍스트가 복사되었습니다",
-        copyFail: "복사 실패",
-        noContent: "복사할 내용이 없습니다",
-        translation: "번역",
-        enableTranslation: "번역 사용",
-        targetLanguage: "대상 언어",
-        fontSize: "글자 크기",
-        darkMode: "다크 모드",
-        showTimestamps: "타임스탬프 표시",
-        textOnlyMode: "텍스트만 보기 (복사 편의)",
-        textCopy: "텍스트 복사",
-        copyOriginal: "📋 원문 복사",
-        copyTranslation: "🌍 번역문 복사",
+        copySuccess: '텍스트가 복사되었습니다',
+        copyFail: '복사 실패',
+        noContent: '복사할 내용이 없습니다',
+        translation: '번역',
+        enableTranslation: '번역 사용',
+        targetLanguage: '대상 언어',
+        fontSize: '글자 크기',
+        darkMode: '다크 모드',
+        showTimestamps: '타임스탬프 표시',
+        textOnlyMode: '텍스트만 보기 (복사 편의)',
+        textCopy: '텍스트 복사',
+        copyOriginal: '📋 원문 복사',
+        copyTranslation: '🌍 번역문 복사',
         textOnlyModeHint:
-          "💡 텍스트만 보기 모드: 번호와 타임스탬프 없이 순수 텍스트만 복사됩니다.",
-        original: "원문",
-        waitingSpeaker: "발표자가 말하기를 기다리고 있습니다...",
-        noContentTranslate: "번역할 내용이 없습니다",
-        liveTranscription: "실시간 전사가 여기에 표시됩니다",
-        originalTranslated: "원문 트랜스크립트가 여기에 번역됩니다",
-        sessionActive: "세션이 활성화되어 있습니다",
-        joinSession: "세션 참가",
-        viewAsAudience: "관객으로 보기",
-        realtimeTranscription: "실시간 전사 및 번역",
-        liveSession: "라이브 세션",
-        translationFailed: "번역 실패",
-        translating: "번역 중...",
-        aiTranslating: "AI 번역 중...",
-        completed: "완료",
+          '💡 텍스트만 보기 모드: 번호와 타임스탬프 없이 순수 텍스트만 복사됩니다.',
+        original: '원문',
+        waitingSpeaker: '발표자가 말하기를 기다리고 있습니다...',
+        noContentTranslate: '번역할 내용이 없습니다',
+        liveTranscription: '실시간 전사가 여기에 표시됩니다',
+        originalTranslated: '원문 트랜스크립트가 여기에 번역됩니다',
+        sessionActive: '세션이 활성화되어 있습니다',
+        joinSession: '세션 참가',
+        viewAsAudience: '관객으로 보기',
+        realtimeTranscription: '실시간 전사 및 번역',
+        liveSession: '라이브 세션',
+        translationFailed: '번역 실패',
+        translating: '번역 중...',
+        aiTranslating: 'AI 번역 중...',
+        completed: '완료',
       },
       ja: {
-        copySuccess: "テキストがコピーされました",
-        copyFail: "コピーに失敗しました",
-        noContent: "コピーする内容がありません",
-        translation: "翻訳",
-        enableTranslation: "翻訳を有効にする",
-        targetLanguage: "対象言語",
-        fontSize: "フォントサイズ",
-        darkMode: "ダークモード",
-        showTimestamps: "タイムスタンプを表示",
-        textOnlyMode: "テキストのみモード（コピー向け）",
-        textCopy: "テキストコピー",
-        copyOriginal: "📋 原文をコピー",
-        copyTranslation: "🌍 翻訳をコピー",
+        copySuccess: 'テキストがコピーされました',
+        copyFail: 'コピーに失敗しました',
+        noContent: 'コピーする内容がありません',
+        translation: '翻訳',
+        enableTranslation: '翻訳を有効にする',
+        targetLanguage: '対象言語',
+        fontSize: 'フォントサイズ',
+        darkMode: 'ダークモード',
+        showTimestamps: 'タイムスタンプを表示',
+        textOnlyMode: 'テキストのみモード（コピー向け）',
+        textCopy: 'テキストコピー',
+        copyOriginal: '📋 原文をコピー',
+        copyTranslation: '🌍 翻訳をコピー',
         textOnlyModeHint:
-          "💡 テキストのみモード：番号とタイムスタンプなしで純粋なテキストのみをコピーします。",
-        original: "原文",
-        waitingSpeaker: "話者の開始を待っています...",
-        noContentTranslate: "翻訳する内容がありません",
-        liveTranscription: "ライブ転写がここに表示されます",
-        originalTranslated: "原文転写がここに翻訳されます",
-        sessionActive: "セッションがアクティブです",
-        joinSession: "セッションに参加",
-        viewAsAudience: "視聴者として表示",
-        realtimeTranscription: "リアルタイム転写と翻訳",
-        liveSession: "ライブセッション",
-        translationFailed: "翻訳に失敗しました",
-        translating: "翻訳中...",
-        aiTranslating: "AI翻訳中...",
-        completed: "完了",
+          '💡 テキストのみモード：番号とタイムスタンプなしで純粋なテキストのみをコピーします。',
+        original: '原文',
+        waitingSpeaker: '話者の開始を待っています...',
+        noContentTranslate: '翻訳する内容がありません',
+        liveTranscription: 'ライブ転写がここに表示されます',
+        originalTranslated: '原文転写がここに翻訳されます',
+        sessionActive: 'セッションがアクティブです',
+        joinSession: 'セッションに参加',
+        viewAsAudience: '視聴者として表示',
+        realtimeTranscription: 'リアルタイム転写と翻訳',
+        liveSession: 'ライブセッション',
+        translationFailed: '翻訳に失敗しました',
+        translating: '翻訳中...',
+        aiTranslating: 'AI翻訳中...',
+        completed: '完了',
       },
       es: {
-        copySuccess: "Texto copiado al portapapeles",
-        copyFail: "Error al copiar",
-        noContent: "No hay contenido para copiar",
-        translation: "Traducción",
-        enableTranslation: "Habilitar traducción",
-        targetLanguage: "Idioma destino",
-        fontSize: "Tamaño de fuente",
-        darkMode: "Modo oscuro",
-        showTimestamps: "Mostrar marcas de tiempo",
-        textOnlyMode: "Modo solo texto (fácil copia)",
-        textCopy: "Copiar texto",
-        copyOriginal: "📋 Copiar original",
-        copyTranslation: "🌍 Copiar traducción",
+        copySuccess: 'Texto copiado al portapapeles',
+        copyFail: 'Error al copiar',
+        noContent: 'No hay contenido para copiar',
+        translation: 'Traducción',
+        enableTranslation: 'Habilitar traducción',
+        targetLanguage: 'Idioma destino',
+        fontSize: 'Tamaño de fuente',
+        darkMode: 'Modo oscuro',
+        showTimestamps: 'Mostrar marcas de tiempo',
+        textOnlyMode: 'Modo solo texto (fácil copia)',
+        textCopy: 'Copiar texto',
+        copyOriginal: '📋 Copiar original',
+        copyTranslation: '🌍 Copiar traducción',
         textOnlyModeHint:
-          "💡 Modo solo texto: Copia texto puro sin números ni marcas de tiempo.",
-        original: "Original",
-        waitingSpeaker: "Esperando que el orador comience...",
-        noContentTranslate: "No hay contenido para traducir",
-        liveTranscription: "La transcripción en vivo aparecerá aquí",
-        originalTranslated: "La transcripción original se traducirá aquí",
-        sessionActive: "La sesión está activa",
-        joinSession: "Unirse a la sesión",
-        viewAsAudience: "Ver como audiencia",
-        realtimeTranscription: "Transcripción y traducción en tiempo real",
-        liveSession: "Sesión en vivo",
-        translationFailed: "Error de traducción",
-        translating: "Traduciendo...",
-        aiTranslating: "IA traduciendo...",
-        completed: "Completado",
+          '💡 Modo solo texto: Copia texto puro sin números ni marcas de tiempo.',
+        original: 'Original',
+        waitingSpeaker: 'Esperando que el orador comience...',
+        noContentTranslate: 'No hay contenido para traducir',
+        liveTranscription: 'La transcripción en vivo aparecerá aquí',
+        originalTranslated: 'La transcripción original se traducirá aquí',
+        sessionActive: 'La sesión está activa',
+        joinSession: 'Unirse a la sesión',
+        viewAsAudience: 'Ver como audiencia',
+        realtimeTranscription: 'Transcripción y traducción en tiempo real',
+        liveSession: 'Sesión en vivo',
+        translationFailed: 'Error de traducción',
+        translating: 'Traduciendo...',
+        aiTranslating: 'IA traduciendo...',
+        completed: 'Completado',
       },
       fr: {
-        copySuccess: "Texte copié dans le presse-papiers",
-        copyFail: "Échec de la copie",
-        noContent: "Aucun contenu à copier",
-        translation: "Traduction",
-        enableTranslation: "Activer la traduction",
-        targetLanguage: "Langue cible",
-        fontSize: "Taille de police",
-        darkMode: "Mode sombre",
-        showTimestamps: "Afficher les horodatages",
-        textOnlyMode: "Mode texte seul (copie facile)",
-        textCopy: "Copier le texte",
+        copySuccess: 'Texte copié dans le presse-papiers',
+        copyFail: 'Échec de la copie',
+        noContent: 'Aucun contenu à copier',
+        translation: 'Traduction',
+        enableTranslation: 'Activer la traduction',
+        targetLanguage: 'Langue cible',
+        fontSize: 'Taille de police',
+        darkMode: 'Mode sombre',
+        showTimestamps: 'Afficher les horodatages',
+        textOnlyMode: 'Mode texte seul (copie facile)',
+        textCopy: 'Copier le texte',
         copyOriginal: "📋 Copier l'original",
-        copyTranslation: "🌍 Copier la traduction",
+        copyTranslation: '🌍 Copier la traduction',
         textOnlyModeHint:
-          "💡 Mode texte seul: Copie le texte pur sans numéros ni horodatages.",
-        original: "Original",
+          '💡 Mode texte seul: Copie le texte pur sans numéros ni horodatages.',
+        original: 'Original',
         waitingSpeaker: "En attente du début de l'orateur...",
-        noContentTranslate: "Aucun contenu à traduire",
-        liveTranscription: "La transcription en direct apparaîtra ici",
-        originalTranslated: "La transcription originale sera traduite ici",
-        sessionActive: "La session est active",
-        joinSession: "Rejoindre la session",
+        noContentTranslate: 'Aucun contenu à traduire',
+        liveTranscription: 'La transcription en direct apparaîtra ici',
+        originalTranslated: 'La transcription originale sera traduite ici',
+        sessionActive: 'La session est active',
+        joinSession: 'Rejoindre la session',
         viewAsAudience: "Voir en tant qu'audience",
-        realtimeTranscription: "Transcription et traduction en temps réel",
-        liveSession: "Session en direct",
-        translationFailed: "Échec de la traduction",
-        translating: "Traduction...",
-        aiTranslating: "IA en traduction...",
-        completed: "Terminé",
+        realtimeTranscription: 'Transcription et traduction en temps réel',
+        liveSession: 'Session en direct',
+        translationFailed: 'Échec de la traduction',
+        translating: 'Traduction...',
+        aiTranslating: 'IA en traduction...',
+        completed: 'Terminé',
       },
       de: {
-        copySuccess: "Text in die Zwischenablage kopiert",
-        copyFail: "Kopieren fehlgeschlagen",
-        noContent: "Kein Inhalt zum Kopieren",
-        translation: "Übersetzung",
-        enableTranslation: "Übersetzung aktivieren",
-        targetLanguage: "Zielsprache",
-        fontSize: "Schriftgröße",
-        darkMode: "Dunkler Modus",
-        showTimestamps: "Zeitstempel anzeigen",
-        textOnlyMode: "Nur-Text-Modus (kopierfreundlich)",
-        textCopy: "Text kopieren",
-        copyOriginal: "📋 Original kopieren",
-        copyTranslation: "🌍 Übersetzung kopieren",
+        copySuccess: 'Text in die Zwischenablage kopiert',
+        copyFail: 'Kopieren fehlgeschlagen',
+        noContent: 'Kein Inhalt zum Kopieren',
+        translation: 'Übersetzung',
+        enableTranslation: 'Übersetzung aktivieren',
+        targetLanguage: 'Zielsprache',
+        fontSize: 'Schriftgröße',
+        darkMode: 'Dunkler Modus',
+        showTimestamps: 'Zeitstempel anzeigen',
+        textOnlyMode: 'Nur-Text-Modus (kopierfreundlich)',
+        textCopy: 'Text kopieren',
+        copyOriginal: '📋 Original kopieren',
+        copyTranslation: '🌍 Übersetzung kopieren',
         textOnlyModeHint:
-          "💡 Nur-Text-Modus: Kopiert reinen Text ohne Nummern und Zeitstempel.",
-        original: "Original",
-        waitingSpeaker: "Warten auf den Beginn des Sprechers...",
-        noContentTranslate: "Kein Inhalt zum Übersetzen",
-        liveTranscription: "Live-Transkription wird hier angezeigt",
-        originalTranslated: "Original-Transkript wird hier übersetzt",
-        sessionActive: "Sitzung ist aktiv",
-        joinSession: "Sitzung beitreten",
-        viewAsAudience: "Als Zuschauer anzeigen",
-        realtimeTranscription: "Echtzeit-Transkription und -Übersetzung",
-        liveSession: "Live-Sitzung",
-        translationFailed: "Übersetzung fehlgeschlagen",
-        translating: "Übersetzen...",
-        aiTranslating: "KI übersetzt...",
-        completed: "Abgeschlossen",
+          '💡 Nur-Text-Modus: Kopiert reinen Text ohne Nummern und Zeitstempel.',
+        original: 'Original',
+        waitingSpeaker: 'Warten auf den Beginn des Sprechers...',
+        noContentTranslate: 'Kein Inhalt zum Übersetzen',
+        liveTranscription: 'Live-Transkription wird hier angezeigt',
+        originalTranslated: 'Original-Transkript wird hier übersetzt',
+        sessionActive: 'Sitzung ist aktiv',
+        joinSession: 'Sitzung beitreten',
+        viewAsAudience: 'Als Zuschauer anzeigen',
+        realtimeTranscription: 'Echtzeit-Transkription und -Übersetzung',
+        liveSession: 'Live-Sitzung',
+        translationFailed: 'Übersetzung fehlgeschlagen',
+        translating: 'Übersetzen...',
+        aiTranslating: 'KI übersetzt...',
+        completed: 'Abgeschlossen',
       },
       zh: {
-        copySuccess: "文本已复制到剪贴板",
-        copyFail: "复制失败",
-        noContent: "没有内容可复制",
-        translation: "翻译",
-        enableTranslation: "启用翻译",
-        targetLanguage: "目标语言",
-        fontSize: "字体大小",
-        darkMode: "深色模式",
-        showTimestamps: "显示时间戳",
-        textOnlyMode: "纯文本模式（便于复制）",
-        textCopy: "复制文本",
-        copyOriginal: "📋 复制原文",
-        copyTranslation: "🌍 复制翻译",
-        textOnlyModeHint: "💡 纯文本模式：复制不带编号和时间戳的纯文本。",
-        original: "原文",
-        waitingSpeaker: "等待发言者开始...",
-        noContentTranslate: "没有内容可翻译",
-        liveTranscription: "实时转录将在这里显示",
-        originalTranslated: "原始转录将在这里翻译",
-        sessionActive: "会话处于活动状态",
-        joinSession: "加入会话",
-        viewAsAudience: "以观众身份查看",
-        realtimeTranscription: "实时转录和翻译",
-        liveSession: "直播会话",
-        translationFailed: "翻译失败",
-        translating: "翻译中...",
-        aiTranslating: "AI翻译中...",
-        completed: "已完成",
+        copySuccess: '文本已复制到剪贴板',
+        copyFail: '复制失败',
+        noContent: '没有内容可复制',
+        translation: '翻译',
+        enableTranslation: '启用翻译',
+        targetLanguage: '目标语言',
+        fontSize: '字体大小',
+        darkMode: '深色模式',
+        showTimestamps: '显示时间戳',
+        textOnlyMode: '纯文本模式（便于复制）',
+        textCopy: '复制文本',
+        copyOriginal: '📋 复制原文',
+        copyTranslation: '🌍 复制翻译',
+        textOnlyModeHint: '💡 纯文本模式：复制不带编号和时间戳的纯文本。',
+        original: '原文',
+        waitingSpeaker: '等待发言者开始...',
+        noContentTranslate: '没有内容可翻译',
+        liveTranscription: '实时转录将在这里显示',
+        originalTranslated: '原始转录将在这里翻译',
+        sessionActive: '会话处于活动状态',
+        joinSession: '加入会话',
+        viewAsAudience: '以观众身份查看',
+        realtimeTranscription: '实时转录和翻译',
+        liveSession: '直播会话',
+        translationFailed: '翻译失败',
+        translating: '翻译中...',
+        aiTranslating: 'AI翻译中...',
+        completed: '已完成',
       },
     };
 
-    return translations[lang]?.[key] || translations["en"][key] || key;
+    return translations[lang]?.[key] || translations['en'][key] || key;
   };
 
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState(
-    () => getUserPreferredLanguage() || "en"
+    () => getUserPreferredLanguage() || 'en',
   );
   const [fontSize, setFontSize] = useState([18]);
   const [darkMode, setDarkMode] = useState(false);
@@ -325,10 +327,10 @@ export default function PublicSessionPage() {
 
   // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
   const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "en", name: "English", flag: "🇺🇸" }, // 원문 표시용
+    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+    { code: 'en', name: 'English', flag: '🇺🇸' }, // 원문 표시용
   ];
 
   // 번역 캐시 (클라이언트 사이드)
@@ -347,16 +349,16 @@ export default function PublicSessionPage() {
   useEffect(() => {
     if (!sessionId) return;
 
-    console.log("🔔 Setting up translation cache subscription...");
+    console.log('🔔 Setting up translation cache subscription...');
 
     const channel = supabase
       .channel(`translation-cache-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "INSERT",
-          schema: "public",
-          table: "translation_cache",
+          event: 'INSERT',
+          schema: 'public',
+          table: 'translation_cache',
         },
         (payload) => {
           const cache = payload.new as {
@@ -365,7 +367,7 @@ export default function PublicSessionPage() {
             translated_text: string;
             quality_score: number;
           };
-          console.log("🎉 New translation cached:", {
+          console.log('🎉 New translation cached:', {
             text: cache.original_text,
             language: cache.target_language,
             translated: cache.translated_text,
@@ -374,16 +376,16 @@ export default function PublicSessionPage() {
 
           // 현재 선택된 언어의 번역이면 UI 업데이트
           if (cache.target_language === selectedLanguageRef.current) {
-            console.log("📝 Updating UI with cached translation");
+            console.log('📝 Updating UI with cached translation');
             setTranscript((prev) => {
               const updated = prev.map((line) => {
                 if (
                   line.original === cache.original_text &&
                   (line.isTranslating ||
-                    line.translated.includes("[번역 중...]"))
+                    line.translated.includes('[번역 중...]'))
                 ) {
                   console.log(
-                    `✅ Updating line: "${line.original}" → "${cache.translated_text}"`
+                    `✅ Updating line: "${line.original}" → "${cache.translated_text}"`,
                   );
                   return {
                     ...line,
@@ -399,22 +401,22 @@ export default function PublicSessionPage() {
             });
           } else {
             console.log(
-              `⏭️ Skipping update: language mismatch (${cache.target_language} !== ${selectedLanguageRef.current})`
+              `⏭️ Skipping update: language mismatch (${cache.target_language} !== ${selectedLanguageRef.current})`,
             );
           }
-        }
+        },
       )
       .subscribe((status) => {
-        console.log("🔔 Translation cache subscription status:", status);
-        if (status === "SUBSCRIBED") {
+        console.log('🔔 Translation cache subscription status:', status);
+        if (status === 'SUBSCRIBED') {
           console.log(
-            "✅ Successfully subscribed to translation cache updates"
+            '✅ Successfully subscribed to translation cache updates',
           );
         }
       });
 
     return () => {
-      console.log("🧹 Cleaning up translation cache subscription");
+      console.log('🧹 Cleaning up translation cache subscription');
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase]); // sessionId와 supabase만 필요, selectedLanguage는 이벤트 핸들러 내부에서 처리
@@ -431,10 +433,10 @@ export default function PublicSessionPage() {
 
         // Try as session ID first
         const { data: directSession, error: directError } = await supabase
-          .from("sessions")
-          .select("*")
-          .eq("id", slug)
-          .eq("status", "active")
+          .from('sessions')
+          .select('*')
+          .eq('id', slug)
+          .eq('status', 'active')
           .single();
 
         if (directSession && !directError) {
@@ -442,10 +444,10 @@ export default function PublicSessionPage() {
         } else {
           // Try to find by custom slug or title match
           const { data: slugSession } = await supabase
-            .from("sessions")
-            .select("*")
-            .ilike("title", `%${slug}%`)
-            .eq("status", "active")
+            .from('sessions')
+            .select('*')
+            .ilike('title', `%${slug}%`)
+            .eq('status', 'active')
             .limit(1)
             .single();
 
@@ -453,9 +455,9 @@ export default function PublicSessionPage() {
         }
 
         if (!sessionData) {
-          console.error("Session not found:", { slug });
+          console.error('Session not found:', { slug });
           setError(
-            `Session not found (ID: ${slug}). The session may have ended or the link may be invalid.`
+            `Session not found (ID: ${slug}). The session may have ended or the link may be invalid.`,
           );
           return;
         }
@@ -465,10 +467,10 @@ export default function PublicSessionPage() {
 
         // Load existing transcripts - 번역이 완료된 것만 표시
         const { data: transcripts } = await supabase
-          .from("transcripts")
-          .select("*")
-          .eq("session_id", sessionData.id)
-          .order("created_at", { ascending: true });
+          .from('transcripts')
+          .select('*')
+          .eq('session_id', sessionData.id)
+          .order('created_at', { ascending: true });
 
         if (transcripts && transcripts.length > 0) {
           console.log(`📚 Loading ${transcripts.length} transcripts...`);
@@ -480,14 +482,14 @@ export default function PublicSessionPage() {
             let translatedText = t.original_text;
 
             // 번역이 활성화된 경우에만 번역 로드
-            if (translationEnabled && selectedLanguage !== "en") {
+            if (translationEnabled && selectedLanguage !== 'en') {
               try {
                 // 캐시 테이블에서 직접 확인
                 const { data: cache } = await supabase
-                  .from("translation_cache")
-                  .select("*")
-                  .eq("original_text", t.original_text)
-                  .eq("target_language", selectedLanguage)
+                  .from('translation_cache')
+                  .select('*')
+                  .eq('original_text', t.original_text)
+                  .eq('target_language', selectedLanguage)
                   .maybeSingle();
 
                 if (cache) {
@@ -495,25 +497,25 @@ export default function PublicSessionPage() {
                   console.log(
                     `✅ Loaded cached translation for "${t.original_text.substring(
                       0,
-                      30
-                    )}..."`
+                      30,
+                    )}..."`,
                   );
                 } else {
                   translatedText = `[번역 중...] ${t.original_text}`;
                   console.log(
                     `⏳ Translation not yet cached for "${t.original_text.substring(
                       0,
-                      30
-                    )}..."`
+                      30,
+                    )}..."`,
                   );
                 }
               } catch (err) {
                 console.error(
                   `❌ Failed to load translation for "${t.original_text.substring(
                     0,
-                    30
+                    30,
                   )}..."`,
-                  err
+                  err,
                 );
                 translatedText = t.original_text; // 실패 시 원문 표시
               }
@@ -534,11 +536,11 @@ export default function PublicSessionPage() {
           setTranscript(formattedTranscripts);
         }
       } catch (error) {
-        console.error("Error loading session:", error);
+        console.error('Error loading session:', error);
         setError(
           `Failed to load session: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
         );
       } finally {
         setLoading(false);
@@ -555,14 +557,14 @@ export default function PublicSessionPage() {
     if (!sessionId) return;
 
     try {
-      console.log("🚀 Joining session:", {
+      console.log('🚀 Joining session:', {
         sessionId,
-        userId: user?.id || "guest",
+        userId: user?.id || 'guest',
       });
 
       // For non-logged in users, mark as joined immediately
       if (!user) {
-        console.log("✅ Guest user viewing session");
+        console.log('✅ Guest user viewing session');
         setHasJoined(true);
         return;
       }
@@ -574,24 +576,24 @@ export default function PublicSessionPage() {
         session_id: sessionId,
         user_id: user.id,
         user_name:
-          user.fullName || user.primaryEmailAddress?.emailAddress || "User",
-        role: isHost ? ("host_viewing" as const) : ("audience" as const),
+          user.fullName || user.primaryEmailAddress?.emailAddress || 'User',
+        role: isHost ? ('host_viewing' as const) : ('audience' as const),
         joined_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from("session_participants")
+        .from('session_participants')
         .insert(participantData);
 
-      if (error && !error.message.includes("duplicate")) {
-        console.error("Error joining session:", error);
+      if (error && !error.message.includes('duplicate')) {
+        console.error('Error joining session:', error);
         throw error;
       }
 
-      console.log("✅ Successfully joined session");
+      console.log('✅ Successfully joined session');
       setHasJoined(true);
     } catch (error) {
-      console.error("❌ Error joining session:", error);
+      console.error('❌ Error joining session:', error);
       // Even if error, allow viewing
       setHasJoined(true);
     }
@@ -600,7 +602,7 @@ export default function PublicSessionPage() {
   // Auto-join session when session is loaded (for both logged-in and guest users)
   useEffect(() => {
     if (sessionId && session && !hasJoined) {
-      console.log("🔄 Auto-joining session...");
+      console.log('🔄 Auto-joining session...');
       joinSession();
     }
   }, [sessionId, session, hasJoined, joinSession]);
@@ -610,37 +612,37 @@ export default function PublicSessionPage() {
     if (!sessionId) return;
 
     console.log(
-      "🔔 Setting up realtime subscription for completed transcripts..."
+      '🔔 Setting up realtime subscription for completed transcripts...',
     );
 
     // 모든 transcript 변경사항 구독 (클라이언트에서 필터링)
     const channel = supabase
       .channel(`transcripts-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "*", // INSERT, UPDATE, DELETE 모든 이벤트
-          schema: "public",
-          table: "transcripts",
+          event: '*', // INSERT, UPDATE, DELETE 모든 이벤트
+          schema: 'public',
+          table: 'transcripts',
           filter: `session_id=eq.${sessionId}`, // 세션 ID만 필터링
         },
         (payload) => {
           console.log(
-            "🔔 Realtime transcript update:",
+            '🔔 Realtime transcript update:',
             payload.eventType,
-            payload.new
+            payload.new,
           );
 
           // UPDATE 이벤트만 처리 (INSERT는 폴링에서 처리)
-          if (payload.eventType === "UPDATE" && payload.new) {
+          if (payload.eventType === 'UPDATE' && payload.new) {
             const updatedTranscript = payload.new as {
               original_text: string;
               translation_status: string;
               created_at: string;
             };
-            if (updatedTranscript.translation_status === "completed") {
+            if (updatedTranscript.translation_status === 'completed') {
               console.log(
-                `🔄 Transcript status updated to completed: "${updatedTranscript.original_text}"`
+                `🔄 Transcript status updated to completed: "${updatedTranscript.original_text}"`,
               );
 
               // 이미 있는 transcript 업데이트 (새로 추가하지 않음)
@@ -654,19 +656,19 @@ export default function PublicSessionPage() {
                     };
                   }
                   return line;
-                })
+                }),
               );
             }
           }
-        }
+        },
       )
       .subscribe((status) => {
-        console.log("🔔 Realtime subscription status:", status);
+        console.log('🔔 Realtime subscription status:', status);
       });
 
     // Cleanup
     return () => {
-      console.log("🧹 Cleaning up realtime subscription");
+      console.log('🧹 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase]); // sessionId와 supabase만 필요
@@ -681,14 +683,14 @@ export default function PublicSessionPage() {
     const reloadForNewLanguage = async () => {
       try {
         const { data: transcripts } = await supabase
-          .from("transcripts")
-          .select("*")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: true });
+          .from('transcripts')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true });
 
         if (transcripts && transcripts.length > 0) {
           console.log(
-            `🔄 Reloading ${transcripts.length} transcripts for ${selectedLanguage}`
+            `🔄 Reloading ${transcripts.length} transcripts for ${selectedLanguage}`,
           );
 
           const formattedTranscripts: TranscriptLine[] = [];
@@ -697,14 +699,14 @@ export default function PublicSessionPage() {
             let translatedText = t.original_text;
             let isTranslating = false;
 
-            if (selectedLanguage !== "en") {
+            if (selectedLanguage !== 'en') {
               // 캐시 테이블에서 직접 확인
               try {
                 const { data: cache } = await supabase
-                  .from("translation_cache")
-                  .select("*")
-                  .eq("original_text", t.original_text)
-                  .eq("target_language", selectedLanguage)
+                  .from('translation_cache')
+                  .select('*')
+                  .eq('original_text', t.original_text)
+                  .eq('target_language', selectedLanguage)
                   .maybeSingle();
 
                 if (cache) {
@@ -735,7 +737,7 @@ export default function PublicSessionPage() {
           setTranscript(formattedTranscripts);
         }
       } catch (error) {
-        console.error("Error reloading transcripts:", error);
+        console.error('Error reloading transcripts:', error);
       }
     };
 
@@ -746,7 +748,7 @@ export default function PublicSessionPage() {
   const handleTranscriptUpdate = useCallback(
     async (newText: string, isPartial: boolean = false) => {
       if (!newText || newText.trim().length === 0) {
-        console.warn("⚠️ Skipping empty transcript update");
+        console.warn('⚠️ Skipping empty transcript update');
         return;
       }
 
@@ -760,7 +762,7 @@ export default function PublicSessionPage() {
         original: newText.trim(),
         translated: newText.trim(),
         translatedLanguage: selectedLanguage,
-        speaker: session?.host_name || "Speaker",
+        speaker: session?.host_name || 'Speaker',
         isTranslating: false,
       };
 
@@ -770,7 +772,7 @@ export default function PublicSessionPage() {
           const newTranscript = [...prev];
           if (
             newTranscript.length > 0 &&
-            newTranscript[newTranscript.length - 1].id.includes("partial")
+            newTranscript[newTranscript.length - 1].id.includes('partial')
           ) {
             newTranscript[newTranscript.length - 1] = {
               ...newLine,
@@ -785,13 +787,13 @@ export default function PublicSessionPage() {
         // Final 업데이트
         setTranscript((prev) => {
           const withoutPartial = prev.filter(
-            (line) => !line.id.includes("partial")
+            (line) => !line.id.includes('partial'),
           );
           return [...withoutPartial, newLine];
         });
 
         // 번역이 필요한 경우
-        if (translationEnabled && selectedLanguage !== "en") {
+        if (translationEnabled && selectedLanguage !== 'en') {
           // 번역 중 상태로 설정
           setTranscript((prev) =>
             prev.map((line) =>
@@ -801,18 +803,18 @@ export default function PublicSessionPage() {
                     translated: `[번역 중...] ${newText.trim()}`,
                     isTranslating: true,
                   }
-                : line
-            )
+                : line,
+            ),
           );
 
           // 캐시 확인 (백그라운드에서 실행)
           setTimeout(async () => {
             try {
               const { data: cache } = await supabase
-                .from("translation_cache")
-                .select("*")
-                .eq("original_text", newText.trim())
-                .eq("target_language", selectedLanguage)
+                .from('translation_cache')
+                .select('*')
+                .eq('original_text', newText.trim())
+                .eq('target_language', selectedLanguage)
                 .maybeSingle();
 
               if (cache) {
@@ -826,26 +828,26 @@ export default function PublicSessionPage() {
                           isTranslating: false,
                           translationQuality: cache.quality_score,
                         }
-                      : line
-                  )
+                      : line,
+                  ),
                 );
               }
               // 캐시에 없으면 Realtime 구독이 처리할 것임
             } catch (error) {
-              console.error("Cache check error:", error);
+              console.error('Cache check error:', error);
             }
           }, 1000); // 1초 후 확인
         }
       }
     },
-    [selectedLanguage, session, translationEnabled, supabase]
+    [selectedLanguage, session, translationEnabled, supabase],
   );
 
   // Subscribe to real-time transcript updates
   useEffect(() => {
     if (!sessionId) return;
 
-    console.log("🔄 Setting up real-time transcript subscription:", {
+    console.log('🔄 Setting up real-time transcript subscription:', {
       sessionId,
       hasJoined,
       timestamp: new Date().toLocaleTimeString(),
@@ -854,26 +856,26 @@ export default function PublicSessionPage() {
     const channel = supabase
       .channel(`public:transcripts-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "INSERT",
-          schema: "public",
-          table: "transcripts",
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transcripts',
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("📨 New transcript received:", payload.new);
+          console.log('📨 New transcript received:', payload.new);
           const newTranscript = payload.new as { original_text: string };
 
           handleTranscriptUpdate(newTranscript.original_text, false);
-        }
+        },
       )
       .subscribe((status) => {
-        console.log("📡 Real-time subscription status:", status);
+        console.log('📡 Real-time subscription status:', status);
       });
 
     return () => {
-      console.log("🧹 Cleaning up real-time subscription");
+      console.log('🧹 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase, handleTranscriptUpdate]);
@@ -884,14 +886,14 @@ export default function PublicSessionPage() {
 
     try {
       const { count } = await supabase
-        .from("session_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("session_id", sessionId)
-        .is("left_at", null);
+        .from('session_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .is('left_at', null);
 
       setParticipantCount(count || 0);
     } catch (error) {
-      console.error("Error updating participant count:", error);
+      console.error('Error updating participant count:', error);
     }
   }, [sessionId, supabase]);
 
@@ -902,16 +904,16 @@ export default function PublicSessionPage() {
     const channel = supabase
       .channel(`public-participants-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "*",
-          schema: "public",
-          table: "session_participants",
+          event: '*',
+          schema: 'public',
+          table: 'session_participants',
           filter: `session_id=eq.${sessionId}`,
         },
         () => {
           updateParticipantCount();
-        }
+        },
       )
       .subscribe();
 
@@ -926,29 +928,29 @@ export default function PublicSessionPage() {
   useEffect(() => {
     if (!sessionId) return;
 
-    console.log("🔔 Setting up session status subscription...");
+    console.log('🔔 Setting up session status subscription...');
 
     const channel = supabase
       .channel(`session-status-${sessionId}`)
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "UPDATE",
-          schema: "public",
-          table: "sessions",
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sessions',
           filter: `id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log("🔔 Session status update:", payload.new);
+          console.log('🔔 Session status update:', payload.new);
           const updatedSession = payload.new as { status: string; id: string };
 
-          if (updatedSession.status === "ended") {
-            console.log("🏁 Session ended, redirecting to summary page...");
+          if (updatedSession.status === 'ended') {
+            console.log('🏁 Session ended, redirecting to summary page...');
 
             // 세션 종료 알림
             addToast({
-              type: "success",
-              title: "세션이 종료되었습니다",
+              type: 'success',
+              title: '세션이 종료되었습니다',
               duration: 3000,
             });
 
@@ -958,14 +960,14 @@ export default function PublicSessionPage() {
               window.location.href = summaryUrl;
             }, 2000);
           }
-        }
+        },
       )
       .subscribe((status) => {
-        console.log("🔔 Session status subscription:", status);
+        console.log('🔔 Session status subscription:', status);
       });
 
     return () => {
-      console.log("🧹 Cleaning up session status subscription");
+      console.log('🧹 Cleaning up session status subscription');
       supabase.removeChannel(channel);
     };
   }, [sessionId, supabase, addToast]);
@@ -978,9 +980,9 @@ export default function PublicSessionPage() {
         prev.map((line) => ({
           ...line,
           translated: line.original,
-          translatedLanguage: "en",
+          translatedLanguage: 'en',
           isTranslating: false,
-        }))
+        })),
       );
       setTranslationStats({ cached: 0, processing: 0, completed: 0 });
       return;
@@ -988,21 +990,21 @@ export default function PublicSessionPage() {
 
     // 언어 변경 시에만 실행
     console.log(
-      `🔄 Language changed to ${selectedLanguage}, updating translations...`
+      `🔄 Language changed to ${selectedLanguage}, updating translations...`,
     );
 
     setTranscript((prev) => {
       if (prev.length === 0) return prev;
 
       // 영어인 경우 즉시 passthrough
-      if (selectedLanguage === "en") {
+      if (selectedLanguage === 'en') {
         return prev.map((line) => ({
           ...line,
           translated:
-            line.original && typeof line.original === "string"
+            line.original && typeof line.original === 'string'
               ? line.original
-              : "",
-          translatedLanguage: "en",
+              : '',
+          translatedLanguage: 'en',
           isTranslating: false,
         }));
       }
@@ -1017,7 +1019,7 @@ export default function PublicSessionPage() {
     });
 
     // 캐시에서 번역 확인
-    if (selectedLanguage !== "en") {
+    if (selectedLanguage !== 'en') {
       setTimeout(async () => {
         const currentTranscripts = await new Promise<TranscriptLine[]>(
           (resolve) => {
@@ -1025,19 +1027,19 @@ export default function PublicSessionPage() {
               resolve([...prev]);
               return prev;
             });
-          }
+          },
         );
 
         for (const line of currentTranscripts) {
-          if (!line || !line.original || typeof line.original !== "string")
+          if (!line || !line.original || typeof line.original !== 'string')
             continue;
 
           try {
             const { data: cache } = await supabase
-              .from("translation_cache")
-              .select("*")
-              .eq("original_text", line.original.trim())
-              .eq("target_language", selectedLanguage)
+              .from('translation_cache')
+              .select('*')
+              .eq('original_text', line.original.trim())
+              .eq('target_language', selectedLanguage)
               .maybeSingle();
 
             if (cache) {
@@ -1050,12 +1052,12 @@ export default function PublicSessionPage() {
                         isTranslating: false,
                         translationQuality: cache.quality_score,
                       }
-                    : l
-                )
+                    : l,
+                ),
               );
             }
           } catch (error) {
-            console.error("Cache check error:", error);
+            console.error('Cache check error:', error);
           }
         }
       }, 500);
@@ -1074,7 +1076,7 @@ export default function PublicSessionPage() {
 
   // 🆕 텍스트 복사 기능 (다국어화)
   const copyTextOnly = useCallback(
-    async (type: "original" | "translation", event?: React.MouseEvent) => {
+    async (type: 'original' | 'translation', event?: React.MouseEvent) => {
       // 이벤트 기본 동작 방지 (페이지 이동 방지)
       if (event) {
         event.preventDefault();
@@ -1083,8 +1085,8 @@ export default function PublicSessionPage() {
 
       if (transcript.length === 0) {
         addToast({
-          type: "warning",
-          title: t("noContent"),
+          type: 'warning',
+          title: t('noContent'),
           duration: 1500,
         });
         return;
@@ -1095,101 +1097,101 @@ export default function PublicSessionPage() {
           (line) =>
             line &&
             line.original &&
-            typeof line.original === "string" &&
-            line.original.trim().length > 0
+            typeof line.original === 'string' &&
+            line.original.trim().length > 0,
         )
         .map((line, index) => {
           const text =
-            type === "original"
+            type === 'original'
               ? line.original
               : line.translated || line.original;
           return textOnlyMode ? text : `${index + 1}. ${text}`;
         })
-        .join("\n\n");
+        .join('\n\n');
 
       try {
         // 모던 브라우저 (HTTPS 환경)
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(textContent);
-          console.log("✅ Text copied using modern clipboard API");
+          console.log('✅ Text copied using modern clipboard API');
         } else {
           // 호환성 fallback (HTTP 환경 등)
-          const textArea = document.createElement("textarea");
+          const textArea = document.createElement('textarea');
           textArea.value = textContent;
-          textArea.style.position = "fixed";
-          textArea.style.left = "-999999px";
-          textArea.style.top = "-999999px";
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
           document.body.appendChild(textArea);
           textArea.focus();
           textArea.select();
 
-          const successful = document.execCommand("copy");
+          const successful = document.execCommand('copy');
           document.body.removeChild(textArea);
 
           if (!successful) {
-            throw new Error("execCommand copy failed");
+            throw new Error('execCommand copy failed');
           }
-          console.log("✅ Text copied using fallback method");
+          console.log('✅ Text copied using fallback method');
         }
 
         // 다국어화된 성공 Toast
         addToast({
-          type: "success",
-          title: t("copySuccess"),
+          type: 'success',
+          title: t('copySuccess'),
           duration: 2000,
         });
       } catch (err) {
-        console.error("❌ Failed to copy text:", err);
+        console.error('❌ Failed to copy text:', err);
 
         // 다국어화된 실패 Toast
         addToast({
-          type: "error",
-          title: t("copyFail"),
+          type: 'error',
+          title: t('copyFail'),
           duration: 3000,
         });
       }
     },
-    [transcript, textOnlyMode, addToast, t]
+    [transcript, textOnlyMode, addToast, t],
   );
 
   // Render transcript content function
-  const renderTranscriptContent = (type: "original" | "translation") => {
+  const renderTranscriptContent = (type: 'original' | 'translation') => {
     if (transcript.length === 0) {
       return (
         <div
-          className={`text-center py-16 ${
-            darkMode ? "text-gray-400" : "text-gray-500"
+          className={`py-16 text-center ${
+            darkMode ? 'text-gray-400' : 'text-gray-500'
           }`}
         >
           <div
-            className={`mx-auto w-16 h-16 rounded-full ${
-              darkMode ? "bg-gray-800" : "bg-gray-100"
-            } flex items-center justify-center mb-6`}
+            className={`mx-auto h-16 w-16 rounded-full ${
+              darkMode ? 'bg-gray-800' : 'bg-gray-100'
+            } mb-6 flex items-center justify-center`}
           >
-            {type === "original" ? (
+            {type === 'original' ? (
               <Mic className="h-8 w-8 opacity-50" />
             ) : (
               <Globe className="h-8 w-8 opacity-50" />
             )}
           </div>
           <h3
-            className={`text-lg font-medium mb-2 ${
-              darkMode ? "text-gray-300" : "text-gray-700"
+            className={`mb-2 text-lg font-medium ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
             }`}
           >
-            {type === "original"
-              ? t("waitingSpeaker")
-              : t("noContentTranslate")}
+            {type === 'original'
+              ? t('waitingSpeaker')
+              : t('noContentTranslate')}
           </h3>
           <p className="text-sm">
-            {type === "original"
-              ? t("liveTranscription")
-              : t("originalTranslated")}
+            {type === 'original'
+              ? t('liveTranscription')
+              : t('originalTranslated')}
           </p>
-          {type === "original" && (
+          {type === 'original' && (
             <div className="mt-4 flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs">{t("sessionActive")}</span>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+              <span className="text-xs">{t('sessionActive')}</span>
             </div>
           )}
         </div>
@@ -1205,19 +1207,19 @@ export default function PublicSessionPage() {
               (line) =>
                 line &&
                 line.original &&
-                typeof line.original === "string" &&
-                line.original.trim().length > 0
+                typeof line.original === 'string' &&
+                line.original.trim().length > 0,
             )
             .map((line) => {
               const text =
-                type === "original"
+                type === 'original'
                   ? line.original
                   : line.translated || line.original;
               return (
                 <div
                   key={`text-only-${type}-${line.id}`}
                   className={`leading-relaxed ${
-                    darkMode ? "text-gray-100" : "text-gray-900"
+                    darkMode ? 'text-gray-100' : 'text-gray-900'
                   }`}
                   style={{ fontSize: `${fontSize[0]}px` }}
                 >
@@ -1236,12 +1238,12 @@ export default function PublicSessionPage() {
             (line) =>
               line &&
               line.original &&
-              typeof line.original === "string" &&
-              line.original.trim().length > 0
+              typeof line.original === 'string' &&
+              line.original.trim().length > 0,
           )
           .map((line, idx) => {
             const text =
-              type === "original"
+              type === 'original'
                 ? line.original
                 : line.translated || line.original;
 
@@ -1253,8 +1255,8 @@ export default function PublicSessionPage() {
                 {/* Timestamp */}
                 {showTimestamps && (
                   <div
-                    className={`text-xs mb-1 flex items-center space-x-2 ${
-                      darkMode ? "text-gray-400" : "text-gray-500"
+                    className={`mb-1 flex items-center space-x-2 text-xs ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
                     }`}
                   >
                     <span className="font-medium">#{idx + 1}</span>
@@ -1262,23 +1264,23 @@ export default function PublicSessionPage() {
                     <span>{line.timestamp}</span>
                     <span>•</span>
                     <span>
-                      {type === "original" ? line.speaker : selectedLang?.name}
+                      {type === 'original' ? line.speaker : selectedLang?.name}
                     </span>
-                    {type === "translation" && line.isTranslating && (
+                    {type === 'translation' && line.isTranslating && (
                       <>
                         <span>•</span>
                         <RefreshCw className="h-3 w-3 animate-spin" />
-                        <span>{t("translating")}</span>
+                        <span>{t('translating')}</span>
                       </>
                     )}
-                    {type === "translation" &&
+                    {type === 'translation' &&
                       !line.isTranslating &&
                       line.translationQuality &&
                       line.translationQuality > 0.8 && (
                         <>
                           <span>•</span>
                           <CheckCircle className="h-3 w-3 text-green-600" />
-                          <span>{t("completed")}</span>
+                          <span>{t('completed')}</span>
                         </>
                       )}
                   </div>
@@ -1286,8 +1288,8 @@ export default function PublicSessionPage() {
 
                 {/* Main Text */}
                 <div
-                  className={`leading-relaxed mb-1 ${
-                    darkMode ? "text-gray-100" : "text-gray-900"
+                  className={`mb-1 leading-relaxed ${
+                    darkMode ? 'text-gray-100' : 'text-gray-900'
                   }`}
                   style={{ fontSize: `${fontSize[0]}px` }}
                 >
@@ -1295,22 +1297,22 @@ export default function PublicSessionPage() {
                 </div>
 
                 {/* Translation should ONLY show below original in mobile view - NOT on desktop */}
-                {type === "original" &&
+                {type === 'original' &&
                   translationEnabled &&
-                  selectedLanguage !== "en" &&
+                  selectedLanguage !== 'en' &&
                   line.translated !== line.original && (
                     <div
-                      className={`lg:hidden leading-relaxed italic pl-4 border-l-2 ${
+                      className={`border-l-2 pl-4 leading-relaxed italic lg:hidden ${
                         darkMode
-                          ? "text-gray-300 border-gray-600"
-                          : "text-gray-700 border-gray-300"
+                          ? 'border-gray-600 text-gray-300'
+                          : 'border-gray-300 text-gray-700'
                       }`}
                       style={{ fontSize: `${fontSize[0] - 1}px` }}
                     >
                       {line.isTranslating ? (
-                        <span className="text-gray-400 flex items-center space-x-2">
+                        <span className="flex items-center space-x-2 text-gray-400">
                           <RefreshCw className="h-3 w-3 animate-spin" />
-                          <span>[{t("aiTranslating")}]</span>
+                          <span>[{t('aiTranslating')}]</span>
                         </span>
                       ) : (
                         line.translated
@@ -1326,7 +1328,7 @@ export default function PublicSessionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Card>
           <CardContent className="p-8">
             <div className="flex flex-col items-center space-y-4">
@@ -1341,14 +1343,14 @@ export default function PublicSessionPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Card>
           <CardContent className="p-8">
             <div className="flex flex-col items-center space-y-4">
               <AlertCircle className="h-8 w-8 text-red-600" />
-              <p className="text-gray-900 font-medium">Session Not Found</p>
-              <p className="text-gray-600 text-sm text-center">{error}</p>
-              <Button onClick={() => router.push("/")} variant="outline">
+              <p className="font-medium text-gray-900">Session Not Found</p>
+              <p className="text-center text-sm text-gray-600">{error}</p>
+              <Button onClick={() => router.push('/')} variant="outline">
                 Go Home
               </Button>
             </div>
@@ -1360,25 +1362,25 @@ export default function PublicSessionPage() {
 
   if (!hasJoined && session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
           <CardContent className="p-8">
-            <div className="text-center space-y-6">
+            <div className="space-y-6 text-center">
               <div>
-                <Mic className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                <Mic className="mx-auto mb-4 h-12 w-12 text-blue-600" />
                 <h1 className="text-2xl font-bold text-gray-900">
                   {session.title}
                 </h1>
-                <p className="text-gray-600 mt-2">by {session.host_name}</p>
+                <p className="mt-2 text-gray-600">by {session.host_name}</p>
                 <Badge className="mt-2 bg-green-100 text-green-800">
-                  {t("liveSession")}
+                  {t('liveSession')}
                 </Badge>
               </div>
 
               <div className="space-y-4">
                 {user && (
                   <div className="text-sm text-gray-600">
-                    Welcome,{" "}
+                    Welcome,{' '}
                     <strong>
                       {user.fullName || user.primaryEmailAddress?.emailAddress}
                     </strong>
@@ -1387,7 +1389,7 @@ export default function PublicSessionPage() {
                 )}
 
                 {user && session?.host_id === user.id && (
-                  <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
+                  <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-600">
                     <strong>👑 You are the host</strong>
                     <br />
                     Join as audience to see how your session appears to
@@ -1400,13 +1402,13 @@ export default function PublicSessionPage() {
                 <Button onClick={joinSession} className="w-full">
                   <Globe className="mr-2 h-4 w-4" />
                   {user && session?.host_id === user.id
-                    ? t("viewAsAudience")
-                    : t("joinSession")}
+                    ? t('viewAsAudience')
+                    : t('joinSession')}
                 </Button>
               </div>
 
               <div className="text-xs text-gray-400">
-                {t("realtimeTranscription")}
+                {t('realtimeTranscription')}
               </div>
             </div>
           </CardContent>
@@ -1417,25 +1419,25 @@ export default function PublicSessionPage() {
 
   return (
     <div
-      className={`min-h-screen ${darkMode ? "dark bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}
     >
       {/* Mobile Header */}
       <header
         className={`border-b ${
-          darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+          darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'
         } sticky top-0 z-40`}
       >
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+              <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
               <div>
                 <span
                   className={`text-sm font-medium ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  {session?.title || "Live Session"}
+                  {session?.title || 'Live Session'}
                 </span>
                 <div className="flex items-center space-x-2 text-xs text-gray-500">
                   <Users className="h-3 w-3" />
@@ -1449,9 +1451,9 @@ export default function PublicSessionPage() {
               {user ? (
                 <div className="flex items-center space-x-1 text-xs text-gray-500">
                   <User className="h-3 w-3" />
-                  <span>{user.fullName || "User"}</span>
+                  <span>{user.fullName || 'User'}</span>
                   {session?.host_id === user.id && (
-                    <span className="text-blue-600 font-medium">👑</span>
+                    <span className="font-medium text-blue-600">👑</span>
                   )}
                 </div>
               ) : (
@@ -1476,7 +1478,7 @@ export default function PublicSessionPage() {
       {showSettings && (
         <div
           className={`border-b ${
-            darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+            darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'
           } p-4`}
         >
           <div className="space-y-4">
@@ -1485,10 +1487,10 @@ export default function PublicSessionPage() {
                 <div className="flex items-center justify-between">
                   <Label
                     className={`text-sm font-medium ${
-                      darkMode ? "text-gray-300" : "text-gray-700"
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
                     }`}
                   >
-                    {t("translation")}
+                    {t('translation')}
                   </Label>
                   <div className="flex items-center space-x-2">
                     <input
@@ -1501,18 +1503,18 @@ export default function PublicSessionPage() {
                     <Label
                       htmlFor="translationEnabled"
                       className={`text-sm ${
-                        darkMode ? "text-gray-300" : "text-gray-700"
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}
                     >
-                      {t("enableTranslation")}
+                      {t('enableTranslation')}
                     </Label>
                   </div>
                 </div>
 
                 <div
                   className={`text-xs ${
-                    darkMode ? "text-gray-400" : "text-gray-500"
-                  } p-3 rounded ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
+                    darkMode ? 'text-gray-400' : 'text-gray-500'
+                  } rounded p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
                 >
                   <div className="space-y-2">
                     <div>
@@ -1525,7 +1527,7 @@ export default function PublicSessionPage() {
                       <div>• Google Translate as fallback</div>
                     </div>
                     <div>
-                      • Your language:{" "}
+                      • Your language:{' '}
                       <strong>
                         {
                           languages.find((l) => l.code === selectedLanguage)
@@ -1534,24 +1536,24 @@ export default function PublicSessionPage() {
                       </strong>
                     </div>
                     {translationEnabled && (
-                      <div className="mt-3 pt-2 border-t border-gray-300 dark:border-gray-600">
+                      <div className="mt-3 border-t border-gray-300 pt-2 dark:border-gray-600">
                         <div className="grid grid-cols-3 gap-3 text-center">
                           <div className="space-y-1">
-                            <div className="font-bold text-green-600 text-sm">
+                            <div className="text-sm font-bold text-green-600">
                               {translationStats.cached}
                             </div>
                             <div className="text-xs">📋 Cached</div>
                             <div className="text-xs opacity-75">Instant</div>
                           </div>
                           <div className="space-y-1">
-                            <div className="font-bold text-blue-600 text-sm">
+                            <div className="text-sm font-bold text-blue-600">
                               {translationStats.processing}
                             </div>
                             <div className="text-xs">⏳ Processing</div>
                             <div className="text-xs opacity-75">AI Working</div>
                           </div>
                           <div className="space-y-1">
-                            <div className="font-bold text-purple-600 text-sm">
+                            <div className="text-sm font-bold text-purple-600">
                               {translationStats.completed}
                             </div>
                             <div className="text-xs">✅ Done</div>
@@ -1570,7 +1572,7 @@ export default function PublicSessionPage() {
                                   (translationStats.cached +
                                     translationStats.completed +
                                     translationStats.processing)) *
-                                  100
+                                  100,
                               )}
                               %
                             </div>
@@ -1585,10 +1587,10 @@ export default function PublicSessionPage() {
                   <div className="space-y-2">
                     <Label
                       className={`text-sm font-medium ${
-                        darkMode ? "text-gray-300" : "text-gray-700"
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}
                     >
-                      {t("targetLanguage")}
+                      {t('targetLanguage')}
                     </Label>
                     <Select
                       value={selectedLanguage}
@@ -1616,10 +1618,10 @@ export default function PublicSessionPage() {
             <div className="space-y-2">
               <Label
                 className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-700"
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                {t("fontSize")}: {fontSize[0]}px
+                {t('fontSize')}: {fontSize[0]}px
               </Label>
               <Slider
                 value={fontSize}
@@ -1643,10 +1645,10 @@ export default function PublicSessionPage() {
                 <Label
                   htmlFor="darkMode"
                   className={`text-sm ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  {t("darkMode")}
+                  {t('darkMode')}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -1660,10 +1662,10 @@ export default function PublicSessionPage() {
                 <Label
                   htmlFor="showTimestamps"
                   className={`text-sm ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  {t("showTimestamps")}
+                  {t('showTimestamps')}
                 </Label>
               </div>
               {/* 🆕 텍스트만 보기 옵션 */}
@@ -1678,10 +1680,10 @@ export default function PublicSessionPage() {
                 <Label
                   htmlFor="textOnlyMode"
                   className={`text-sm ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  {t("textOnlyMode")}
+                  {t('textOnlyMode')}
                 </Label>
               </div>
             </div>
@@ -1691,38 +1693,38 @@ export default function PublicSessionPage() {
               <div className="space-y-2">
                 <Label
                   className={`text-sm font-medium ${
-                    darkMode ? "text-gray-300" : "text-gray-700"
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  {t("textCopy")}
+                  {t('textCopy')}
                 </Label>
                 <div className="flex space-x-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={(e) => copyTextOnly("original", e)}
+                    onClick={(e) => copyTextOnly('original', e)}
                     className="flex-1"
                   >
-                    {t("copyOriginal")}
+                    {t('copyOriginal')}
                   </Button>
                   {translationEnabled && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e) => copyTextOnly("translation", e)}
+                      onClick={(e) => copyTextOnly('translation', e)}
                       className="flex-1"
                     >
-                      {t("copyTranslation")}
+                      {t('copyTranslation')}
                     </Button>
                   )}
                 </div>
                 {textOnlyMode && (
                   <p
                     className={`text-xs ${
-                      darkMode ? "text-gray-400" : "text-gray-500"
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
                     }`}
                   >
-                    {t("textOnlyModeHint")}
+                    {t('textOnlyModeHint')}
                   </p>
                 )}
               </div>
@@ -1732,45 +1734,45 @@ export default function PublicSessionPage() {
       )}
 
       {/* Main Content */}
-      <div className="flex flex-col h-[calc(100vh-80px)]">
+      <div className="flex h-[calc(100vh-80px)] flex-col">
         {/* Mobile Tab Navigation - Show only on mobile */}
-        <div className="lg:hidden border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="border-b border-gray-200 bg-white lg:hidden dark:border-gray-700 dark:bg-gray-800">
           <div className="flex">
             <button
               onClick={() => setTranslationEnabled(false)}
-              className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
+              className={`flex-1 border-b-2 px-4 py-3 text-center text-sm font-medium transition-colors ${
                 !translationEnabled
                   ? `border-blue-500 ${
                       darkMode
-                        ? "text-blue-400 bg-blue-950/30"
-                        : "text-blue-600 bg-blue-50"
+                        ? 'bg-blue-950/30 text-blue-400'
+                        : 'bg-blue-50 text-blue-600'
                     }`
                   : `border-transparent ${
                       darkMode
-                        ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                     }`
               }`}
             >
-              📝 {t("original")}
+              📝 {t('original')}
             </button>
             <button
               onClick={() => setTranslationEnabled(true)}
-              className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
+              className={`flex-1 border-b-2 px-4 py-3 text-center text-sm font-medium transition-colors ${
                 translationEnabled
                   ? `border-green-500 ${
                       darkMode
-                        ? "text-green-400 bg-green-950/30"
-                        : "text-green-600 bg-green-50"
+                        ? 'bg-green-950/30 text-green-400'
+                        : 'bg-green-50 text-green-600'
                     }`
                   : `border-transparent ${
                       darkMode
-                        ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                     }`
               }`}
             >
-              🌍 {t("translation")}
+              🌍 {t('translation')}
               {selectedLang && (
                 <span className="ml-1 text-xs opacity-75">
                   {selectedLang.flag}
@@ -1781,31 +1783,31 @@ export default function PublicSessionPage() {
         </div>
 
         {/* Desktop Layout - Show only on desktop */}
-        <div className="hidden lg:flex lg:flex-row flex-1">
+        <div className="hidden flex-1 lg:flex lg:flex-row">
           {/* Original Transcript - Desktop */}
           <div
             className={`flex-1 transition-all duration-300 ${
-              translationEnabled ? "lg:mr-2" : ""
+              translationEnabled ? 'lg:mr-2' : ''
             }`}
           >
             <div className="h-full p-4">
               <Card
                 className={`h-full ${
-                  darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+                  darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'
                 }`}
               >
                 <CardHeader>
                   <CardTitle
                     className={`flex items-center space-x-2 ${
-                      darkMode ? "text-white" : "text-gray-900"
+                      darkMode ? 'text-white' : 'text-gray-900'
                     }`}
                   >
                     <Mic className="h-5 w-5" />
-                    <span>{t("original")} Transcript</span>
-                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                    <span>{t('original')} Transcript</span>
+                    <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
                     <span
                       className={`text-sm font-normal ${
-                        darkMode ? "text-gray-300" : "text-gray-500"
+                        darkMode ? 'text-gray-300' : 'text-gray-500'
                       }`}
                     >
                       Live
@@ -1813,8 +1815,8 @@ export default function PublicSessionPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-[calc(100%-80px)]">
-                  <div className="space-y-4 h-full overflow-y-auto">
-                    {renderTranscriptContent("original")}
+                  <div className="h-full space-y-4 overflow-y-auto">
+                    {renderTranscriptContent('original')}
                   </div>
                 </CardContent>
               </Card>
@@ -1823,26 +1825,26 @@ export default function PublicSessionPage() {
 
           {/* Translation Side Panel - Desktop */}
           {translationEnabled && (
-            <div className="lg:w-1/2 w-full">
+            <div className="w-full lg:w-1/2">
               <div className="h-full p-4 pl-2">
                 <Card
                   className={`h-full border-l-4 border-green-500 ${
-                    darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+                    darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'
                   }`}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle
                         className={`flex items-center space-x-2 ${
-                          darkMode ? "text-white" : "text-gray-900"
+                          darkMode ? 'text-white' : 'text-gray-900'
                         }`}
                       >
                         <Globe className="h-5 w-5 text-green-600" />
-                        <span>{t("translation")}</span>
+                        <span>{t('translation')}</span>
                         {selectedLang && (
                           <span
                             className={`text-sm font-normal ${
-                              darkMode ? "text-gray-300" : "text-gray-500"
+                              darkMode ? 'text-gray-300' : 'text-gray-500'
                             }`}
                           >
                             ({selectedLang.flag} {selectedLang.name})
@@ -1882,8 +1884,8 @@ export default function PublicSessionPage() {
                   </CardHeader>
 
                   <CardContent className="h-[calc(100%-140px)]">
-                    <div className="space-y-4 h-full overflow-y-auto">
-                      {renderTranscriptContent("translation")}
+                    <div className="h-full space-y-4 overflow-y-auto">
+                      {renderTranscriptContent('translation')}
                     </div>
                   </CardContent>
                 </Card>
@@ -1893,18 +1895,18 @@ export default function PublicSessionPage() {
         </div>
 
         {/* Mobile Layout - Show only on mobile */}
-        <div className="lg:hidden flex-1 flex flex-col">
+        <div className="flex flex-1 flex-col lg:hidden">
           <div className="flex-1 p-4">
             <Card
               className={`h-full ${
-                darkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+                darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'
               }`}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle
                     className={`flex items-center space-x-2 ${
-                      darkMode ? "text-white" : "text-gray-900"
+                      darkMode ? 'text-white' : 'text-gray-900'
                     }`}
                   >
                     {translationEnabled ? (
@@ -1914,7 +1916,7 @@ export default function PublicSessionPage() {
                         {selectedLang && (
                           <span
                             className={`text-sm font-normal ${
-                              darkMode ? "text-gray-300" : "text-gray-500"
+                              darkMode ? 'text-gray-300' : 'text-gray-500'
                             }`}
                           >
                             ({selectedLang.flag} {selectedLang.name})
@@ -1925,10 +1927,10 @@ export default function PublicSessionPage() {
                       <>
                         <Mic className="h-5 w-5" />
                         <span>Original Transcript</span>
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                        <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
                         <span
                           className={`text-sm font-normal ${
-                            darkMode ? "text-gray-300" : "text-gray-500"
+                            darkMode ? 'text-gray-300' : 'text-gray-500'
                           }`}
                         >
                           Live
@@ -1964,10 +1966,10 @@ export default function PublicSessionPage() {
               </CardHeader>
 
               <CardContent className="h-[calc(100%-100px)] overflow-hidden">
-                <div className="space-y-4 h-full overflow-y-auto">
+                <div className="h-full space-y-4 overflow-y-auto">
                   {translationEnabled
-                    ? renderTranscriptContent("translation")
-                    : renderTranscriptContent("original")}
+                    ? renderTranscriptContent('translation')
+                    : renderTranscriptContent('original')}
                 </div>
               </CardContent>
             </Card>
@@ -1978,8 +1980,8 @@ export default function PublicSessionPage() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ChatbotWidget
-        transcript={transcript.map((line) => line.original).join("\n")}
-        sessionId={sessionId || ""}
+        transcript={transcript.map((line) => line.original).join('\n')}
+        sessionId={sessionId || ''}
       />
     </div>
   );

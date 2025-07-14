@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Calendar,
   Clock,
@@ -32,14 +32,14 @@ import {
   Trash2,
   FileText,
   Share2,
-} from "lucide-react";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { Session } from "@/lib/types";
-import { useSession, useUser } from "@clerk/nextjs";
+} from 'lucide-react';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { Session } from '@/lib/types';
+import { useSession, useUser } from '@clerk/nextjs';
 
 interface SavedSession extends Session {
-  role: "speaker" | "audience";
+  role: 'speaker' | 'audience';
   saved_at: string;
   expires_at?: string;
   is_premium: boolean;
@@ -50,12 +50,14 @@ interface SavedSession extends Session {
 export default function MySessionsPage() {
   const { user } = useUser();
   const { session: clerkSession } = useSession();
-  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null));
+  const supabase = createClient(
+    clerkSession?.getToken() ?? Promise.resolve(null),
+  );
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [activeTab, setActiveTab] = useState("live");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [activeTab, setActiveTab] = useState('live');
   const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<Record<
@@ -71,35 +73,35 @@ export default function MySessionsPage() {
       try {
         // Load user profile
         const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("*")
-          .eq("id", user.id)
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
           .single();
 
         setUserProfile(profile);
 
         // Load speaker sessions (sessions where user is host)
         const { data: speakerSessions } = await supabase
-          .from("sessions")
+          .from('sessions')
           .select(
             `
             *,
             transcripts(count)
-          `
+          `,
           )
-          .eq("host_id", user.id);
+          .eq('host_id', user.id);
 
         // Load audience sessions (sessions where user participated)
         const { data: audienceSessions } = await supabase
-          .from("user_sessions")
+          .from('user_sessions')
           .select(
             `
             *,
             sessions(*)
-          `
+          `,
           )
-          .eq("user_id", user.id)
-          .eq("role", "audience");
+          .eq('user_id', user.id)
+          .eq('role', 'audience');
 
         const formattedSessions: SavedSession[] = [];
 
@@ -108,7 +110,7 @@ export default function MySessionsPage() {
           formattedSessions.push({
             ...session,
             id: `speaker-${session.id}`, // Make key unique
-            role: "speaker" as const,
+            role: 'speaker' as const,
             saved_at: session.created_at,
             expires_at: undefined, // Speaker sessions never expire
             is_premium: true, // Speaker sessions are always premium
@@ -123,7 +125,7 @@ export default function MySessionsPage() {
             formattedSessions.push({
               ...userSession.sessions,
               id: `audience-${userSession.sessions.id}`, // Make key unique
-              role: "audience" as const,
+              role: 'audience' as const,
               saved_at: userSession.saved_at,
               expires_at: userSession.expires_at,
               is_premium: userSession.is_premium,
@@ -135,7 +137,7 @@ export default function MySessionsPage() {
 
         setSessions(formattedSessions);
       } catch (error) {
-        console.error("Error loading sessions:", error);
+        console.error('Error loading sessions:', error);
       } finally {
         setLoading(false);
       }
@@ -145,41 +147,41 @@ export default function MySessionsPage() {
   }, [user, supabase]);
 
   const getStatusColor = (session: SavedSession) => {
-    if (session.role === "speaker") {
-      return "bg-purple-100 text-purple-800";
+    if (session.role === 'speaker') {
+      return 'bg-purple-100 text-purple-800';
     }
 
     if (session.expires_at && new Date(session.expires_at) < new Date()) {
-      return "bg-red-100 text-red-800";
+      return 'bg-red-100 text-red-800';
     }
 
     if (session.is_premium) {
-      return "bg-blue-100 text-blue-800";
+      return 'bg-blue-100 text-blue-800';
     }
 
-    return "bg-green-100 text-green-800";
+    return 'bg-green-100 text-green-800';
   };
 
   const getStatusText = (session: SavedSession) => {
-    if (session.role === "speaker") {
-      return "Speaker";
+    if (session.role === 'speaker') {
+      return 'Speaker';
     }
 
     if (session.expires_at && new Date(session.expires_at) < new Date()) {
-      return "Expired";
+      return 'Expired';
     }
 
     if (session.is_premium) {
-      return "Premium";
+      return 'Premium';
     }
 
-    return "Free";
+    return 'Free';
   };
 
   // 🆕 D-day 계산 함수
   const getDaysRemaining = (session: SavedSession) => {
     if (
-      session.role === "speaker" ||
+      session.role === 'speaker' ||
       session.is_premium ||
       !session.expires_at
     ) {
@@ -203,12 +205,12 @@ export default function MySessionsPage() {
     }
 
     if (daysRemaining <= 0) {
-      return <Badge className="bg-red-100 text-red-800 text-xs">Expired</Badge>;
+      return <Badge className="bg-red-100 text-xs text-red-800">Expired</Badge>;
     }
 
     if (daysRemaining <= 3) {
       return (
-        <Badge className="bg-orange-100 text-orange-800 text-xs">
+        <Badge className="bg-orange-100 text-xs text-orange-800">
           D-{daysRemaining}
         </Badge>
       );
@@ -216,21 +218,21 @@ export default function MySessionsPage() {
 
     if (daysRemaining <= 7) {
       return (
-        <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+        <Badge className="bg-yellow-100 text-xs text-yellow-800">
           D-{daysRemaining}
         </Badge>
       );
     }
 
     return (
-      <Badge className="bg-green-100 text-green-800 text-xs">
+      <Badge className="bg-green-100 text-xs text-green-800">
         D-{daysRemaining}
       </Badge>
     );
   };
 
   const getStatusIcon = (session: SavedSession) => {
-    if (session.role === "speaker") {
+    if (session.role === 'speaker') {
       return <Mic className="h-3 w-3" />;
     }
 
@@ -249,19 +251,19 @@ export default function MySessionsPage() {
     const matchesSearch =
       session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       session.host_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === "all" || session.role === filterRole;
+    const matchesRole = filterRole === 'all' || session.role === filterRole;
     const matchesStatus =
-      filterStatus === "all" ||
+      filterStatus === 'all' ||
       getStatusText(session).toLowerCase() === filterStatus;
     return matchesSearch && matchesRole && matchesStatus;
   });
 
   // Separate live and completed sessions
   const liveSessions = filteredSessions.filter(
-    (session) => session.status === "active"
+    (session) => session.status === 'active',
   );
   const completedSessions = filteredSessions.filter(
-    (session) => session.status === "ended"
+    (session) => session.status === 'ended',
   );
 
   const sortedLiveSessions = [...liveSessions].sort((a, b) => {
@@ -273,27 +275,27 @@ export default function MySessionsPage() {
   });
 
   const displaySessions =
-    activeTab === "live" ? sortedLiveSessions : sortedCompletedSessions;
+    activeTab === 'live' ? sortedLiveSessions : sortedCompletedSessions;
 
   const deleteSession = async (sessionId: string) => {
     if (!user) return;
 
     try {
       await supabase
-        .from("user_sessions")
+        .from('user_sessions')
         .delete()
-        .eq("user_id", user.id)
-        .eq("session_id", sessionId);
+        .eq('user_id', user.id)
+        .eq('session_id', sessionId);
 
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch (error) {
-      console.error("Error deleting session:", error);
+      console.error('Error deleting session:', error);
     }
   };
 
   const upgradeToPremium = () => {
     // Implement premium upgrade logic
-    console.log("Upgrade to premium");
+    console.log('Upgrade to premium');
   };
 
   if (!user) {
@@ -304,7 +306,7 @@ export default function MySessionsPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Sessions</h1>
+        <h1 className="mb-2 text-3xl font-bold text-gray-900">My Sessions</h1>
         <p className="text-gray-600">
           Access your lecture transcripts and translations
         </p>
@@ -316,19 +318,19 @@ export default function MySessionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-blue-900">
-                {userProfile?.subscription_status === "premium"
-                  ? "Premium Plan"
-                  : "Free Plan"}
+                {userProfile?.subscription_status === 'premium'
+                  ? 'Premium Plan'
+                  : 'Free Plan'}
               </h3>
               <p className="text-sm text-blue-700">
-                {userProfile?.subscription_status === "premium"
-                  ? "Unlimited access to all features"
+                {userProfile?.subscription_status === 'premium'
+                  ? 'Unlimited access to all features'
                   : `${
-                      sessions.filter((s) => s.role === "audience").length
+                      sessions.filter((s) => s.role === 'audience').length
                     } sessions saved • 30 days remaining`}
               </p>
             </div>
-            {userProfile?.subscription_status !== "premium" && (
+            {userProfile?.subscription_status !== 'premium' && (
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
@@ -343,23 +345,23 @@ export default function MySessionsPage() {
       </Card>
 
       {/* Live/Completed Tabs */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 rounded-lg p-1">
+      <div className="mb-6 flex space-x-1 rounded-lg bg-gray-100 p-1">
         <button
-          onClick={() => setActiveTab("live")}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === "live"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-600 hover:text-gray-900"
+          onClick={() => setActiveTab('live')}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'live'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           🔴 Live Sessions ({liveSessions.length})
         </button>
         <button
-          onClick={() => setActiveTab("completed")}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === "completed"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-600 hover:text-gray-900"
+          onClick={() => setActiveTab('completed')}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'completed'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           📝 Completed ({completedSessions.length})
@@ -367,10 +369,10 @@ export default function MySessionsPage() {
       </div>
 
       {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row">
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
             <Input
               placeholder="Search sessions or hosts..."
               value={searchTerm}
@@ -406,15 +408,15 @@ export default function MySessionsPage() {
       {/* Sessions List */}
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-500 mt-2">Loading sessions...</p>
+          <div className="py-12 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-500">Loading sessions...</p>
           </div>
         ) : displaySessions.length === 0 ? (
-          <div className="text-center py-12">
-            <Mic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <div className="py-12 text-center">
+            <Mic className="mx-auto mb-4 h-12 w-12 text-gray-400" />
             <p className="text-gray-500">No sessions found</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="mt-1 text-sm text-gray-400">
               Start a session or join one to see it here
             </p>
           </div>
@@ -422,12 +424,12 @@ export default function MySessionsPage() {
           displaySessions.map((session: SavedSession) => (
             <Card
               key={session.id}
-              className="hover:shadow-md transition-shadow"
+              className="transition-shadow hover:shadow-md"
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
+                    <div className="mb-2 flex items-center space-x-2">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {session.title}
                       </h3>
@@ -441,9 +443,9 @@ export default function MySessionsPage() {
                       {renderDaysBadge(session)}
                     </div>
 
-                    <p className="text-gray-600 mb-3">
-                      {session.role === "speaker"
-                        ? "You hosted this session"
+                    <p className="mb-3 text-gray-600">
+                      {session.role === 'speaker'
+                        ? 'You hosted this session'
                         : `by ${session.host_name}`}
                     </p>
 
@@ -461,19 +463,19 @@ export default function MySessionsPage() {
                       <div className="flex items-center space-x-1">
                         <span>{session.primary_language}</span>
                       </div>
-                      {session.role === "audience" && session.expires_at && (
+                      {session.role === 'audience' && session.expires_at && (
                         <div className="flex items-center space-x-1">
                           <span>
                             {(() => {
                               const daysRemaining = getDaysRemaining(session);
                               if (daysRemaining === null) return null;
-                              if (daysRemaining <= 0) return "Expired";
+                              if (daysRemaining <= 0) return 'Expired';
                               if (daysRemaining === 1)
-                                return "Expires tomorrow";
+                                return 'Expires tomorrow';
                               if (daysRemaining <= 7)
                                 return `Expires in ${daysRemaining} days`;
                               return `Expires ${new Date(
-                                session.expires_at
+                                session.expires_at,
                               ).toLocaleDateString()}`;
                             })()}
                           </span>
@@ -483,7 +485,7 @@ export default function MySessionsPage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {activeTab === "live" ? (
+                    {activeTab === 'live' ? (
                       <Button size="sm" variant="outline" asChild>
                         <Link
                           href={`/session/${session.original_id || session.id}`}
@@ -538,7 +540,7 @@ export default function MySessionsPage() {
                         )}
                       </>
                     )}
-                    {session.role === "audience" && (
+                    {session.role === 'audience' && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -559,7 +561,7 @@ export default function MySessionsPage() {
       </div>
 
       {/* Premium Features */}
-      {userProfile?.subscription_status !== "premium" && (
+      {userProfile?.subscription_status !== 'premium' && (
         <Card className="mt-8 border-purple-200 bg-purple-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -571,7 +573,7 @@ export default function MySessionsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div className="mb-4 grid gap-4 md:grid-cols-3">
               <div className="flex items-center space-x-2">
                 <Zap className="h-4 w-4 text-purple-600" />
                 <span className="text-sm">Unlimited session storage</span>

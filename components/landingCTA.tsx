@@ -1,8 +1,8 @@
-import { ClerkLoading, ClerkLoaded, SignedIn, SignedOut } from "@clerk/nextjs";
-import { Button } from "./ui/button";
-import { Mic } from "lucide-react";
-import { SignUpButton } from "./auth/auth-buttons";
-import Link from "next/link";
+import { ClerkLoading, ClerkLoaded, SignedIn, SignedOut } from '@clerk/nextjs';
+import { Button } from './ui/button';
+import { Mic } from 'lucide-react';
+import { SignUpButton } from './auth/auth-buttons';
+import Link from 'next/link';
 
 export function LandingCTA() {
   return (

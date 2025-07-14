@@ -1,6 +1,6 @@
-import { ClerkLoading, ClerkLoaded, SignedIn, SignedOut } from "@clerk/nextjs";
-import { SignInButton, SignUpButton } from "./auth/auth-buttons";
-import CustomUserButton from "./auth/customUserButton";
+import { ClerkLoading, ClerkLoaded, SignedIn, SignedOut } from '@clerk/nextjs';
+import { SignInButton, SignUpButton } from './auth/auth-buttons';
+import CustomUserButton from './auth/customUserButton';
 
 export function NavAuthButtons() {
   return (

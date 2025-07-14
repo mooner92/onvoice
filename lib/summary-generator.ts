@@ -1,60 +1,72 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from '@supabase/supabase-js';
 
 const CATEGORY_PROMPTS = {
-  general: "Summarize the following lecture content as a list of clear, concise bullet points. Focus on key ideas, facts, and conclusions.",
-  sports: "Summarize the following sports-related content as bullet points. Highlight game results, player info, strategies, and key moments.",
-  economics: "Summarize the following economics-related content as bullet points. Include market trends, economic indicators, investment info, and key analysis.",
-  technology: "Summarize the following technology-related content as bullet points. Focus on technical concepts, innovations, and main takeaways.",
-  education: "Summarize the following education-related content as bullet points. Highlight learning objectives, key concepts, and educational value.",
-  business: "Summarize the following business-related content as bullet points. Focus on business strategies, market analysis, and management insights.",
-  medical: "Summarize the following medical-related content as bullet points. Highlight medical info, treatment methods, and health management.",
-  legal: "Summarize the following legal-related content as bullet points. Focus on legal issues, precedents, regulations, and main points.",
-  entertainment: "Summarize the following entertainment-related content as bullet points. Highlight work analysis, cultural significance, and trends.",
-  science: "Summarize the following science-related content as bullet points. Focus on scientific principles, research results, and key findings."
-}
+  general:
+    'Summarize the following lecture content as a list of clear, concise bullet points. Focus on key ideas, facts, and conclusions.',
+  sports:
+    'Summarize the following sports-related content as bullet points. Highlight game results, player info, strategies, and key moments.',
+  economics:
+    'Summarize the following economics-related content as bullet points. Include market trends, economic indicators, investment info, and key analysis.',
+  technology:
+    'Summarize the following technology-related content as bullet points. Focus on technical concepts, innovations, and main takeaways.',
+  education:
+    'Summarize the following education-related content as bullet points. Highlight learning objectives, key concepts, and educational value.',
+  business:
+    'Summarize the following business-related content as bullet points. Focus on business strategies, market analysis, and management insights.',
+  medical:
+    'Summarize the following medical-related content as bullet points. Highlight medical info, treatment methods, and health management.',
+  legal:
+    'Summarize the following legal-related content as bullet points. Focus on legal issues, precedents, regulations, and main points.',
+  entertainment:
+    'Summarize the following entertainment-related content as bullet points. Highlight work analysis, cultural significance, and trends.',
+  science:
+    'Summarize the following science-related content as bullet points. Focus on scientific principles, research results, and key findings.',
+};
 
 export interface SummaryGenerationOptions {
-  sessionId: string
-  force?: boolean
+  sessionId: string;
+  force?: boolean;
 }
 
 export interface SummaryResult {
-  summary: string
-  category: string
-  transcriptCount: number
-  fromCache: boolean
+  summary: string;
+  category: string;
+  transcriptCount: number;
+  fromCache: boolean;
 }
 
-export async function generateSessionSummary(options: SummaryGenerationOptions): Promise<SummaryResult> {
-  const { sessionId, force = false } = options
+export async function generateSessionSummary(
+  options: SummaryGenerationOptions,
+): Promise<SummaryResult> {
+  const { sessionId, force = false } = options;
 
-  console.log(`🤖 Starting summary generation for session ${sessionId}`)
+  console.log(`🤖 Starting summary generation for session ${sessionId}`);
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
 
   // Get session info
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('*')
     .eq('id', sessionId)
-    .single()
+    .single();
 
   if (sessionError || !session) {
-    throw new Error("Session not found")
+    throw new Error('Session not found');
   }
 
   // Check if summary already exists, unless force is true
   if (session.summary && !force) {
-    console.log(`✅ Summary already exists for session ${sessionId}`)
+    console.log(`✅ Summary already exists for session ${sessionId}`);
     return {
       summary: session.summary,
       category: session.category,
       transcriptCount: 0,
-      fromCache: true
-    }
+      fromCache: true,
+    };
   }
 
   // Get all transcripts for this session
@@ -62,30 +74,31 @@ export async function generateSessionSummary(options: SummaryGenerationOptions):
     .from('transcripts')
     .select('original_text, created_at')
     .eq('session_id', sessionId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (transcriptError) {
-    console.error('Error fetching transcripts:', transcriptError)
-    throw new Error("Failed to fetch transcripts")
+    console.error('Error fetching transcripts:', transcriptError);
+    throw new Error('Failed to fetch transcripts');
   }
 
   if (!transcripts || transcripts.length === 0) {
-    throw new Error("No transcripts found for this session")
+    throw new Error('No transcripts found for this session');
   }
 
   // Combine all transcripts
-  const fullTranscript = transcripts
-    .map(t => t.original_text)
-    .join(' ')
+  const fullTranscript = transcripts.map((t) => t.original_text).join(' ');
 
   // Limit transcript length for API efficiency
-  const maxLength = 8000
-  const truncatedTranscript = fullTranscript.length > maxLength 
-    ? fullTranscript.substring(0, maxLength) + '...'
-    : fullTranscript
+  const maxLength = 8000;
+  const truncatedTranscript =
+    fullTranscript.length > maxLength
+      ? fullTranscript.substring(0, maxLength) + '...'
+      : fullTranscript;
 
   // Get category-specific prompt
-  const categoryPrompt = CATEGORY_PROMPTS[session.category as keyof typeof CATEGORY_PROMPTS] || CATEGORY_PROMPTS.general
+  const categoryPrompt =
+    CATEGORY_PROMPTS[session.category as keyof typeof CATEGORY_PROMPTS] ||
+    CATEGORY_PROMPTS.general;
 
   // Generate English summary using Gemini
   const summaryPrompt = `
@@ -143,127 +156,161 @@ Please follow these instructions:
 - theme<br/>
 - event<br/>
 - takeaway<br/>
-`
+`;
 
-  console.log(`🤖 Generating English summary for session ${sessionId} (category: ${session.category})`)
-  
+  console.log(
+    `🤖 Generating English summary for session ${sessionId} (category: ${session.category})`,
+  );
+
   // Generate summary using Gemini
-  const geminiApiKey = process.env.GEMINI_API_KEY
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
-    console.error('Gemini API key not found')
-    throw new Error("Gemini API key not configured")
+    console.error('Gemini API key not found');
+    throw new Error('Gemini API key not configured');
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: summaryPrompt
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 800,
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    }),
-  })
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: summaryPrompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 800,
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
-    const errorText = await response.text()
-    console.error('Gemini API error:', response.status, errorText)
-    throw new Error("Failed to generate summary with Gemini")
+    const errorText = await response.text();
+    console.error('Gemini API error:', response.status, errorText);
+    throw new Error('Failed to generate summary with Gemini');
   }
 
-  const data = await response.json()
-  console.log('🔍 Full Gemini API response:', JSON.stringify(data, null, 2))
-  
-  let englishSummary = null
+  const data = await response.json();
+  console.log('🔍 Full Gemini API response:', JSON.stringify(data, null, 2));
+
+  let englishSummary = null;
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    const candidate = data.candidates[0]
-    
-    if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
-      englishSummary = candidate.content.parts[0].text.trim()
+    const candidate = data.candidates[0];
+
+    if (
+      candidate.content.parts &&
+      candidate.content.parts[0] &&
+      candidate.content.parts[0].text
+    ) {
+      englishSummary = candidate.content.parts[0].text.trim();
     } else {
-      console.error('❌ Gemini response missing content.parts:', candidate.content)
+      console.error(
+        '❌ Gemini response missing content.parts:',
+        candidate.content,
+      );
     }
   } else {
-    console.error('❌ Invalid Gemini response structure:', data)
+    console.error('❌ Invalid Gemini response structure:', data);
   }
 
   if (!englishSummary) {
-    throw new Error("Failed to generate summary")
+    throw new Error('Failed to generate summary');
   }
 
-  console.log(`✅ Gemini summary generated: ${englishSummary.substring(0, 100)}...`)
+  console.log(
+    `✅ Gemini summary generated: ${englishSummary.substring(0, 100)}...`,
+  );
 
   // Save English summary to database
   const { error: updateError } = await supabase
     .from('sessions')
     .update({ summary: englishSummary })
-    .eq('id', sessionId)
+    .eq('id', sessionId);
 
   if (updateError) {
-    console.error('Error saving summary:', updateError)
+    console.error('Error saving summary:', updateError);
     // Still continue even if saving fails
   } else {
-    console.log(`✅ English summary cached for session ${sessionId}`)
+    console.log(`✅ English summary cached for session ${sessionId}`);
   }
 
   // Generate translations for supported languages and save to session_summary_cache
-  const supportedLanguages = ['ko', 'zh', 'hi']
-  
-  console.log(`🌍 Generating translations for summary...`)
-  
+  const supportedLanguages = ['ko', 'zh', 'hi'];
+
+  console.log(`🌍 Generating translations for summary...`);
+
   // Save English summary to cache first
-  await supabase
-    .from('session_summary_cache')
-    .upsert({
-      session_id: sessionId,
-      language_code: 'en',
-      summary_text: englishSummary
-    })
+  await supabase.from('session_summary_cache').upsert({
+    session_id: sessionId,
+    language_code: 'en',
+    summary_text: englishSummary,
+  });
 
   for (const lang of supportedLanguages) {
     try {
       const translationPrompt = `Translate the following English summary to ${lang === 'ko' ? 'Korean' : lang === 'zh' ? 'Chinese' : 'Hindi'}. Maintain the professional tone and technical accuracy:
 
-${englishSummary}`
+${englishSummary}`;
 
-      const translationResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: translationPrompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 800,
+      const translationResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      })
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: translationPrompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 800,
+            },
+          }),
+        },
+      );
 
       if (!translationResponse.ok) {
-        console.error(`Gemini translation API error for ${lang}:`, translationResponse.status)
-        continue
+        console.error(
+          `Gemini translation API error for ${lang}:`,
+          translationResponse.status,
+        );
+        continue;
       }
 
-      const translationData = await translationResponse.json()
-      
-      let translatedSummary = null
-      if (translationData.candidates && translationData.candidates[0] && translationData.candidates[0].content) {
-        const candidate = translationData.candidates[0]
-        
-        if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
-          translatedSummary = candidate.content.parts[0].text.trim()
+      const translationData = await translationResponse.json();
+
+      let translatedSummary = null;
+      if (
+        translationData.candidates &&
+        translationData.candidates[0] &&
+        translationData.candidates[0].content
+      ) {
+        const candidate = translationData.candidates[0];
+
+        if (
+          candidate.content.parts &&
+          candidate.content.parts[0] &&
+          candidate.content.parts[0].text
+        ) {
+          translatedSummary = candidate.content.parts[0].text.trim();
         }
       }
 
@@ -274,27 +321,30 @@ ${englishSummary}`
           .upsert({
             session_id: sessionId,
             language_code: lang,
-            summary_text: translatedSummary
-          })
+            summary_text: translatedSummary,
+          });
 
         if (cacheError) {
-          console.error(`Error caching ${lang} summary translation:`, cacheError)
+          console.error(
+            `Error caching ${lang} summary translation:`,
+            cacheError,
+          );
         } else {
-          console.log(`✅ Cached ${lang} summary translation`)
+          console.log(`✅ Cached ${lang} summary translation`);
         }
       }
     } catch (error) {
-      console.error(`Error translating summary to ${lang}:`, error)
+      console.error(`Error translating summary to ${lang}:`, error);
     }
   }
 
-  console.log(`✅ Summary generated and saved for session ${sessionId}`)
-  console.log(`✅ Summary generated: ${englishSummary.substring(0, 100)}...`)
+  console.log(`✅ Summary generated and saved for session ${sessionId}`);
+  console.log(`✅ Summary generated: ${englishSummary.substring(0, 100)}...`);
 
   return {
     summary: englishSummary,
     category: session.category,
     transcriptCount: transcripts.length,
-    fromCache: false
-  }
-} 
+    fromCache: false,
+  };
+}

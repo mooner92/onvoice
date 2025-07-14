@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { X, BookOpen, Clock, Share2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+} from '@/components/ui/card';
+import { X, BookOpen, Clock, Share2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface SaveSessionModalProps {
   isOpen: boolean;
@@ -41,25 +41,25 @@ export function SaveSessionModal({
         returnUrl: window.location.href, // 현재 전체 URL 저장
       };
 
-      localStorage.setItem("pendingSessionSave", JSON.stringify(sessionData));
-      sessionStorage.setItem("pendingSessionSave", JSON.stringify(sessionData)); // 백업용
+      localStorage.setItem('pendingSessionSave', JSON.stringify(sessionData));
+      sessionStorage.setItem('pendingSessionSave', JSON.stringify(sessionData)); // 백업용
 
-      console.log("💾 Storing session save data:", sessionData);
-      console.log("🔐 Initiating Google login for session save");
-      console.log("📍 Current URL:", window.location.href);
-      console.log("🎯 Target return path:", currentSummaryPath);
+      console.log('💾 Storing session save data:', sessionData);
+      console.log('🔐 Initiating Google login for session save');
+      console.log('📍 Current URL:', window.location.href);
+      console.log('🎯 Target return path:', currentSummaryPath);
 
       // Redirect to Google login with specific return path
       router.push(
         `/auth/sign-in?redirect_url=${encodeURIComponent(
-          window.location.origin + currentSummaryPath
-        )}`
+          window.location.origin + currentSummaryPath,
+        )}`,
       );
 
       // Modal will close after successful login via useEffect in parent
     } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed");
+      console.error('Login failed:', error);
+      alert('Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -68,12 +68,12 @@ export function SaveSessionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="relative">
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute top-4 right-4 text-gray-400 transition-colors hover:text-gray-600"
           >
             <X className="h-5 w-5" />
           </button>
@@ -86,8 +86,8 @@ export function SaveSessionModal({
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Session Preview */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-2">{sessionTitle}</h4>
+          <div className="rounded-lg bg-gray-50 p-4">
+            <h4 className="mb-2 font-medium text-gray-900">{sessionTitle}</h4>
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center space-x-2">
                 <BookOpen className="h-4 w-4" />
@@ -109,15 +109,15 @@ export function SaveSessionModal({
             <h5 className="font-medium text-gray-900">Benefits of saving:</h5>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-start space-x-2">
-                <span className="text-green-600 mt-0.5">•</span>
+                <span className="mt-0.5 text-green-600">•</span>
                 <span>Access My Sessions anytime</span>
               </li>
               <li className="flex items-start space-x-2">
-                <span className="text-green-600 mt-0.5">•</span>
+                <span className="mt-0.5 text-green-600">•</span>
                 <span>AI summary and translation</span>
               </li>
               <li className="flex items-start space-x-2">
-                <span className="text-green-600 mt-0.5">•</span>
+                <span className="mt-0.5 text-green-600">•</span>
                 <span>Convenient access on mobile</span>
               </li>
             </ul>
@@ -132,7 +132,7 @@ export function SaveSessionModal({
             >
               {isLoading ? (
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                   <span>Logging in...</span>
                 </div>
               ) : (

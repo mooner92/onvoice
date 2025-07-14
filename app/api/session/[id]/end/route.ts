@@ -1,34 +1,34 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { generateSessionSummary } from "@/lib/summary-generator"
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { generateSessionSummary } from '@/lib/summary-generator';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    let hostId: string | undefined
-    
+    let hostId: string | undefined;
+
     // Try to parse JSON body, but it's optional
     try {
-      const body = await req.json()
-      hostId = body.hostId
+      const body = await req.json();
+      hostId = body.hostId;
     } catch {
       // Body might be empty or not JSON, which is okay
-      console.log('No JSON body provided, proceeding without hostId')
+      console.log('No JSON body provided, proceeding without hostId');
     }
-    
-    const resolvedParams = await params
-    const sessionId = resolvedParams.id
+
+    const resolvedParams = await params;
+    const sessionId = resolvedParams.id;
 
     if (!sessionId) {
       return NextResponse.json(
-        { error: "Missing session ID" },
-        { status: 400 }
-      )
+        { error: 'Missing session ID' },
+        { status: 400 },
+      );
     }
 
-    const supabase = await createClient()
+    const supabase = await createClient();
 
     // If hostId is provided, verify host ownership
     if (hostId) {
@@ -37,13 +37,13 @@ export async function POST(
         .select('*')
         .eq('id', sessionId)
         .eq('host_id', hostId)
-        .single()
+        .single();
 
       if (sessionError || !session) {
         return NextResponse.json(
-          { error: "Session not found or unauthorized" },
-          { status: 404 }
-        )
+          { error: 'Session not found or unauthorized' },
+          { status: 404 },
+        );
       }
     }
 
@@ -52,64 +52,67 @@ export async function POST(
       .from('sessions')
       .update({
         status: 'ended',
-        ended_at: new Date().toISOString()
+        ended_at: new Date().toISOString(),
       })
-      .eq('id', sessionId)
+      .eq('id', sessionId);
 
     if (updateError) {
-      console.error('Error ending session:', updateError)
+      console.error('Error ending session:', updateError);
       return NextResponse.json(
-        { error: "Failed to end session" },
-        { status: 500 }
-      )
+        { error: 'Failed to end session' },
+        { status: 500 },
+      );
     }
 
     // Get session statistics
     const { count: transcriptCount } = await supabase
       .from('transcripts')
       .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId)
+      .eq('session_id', sessionId);
 
     const { count: participantCount } = await supabase
       .from('session_participants')
       .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId)
+      .eq('session_id', sessionId);
 
     // Generate summary if there are transcripts
-    let summaryGenerated = false
+    let summaryGenerated = false;
     if (transcriptCount && transcriptCount > 0) {
       try {
-        console.log(`🤖 Generating summary for session ${sessionId} with ${transcriptCount} transcripts`)
-        
+        console.log(
+          `🤖 Generating summary for session ${sessionId} with ${transcriptCount} transcripts`,
+        );
+
         // Call summary generation function directly
-        const summaryData = await generateSessionSummary({ sessionId })
-        
+        const summaryData = await generateSessionSummary({ sessionId });
+
         if (summaryData) {
-          console.log(`✅ Summary generated: ${summaryData.summary?.substring(0, 50)}...`)
-          summaryGenerated = true
+          console.log(
+            `✅ Summary generated: ${summaryData.summary?.substring(0, 50)}...`,
+          );
+          summaryGenerated = true;
         } else {
-          console.error('Failed to generate summary')
+          console.error('Failed to generate summary');
         }
       } catch (summaryError) {
-        console.error('Error generating summary:', summaryError)
+        console.error('Error generating summary:', summaryError);
       }
     }
 
     return NextResponse.json({
-      message: "Session ended successfully",
+      message: 'Session ended successfully',
       statistics: {
         transcript_count: transcriptCount || 0,
         participant_count: participantCount || 0,
         duration: 0,
-        summary_generated: summaryGenerated
-      }
-    })
-
+        summary_generated: summaryGenerated,
+      },
+    });
   } catch (error) {
-    console.error('Session end error:', error)
+    console.error('Session end error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
   }
-} 
+}

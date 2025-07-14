@@ -7,7 +7,11 @@ interface ChatbotCoreProps {
   children: (props: {
     messages: Message[];
     input: string;
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
+    handleInputChange: (
+      e:
+        | React.ChangeEvent<HTMLInputElement>
+        | React.ChangeEvent<HTMLTextAreaElement>,
+    ) => void;
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
     isLoading: boolean;
     error: Error | undefined;
@@ -15,13 +19,18 @@ interface ChatbotCoreProps {
   }) => ReactNode;
 }
 
-export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProps) {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
-    api: `/api/session/${sessionId}/chatbot`,
-    body: {
-      transcript,
-    },
-  });
+export function ChatbotCore({
+  transcript,
+  sessionId,
+  children,
+}: ChatbotCoreProps) {
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
+    useChat({
+      api: `/api/session/${sessionId}/chatbot`,
+      body: {
+        transcript,
+      },
+    });
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Add a ref to always have the latest transcript
@@ -81,4 +90,4 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
     error,
     messagesEndRef,
   });
-} 
+}

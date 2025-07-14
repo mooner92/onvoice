@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { UserButton } from "@clerk/nextjs";
-import { Mic, QrCode } from "lucide-react";
+import { UserButton } from '@clerk/nextjs';
+import { Mic, QrCode } from 'lucide-react';
 
 export default function CustomUserButton({
   showName = false,
