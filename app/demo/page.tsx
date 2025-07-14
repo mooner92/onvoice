@@ -45,7 +45,7 @@ export default function DemoPage() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
               <QrCode className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">LiveTranscribe</span>
+              <span className="text-2xl font-bold text-gray-900">OnVoice</span>
             </Link>
             <Badge variant="outline">Demo Sessions</Badge>
           </div>
