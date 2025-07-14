@@ -65,20 +65,20 @@ export default function HomePage() {
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t">
-              <nav className="flex flex-col space-y-4 pt-4">
-                <Link
-                  href="#features"
-                  className="text-gray-600 hover:text-blue-600 py-2"
+              <nav className="flex flex-col space-y-2 pt-4 text-base font-medium text-gray-700 min-w-0">
+                <Link 
+                  href="#features" 
+                  className="text-gray-600 hover:text-blue-600 whitespace-nowrap inline-block"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Features
+                Features
                 </Link>
-                <Link
-                  href="#how-it-works"
-                  className="text-gray-600 hover:text-blue-600 py-2"
+                <Link 
+                  href="#how-it-works" 
+                  className="text-gray-600 hover:text-blue-600 whitespace-nowrap inline-block"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  How It Works
+                How It Works
                 </Link>
                 <SignedIn>
                   <Link
@@ -117,17 +117,18 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20">
+      <section className="py-32 min-h-screen flex items-center">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Capture, Share & Summarize
-            <span className="block text-blue-600">Your Voice Sessions</span>
+            From spoken words to shared knowledge
+            <span className="block text-blue-600 mt-4">Instantly, Intelligently, & Inclusively</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Real-time speech transcription with Web Speech API, AI-powered
-            summaries via Gemini 2.0, and seamless session sharing. Transform
-            your lectures into accessible, searchable content instantly.
+          <p className="text-xl text-gray-600 mb-4 max-w-6xl mx-auto">
+            Real-time speech transcription, accurate context-aware summaries, & seamless session sharing 
           </p>
+          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            Transform your talks into accessible, searchable content instantly
+            </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <LandingCTA />
             <Button size="lg" variant="outline" asChild>
@@ -143,9 +144,7 @@ export default function HomePage() {
       {/* Features Section */}
       <section id="features" className="py-20 bg-white">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Key Features
-          </h2>
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">Features</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card>
               <CardHeader>
@@ -157,8 +156,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Attendees simply scan the QR code displayed on screen to join
-                  the session instantly from any device.
+                  Attendees can simply scan the QR code displayed on screen to instantly join the session from anywhere, on any device.
                 </p>
               </CardContent>
             </Card>
@@ -167,15 +165,11 @@ export default function HomePage() {
               <CardHeader>
                 <Zap className="h-12 w-12 text-blue-600 mb-4" />
                 <CardTitle>Real-Time Transcription</CardTitle>
-                <CardDescription>
-                  Instant speech-to-text with Web Speech API
-                </CardDescription>
+                <CardDescription>Instant & accurate speech-to-text</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Browser-based speech recognition captures your voice in
-                  real-time, providing immediate transcription with automatic
-                  session persistence and recovery.
+                  Browser-based speech recognition captures your voice in real-time, providing immediate transcription with automatic session persistence & recovery.
                 </p>
               </CardContent>
             </Card>
@@ -183,16 +177,12 @@ export default function HomePage() {
             <Card>
               <CardHeader>
                 <Globe className="h-12 w-12 text-blue-600 mb-4" />
-                <CardTitle>Gemini 2.0 Translation</CardTitle>
-                <CardDescription>
-                  Multi-language support with intelligent caching
-                </CardDescription>
+                <CardTitle>Translation</CardTitle>
+                <CardDescription>Multi-language support with intelligent caching</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Currently supports Korean, Chinese, Hindi, and English in
-                  beta. More languages coming soon! Smart caching reduces
-                  translation costs by 90%+ while maintaining quality.
+                  Currently supports English, Chinese, Korean, & Hindi in beta. More languages coming soon!
                 </p>
               </CardContent>
             </Card>
@@ -200,16 +190,12 @@ export default function HomePage() {
             <Card>
               <CardHeader>
                 <Download className="h-12 w-12 text-blue-600 mb-4" />
-                <CardTitle>Save, Share & Archive</CardTitle>
-                <CardDescription>
-                  Complete session lifecycle management
-                </CardDescription>
+                <CardTitle>Save, Share, & Archive</CardTitle>
+                <CardDescription>Complete session lifecycle management</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Automatically save transcripts, generate shareable links, and
-                  archive sessions. Hosts get unlimited storage, audience
-                  members get 30-day free access to saved sessions.
+                  Automatically save transcripts, generate shareable links, & archive sessions. Hosts get unlimited storage, audience members get 30-day free access to saved sessions.
                 </p>
               </CardContent>
             </Card>
@@ -217,16 +203,12 @@ export default function HomePage() {
             <Card>
               <CardHeader>
                 <div className="text-4xl mb-4">🤖</div>
-                <CardTitle>Smart AI Summaries</CardTitle>
-                <CardDescription>
-                  Gemini 2.0 creates context-aware session summaries
-                </CardDescription>
+                <CardTitle>AI Summaries</CardTitle>
+                <CardDescription>Our summary model creates accurate context-aware session summaries</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Transform hours of speech into concise, actionable summaries.
-                  AI analyzes content by category (education, business, medical,
-                  etc.) and generates multilingual summaries automatically.
+                  Transform hours of speech into accurate context-aware summaries. AI analyzes content by category (education, business, medical, etc.) & generates multilingual summaries automatically.
                 </p>
               </CardContent>
             </Card>
@@ -241,9 +223,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Ask questions about session content, get explanations, and
-                  interact with transcripts using AI-powered chat functionality
-                  for better understanding.
+                  Ask questions about session content, get explanations, & interact with transcripts using AI-powered chat functionality for better understanding.
                 </p>
               </CardContent>
             </Card>
@@ -251,112 +231,61 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works Section */}
+            {/* How It Works Section */}
       <section id="how-it-works" className="py-20 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="mb-12 text-center text-4xl font-bold text-gray-900">
             How It Works
           </h2>
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                For Hosts
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    1
+
+          {/* Two-column grid */}
+          <div className="mx-10 grid gap-8 md:grid-cols-2">
+            {/* --------------------------- HOSTS ------------------------- */}
+            <div className="mr-0">
+              <h3 className="mb-6 text-2xl font-bold text-gray-900">For Hosts</h3>
+
+              <div className="space-y-6">
+                {[
+                  "Sign in & create session with a title & category",
+                  "Allow microphone access & start recording",
+                  "Display a QR code for the audience to scan & join",
+                  "Speak normally. Just Speak.",
+                  "End the session & receive an accurate context-aware summary",
+                ].map((text, i) => (
+                  <div key={i} className="flex items-start gap-x-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <p className="text-gray-600">{text}</p>
                   </div>
-                  <p className="text-gray-600">
-                    Sign in with Google and create session with title & category
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-gray-600">
-                    Allow microphone access and start recording
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-gray-600">
-                    Display QR code for audience to scan and join
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-gray-600">
-                    Speak normally - Web Speech API captures everything in
-                    real-time
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-gray-600">
-                    End session and Gemini 2.0 generates smart AI summary
-                  </p>
-                </div>
+                ))}
               </div>
             </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                For Attendees
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    1
+
+            {/* ------------------------- ATTENDEES ----------------------- */}
+            <div className="ml-12 md:max-w-[34rem] lg:max-w-[38rem]">
+              <h3 className="mb-6 text-2xl font-bold text-gray-900">For Attendees</h3>
+
+              <div className="space-y-6">
+                {[
+                  "Scan the QR code with your smartphone camera",
+                  "Access the session instantly – no login required",
+                  "Choose translation language & customise settings",
+                  "Follow along with live transcription & AI translations",
+                  "Save the session (with Google login) for free 30-day access",
+                ].map((text, i) => (
+                  <div key={i} className="flex items-start gap-x-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <p className="text-gray-600">{text}</p>
                   </div>
-                  <p className="text-gray-600">
-                    Scan QR code with smartphone camera
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-gray-600">
-                    Access session instantly - no login required
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-gray-600">
-                    Choose translation language & customize settings
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-gray-600">
-                    Follow along with live captions & AI translations
-                  </p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-gray-600">
-                    Save session (with Google login) for 30-day access
-                  </p>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </section>
-
+  </section>
       {/* CTA Section */}
       <section className="py-20 bg-blue-600">
         <div className="container mx-auto px-4 text-center">
@@ -364,9 +293,7 @@ export default function HomePage() {
             Ready to Make Your Content Accessible?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Start your first session today and experience Web Speech API
-            transcription, Gemini 2.0 translation, and smart AI-powered
-            summaries.
+            Start your first session today & experience Web Speech API transcription, Gemini 2.0 translation, & smart AI-powered summaries.
           </p>
           <div className="flex justify-center max-w-screen-md mx-auto">
             <PricingTable newSubscriptionRedirectUrl="/host" />
@@ -384,7 +311,6 @@ export default function HomePage() {
           </Button> */}
         </div>
       </section>
-
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="container mx-auto px-4">
@@ -394,10 +320,10 @@ export default function HomePage() {
           </div>
 
           {/* Social Links */}
-          <div className="flex items-center justify-center space-x-6 mb-6">
-            <a
-              href="https://github.com/your-username/onvoice"
-              target="_blank"
+          {/* <div className="flex items-center justify-center space-x-6 mb-6">
+            <a 
+              href="https://github.com/your-username/onvoice" 
+              target="_blank" 
               rel="noopener noreferrer"
               className="text-gray-400 hover:text-white transition-colors"
             >
@@ -425,13 +351,11 @@ export default function HomePage() {
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
               </svg>
             </a>
-          </div>
+          </div> */}
 
           <div className="text-center text-gray-400">
-            <p>&copy; 2024 OnVoice. Making lectures accessible to everyone.</p>
-            <p className="text-sm mt-2">
-              Powered by Web Speech API • Gemini 2.0 • Real-time Translation
-            </p>
+            <p>&copy; 2025 OnVoice </p>
+            <p className="text-sm mt-2">Powered by Web Speech API • Gemini 2.0 • Real-time Translation</p>
           </div>
         </div>
       </footer>
