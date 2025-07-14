@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase"
 import { QRCodeDisplay } from "@/components/ui/qr-code"
 import { RealtimeSTT } from "@/components/RealtimeSTT"
 import type { Session } from "@/lib/types"
+import { useUser } from "@clerk/nextjs"
 
 interface TranscriptLine {
   id: string;
@@ -26,7 +27,7 @@ interface TranscriptLine {
 }
 
 export default function HostDashboard() {
-  const { user } = useAuth()
+  const { isLoaded, user } = useUser()
   const router = useRouter()
   const supabase = createClient()
   
@@ -340,7 +341,7 @@ export default function HostDashboard() {
           description: sessionDescription,
           category: sessionCategory,
           hostId: user.id,
-          hostName: user.user_metadata?.full_name || user.email,
+          hostName: user.fullName || user.primaryEmailAddress,
           primaryLanguage: primaryLanguage,
         }),
       })
@@ -507,7 +508,7 @@ export default function HostDashboard() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
               <Mic className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">LiveTranscribe</span>
+              <span className="text-2xl font-bold text-gray-900">OnVoice</span>
             </Link>
             <Badge variant="outline">Host Dashboard</Badge>
           </div>
