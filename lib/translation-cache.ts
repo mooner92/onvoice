@@ -187,27 +187,57 @@ export async function saveBatchTranslationsToCache(
   return cacheIds
 }
 
-// 인기 언어 목록 (우선순위 번역용) - 사용량이 많은 3개 언어로 축소
+// 🆕 모든 지원 언어 (기존의 고정된 3개에서 확장)
+export const ALL_SUPPORTED_LANGUAGES = ['ko', 'en', 'zh', 'hi']
+
+// 🆕 기본 우선순위 언어 (하위 호환성을 위해 유지)
 export const PRIORITY_LANGUAGES = ['ko', 'zh', 'hi']
 
-// 번역 우선순위 계산
-export function calculateTranslationPriority(
-  targetLanguage: string,
-  sessionId?: string
-): number {
-  let priority = 5 // 기본 우선순위
+// 🆕 입력 언어에 따른 대상 언어 결정 함수
+export function getTargetLanguages(inputLanguage: string): string[] {
+  // 입력 언어를 제외한 나머지 3개 언어 반환
+  return ALL_SUPPORTED_LANGUAGES.filter(lang => lang !== inputLanguage)
+}
+
+// 🆕 언어 감지 함수 (개선된 휴리스틱 기반)
+export function detectLanguage(text: string): string {
+  // 텍스트 정리
+  const cleanText = text.trim()
+  if (cleanText.length === 0) return 'en'
   
-  // 인기 언어는 높은 우선순위
-  if (PRIORITY_LANGUAGES.includes(targetLanguage)) {
-    priority += PRIORITY_LANGUAGES.indexOf(targetLanguage) * 2
+  // 언어별 문자 수 계산
+  const koreanChars = (cleanText.match(/[가-힣]/g) || []).length
+  const chineseChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length
+  const hindiChars = (cleanText.match(/[\u0900-\u097f]/g) || []).length
+  const englishChars = (cleanText.match(/[a-zA-Z]/g) || []).length
+  
+  const totalChars = cleanText.length
+  const threshold = 0.1 // 10% 이상이면 해당 언어로 판단
+  
+  // 한글이 가장 많으면 한국어
+  if (koreanChars / totalChars > threshold && koreanChars > chineseChars && koreanChars > hindiChars) {
+    return 'ko'
   }
   
-  // 세션이 활성화된 경우 높은 우선순위
-  if (sessionId) {
-    priority += 10
+  // 중국어 문자가 가장 많으면 중국어
+  if (chineseChars / totalChars > threshold && chineseChars > koreanChars && chineseChars > hindiChars) {
+    return 'zh'
   }
   
-  return priority
+  // 힌디어 문자가 가장 많으면 힌디어
+  if (hindiChars / totalChars > threshold && hindiChars > koreanChars && hindiChars > chineseChars) {
+    return 'hi'
+  }
+  
+  // 영어 또는 기타 알파벳 문자가 많으면 영어
+  if (englishChars / totalChars > threshold || 
+      (koreanChars === 0 && chineseChars === 0 && hindiChars === 0 && englishChars > 0)) {
+    return 'en'
+  }
+  
+  // 판단이 어려운 경우 영어를 기본값으로
+  console.log(`🤔 Language detection uncertain for: "${cleanText.substring(0, 30)}..." - defaulting to English`)
+  return 'en'
 }
 
 // 스마트 Mock 번역 생성 (즉시 응답용)
@@ -451,4 +481,17 @@ export function getPerformanceStats(): {
     cacheCheck: calculateStats(metrics.cacheCheckTime),
     totalSave: calculateStats(metrics.totalSaveTime)
   }
+} 
+
+// 🆕 UI에서 사용할 언어 정의
+export const LANGUAGE_DEFINITIONS = [
+  { code: "ko", name: "Korean", flag: "🇰🇷" },
+  { code: "en", name: "English", flag: "🇺🇸" },
+  { code: "zh", name: "Chinese", flag: "🇨🇳" },
+  { code: "hi", name: "Hindi", flag: "🇮🇳" },
+]
+
+// 🆕 특정 언어를 제외한 언어 목록 가져오기 (UI용)
+export function getAvailableLanguagesForUI(excludeLanguage?: string) {
+  return LANGUAGE_DEFINITIONS.filter(lang => lang.code !== excludeLanguage)
 } 
