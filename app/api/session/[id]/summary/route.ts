@@ -1,47 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { generateSessionSummary } from '@/lib/summary-generator'
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import { generateSessionSummary } from "@/lib/summary-generator"
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const resolvedParams = await params
     const sessionId = resolvedParams.id
 
     if (!sessionId) {
-      return NextResponse.json({ error: 'Missing session ID' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Missing session ID" },
+        { status: 400 }
+      )
     }
 
-    // Parse force flag from request body
-    let force = false
-    try {
-      const body = await req.json()
-      force = !!body.force
-    } catch {
-      // ignore if no body or invalid JSON
+    // Use service role key for API routes
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Check if session exists
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 }
+      )
     }
 
-    // Use the modular summary generator
-    const result = await generateSessionSummary({
-      sessionId,
-      force,
+    // Generate summary
+    const summaryData = await generateSessionSummary({ 
+      sessionId, 
+      force: true 
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      summary: summaryData.summary,
+      category: summaryData.category,
+      transcriptCount: summaryData.transcriptCount
+    })
+
   } catch (error) {
     console.error('Summary generation error:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      geminiKey: process.env.GEMINI_API_KEY ? 'Present' : 'Missing',
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing',
-      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Present' : 'Missing',
-    })
     return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 },
+      { error: "Internal server error" },
+      { status: 500 }
     )
   }
 }
@@ -58,7 +70,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Missing session ID' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Use service role key for API routes
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     const { data: session, error } = await supabase
       .from('sessions')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { auth } from '@clerk/nextjs/server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +10,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Verify user authentication with Clerk
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify that the requesting user matches the hostId
+    if (userId !== hostId) {
+      return NextResponse.json({ error: 'Forbidden: Cannot create session for another user' }, { status: 403 })
+    }
+
+    // Use safe server-side Supabase client
+    const supabase = createServerSupabaseClient()
 
     // Create session
     const { data: session, error } = await supabase
