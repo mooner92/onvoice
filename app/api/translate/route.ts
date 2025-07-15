@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getTranslationFromCache, generateSmartMockTranslation, PRIORITY_LANGUAGES } from '@/lib/translation-cache'
-import { addTranslationJob } from '@/lib/translation-queue'
-import type { TranslationResponse } from '@/lib/types'
+import { NextRequest, NextResponse } from "next/server"
+import { 
+  getTranslationFromCache, 
+  generateSmartMockTranslation,
+  ALL_SUPPORTED_LANGUAGES
+} from "@/lib/translation-cache"
+import { addTranslationJob } from "@/lib/translation-queue"
+import type { TranslationResponse } from "@/lib/types"
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,10 +99,10 @@ export async function POST(req: NextRequest) {
 function calculatePriority(targetLanguage: string, sessionId?: string): number {
   let priority = 5 // 기본 우선순위
 
-  // 인기 언어는 높은 우선순위
-  if (PRIORITY_LANGUAGES.includes(targetLanguage)) {
-    const index = PRIORITY_LANGUAGES.indexOf(targetLanguage)
-    priority += (PRIORITY_LANGUAGES.length - index) * 2
+  // 지원 언어는 높은 우선순위
+  if (ALL_SUPPORTED_LANGUAGES.includes(targetLanguage)) {
+    const index = ALL_SUPPORTED_LANGUAGES.indexOf(targetLanguage)
+    priority += (ALL_SUPPORTED_LANGUAGES.length - index) * 2
   }
 
   // 활성 세션이 있으면 높은 우선순위

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { performBatchTranslation, saveBatchTranslationsToCache } from '@/lib/translation-queue'
-import { PRIORITY_LANGUAGES } from '@/lib/translation-cache'
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import { performBatchTranslation, saveBatchTranslationsToCache } from "@/lib/translation-queue"
+import { getTargetLanguages, detectLanguage } from "@/lib/translation-cache"
 
 // In-memory session storage for quick access
 interface SessionData {
@@ -107,9 +107,12 @@ export async function POST(req: NextRequest) {
 
           console.log(`🔄 Translation status updated to 'processing' (${statusUpdateTime}ms)`)
 
-          // 영어 제외한 우선순위 언어들
-          const targetLanguages = PRIORITY_LANGUAGES.filter((lang) => lang !== 'en')
-
+          // 🆕 입력 언어 감지 후 해당 언어를 제외한 나머지 3개 언어로 번역
+          const inputLanguage = detectLanguage(cleanedTranscript)
+          const targetLanguages = getTargetLanguages(inputLanguage)
+          
+          console.log(`🌍 Detected input language: ${inputLanguage}, translating to: [${targetLanguages.join(', ')}]`)
+          
           try {
             // 즉시 배치 번역 실행
             const translationStart = Date.now()
