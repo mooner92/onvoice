@@ -3,7 +3,7 @@ import localFont from 'next/font/local'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 
-const AdvercaseFontRegular = localFont({
+const AdvercaseFont = localFont({
   src: [
     {
       path: '../public/fonts/AdvercaseFont-Demo-Regular.otf',
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang='en'>
-        <body className={`${AdvercaseFontRegular.variable} antialiased`}>{children}</body>
+        <body className={`${AdvercaseFont.variable} antialiased`}>{children}</body>
       </html>
     </ClerkProvider>
   )

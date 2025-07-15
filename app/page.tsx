@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Globe, QrCode, Zap, Download, Menu, X } from 'lucide-react'
+import { Mic, Globe, QrCode, Zap, Download, Menu, X, MouseIcon } from 'lucide-react'
 import { PricingTable, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useState } from 'react'
@@ -13,7 +13,7 @@ export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100'>
+    <main className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100'>
       {/* Header */}
       <header className='sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm'>
         <div className='container mx-auto px-4 py-4'>
@@ -97,8 +97,8 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className='flex min-h-screen items-center py-32'>
-        <div className='container mx-auto px-4 text-center'>
+      <section className='flex h-[calc(100vh-65px)] flex-col items-center justify-center py-32'>
+        <div className='container mx-auto flex flex-col items-center justify-center px-4 text-center'>
           <h1 className='mb-6 text-5xl font-bold text-gray-900'>
             From spoken words to shared knowledge
             <span className='mt-4 block text-blue-600'>Instantly, Intelligently, & Inclusively</span>
@@ -119,6 +119,9 @@ export default function HomePage() {
             </Button>
           </div>
         </div>
+        <Link href='#features' className='relative top-32 flex justify-center hover:cursor-pointer'>
+          <MouseIcon className='size-6 animate-bounce text-blue-600' />
+        </Link>
       </section>
 
       {/* Features Section */}
@@ -337,6 +340,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-    </div>
+    </main>
   )
 }
