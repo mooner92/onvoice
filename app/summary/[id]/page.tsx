@@ -720,7 +720,30 @@ export default function PublicSessionSummaryPage() {
   // 텍스트 복사 기능
   const copyText = async (text: string, type: string) => {
     try {
-      await navigator.clipboard.writeText(text)
+      // 모던 브라우저 (HTTPS 환경)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+        console.log('✅ Text copied using modern clipboard API')
+      } else {
+        // 호환성 fallback (HTTP/IP 환경)
+        const textArea = document.createElement('textarea')
+        textArea.value = text
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textArea)
+
+        if (!successful) {
+          throw new Error('execCommand copy failed')
+        }
+        console.log('✅ Text copied using fallback method')
+      }
+
       const successMessage =
         userLanguage === 'ko'
           ? `${type}이(가) 클립보드에 복사되었습니다.`
@@ -748,7 +771,30 @@ export default function PublicSessionSummaryPage() {
   const copyLink = async () => {
     const url = window.location.href
     try {
-      await navigator.clipboard.writeText(url)
+      // 모던 브라우저 (HTTPS 환경)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url)
+        console.log('✅ Link copied using modern clipboard API')
+      } else {
+        // 호환성 fallback (HTTP/IP 환경)
+        const textArea = document.createElement('textarea')
+        textArea.value = url
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textArea)
+
+        if (!successful) {
+          throw new Error('execCommand copy failed')
+        }
+        console.log('✅ Link copied using fallback method')
+      }
+
       const successMessage =
         userLanguage === 'ko'
           ? '링크가 클립보드에 복사되었습니다!'
