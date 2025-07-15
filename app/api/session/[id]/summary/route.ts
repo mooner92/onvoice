@@ -1,27 +1,18 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { generateSessionSummary } from "@/lib/summary-generator"
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { generateSessionSummary } from '@/lib/summary-generator'
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const resolvedParams = await params
     const sessionId = resolvedParams.id
 
     if (!sessionId) {
-      return NextResponse.json(
-        { error: "Missing session ID" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing session ID' }, { status: 400 })
     }
 
     // Use service role key for API routes
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
     // Check if session exists
     const { data: session, error: sessionError } = await supabase
@@ -31,30 +22,23 @@ export async function POST(
       .single()
 
     if (sessionError || !session) {
-      return NextResponse.json(
-        { error: "Session not found" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
     // Generate summary
-    const summaryData = await generateSessionSummary({ 
-      sessionId, 
-      force: true 
+    const summaryData = await generateSessionSummary({
+      sessionId,
+      force: true,
     })
 
     return NextResponse.json({
       summary: summaryData.summary,
       category: summaryData.category,
-      transcriptCount: summaryData.transcriptCount
+      transcriptCount: summaryData.transcriptCount,
     })
-
   } catch (error) {
     console.error('Summary generation error:', error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -71,10 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Use service role key for API routes
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
     const { data: session, error } = await supabase
       .from('sessions')

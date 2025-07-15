@@ -36,18 +36,18 @@ export default function SessionPage() {
   const [participantCount, setParticipantCount] = useState(0)
 
   const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "en", name: "English", flag: "🇺🇸" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "ja", name: "Japanese", flag: "🇯🇵" },
-    { code: "es", name: "Spanish", flag: "🇪🇸" },
-    { code: "fr", name: "French", flag: "🇫🇷" },
-    { code: "de", name: "German", flag: "🇩🇪" },
-    { code: "it", name: "Italian", flag: "🇮🇹" },
-    { code: "pt", name: "Portuguese", flag: "🇵🇹" },
-    { code: "ru", name: "Russian", flag: "🇷🇺" },
-    { code: "ar", name: "Arabic", flag: "🇸🇦" },
+    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+    { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
+    { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+    { code: 'fr', name: 'French', flag: '🇫🇷' },
+    { code: 'de', name: 'German', flag: '🇩🇪' },
+    { code: 'it', name: 'Italian', flag: '🇮🇹' },
+    { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
+    { code: 'ru', name: 'Russian', flag: '🇷🇺' },
+    { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
   ]
 
   // Check authentication

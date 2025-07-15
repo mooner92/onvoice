@@ -113,10 +113,10 @@ export default function PublicSessionSummaryPage() {
 
   // 지원 언어 목록
   const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "en", name: "English", flag: "🇺🇸" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
+    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
   ]
 
   const getCategoryName = (category: string) => {

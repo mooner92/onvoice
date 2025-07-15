@@ -25,8 +25,8 @@ export function createServerSupabaseClient() {
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
+      persistSession: false,
+    },
   })
 }
 
@@ -47,4 +47,4 @@ export function createClientSupabaseClient() {
   }
 
   return createClient(supabaseUrl, anonKey)
-} 
+}

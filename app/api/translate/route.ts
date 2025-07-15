@@ -1,11 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
-import { 
-  getTranslationFromCache, 
-  generateSmartMockTranslation,
-  ALL_SUPPORTED_LANGUAGES
-} from "@/lib/translation-cache"
-import { addTranslationJob } from "@/lib/translation-queue"
-import type { TranslationResponse } from "@/lib/types"
+import { NextRequest, NextResponse } from 'next/server'
+import { getTranslationFromCache, generateSmartMockTranslation, ALL_SUPPORTED_LANGUAGES } from '@/lib/translation-cache'
+import { addTranslationJob } from '@/lib/translation-queue'
+import type { TranslationResponse } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
   try {

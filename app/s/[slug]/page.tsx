@@ -299,10 +299,10 @@ export default function PublicSessionPage() {
 
   // 🚀 모든 지원 언어 제공 (자동 번역 지원)
   const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "en", name: "English", flag: "🇺🇸" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
+    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
   ]
 
   // 번역 캐시 (클라이언트 사이드)
