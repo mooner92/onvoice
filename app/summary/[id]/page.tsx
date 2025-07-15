@@ -721,27 +721,11 @@ export default function PublicSessionSummaryPage() {
   const copyText = async (text: string, type: string) => {
     try {
       // 모던 브라우저 (HTTPS 환경)
-      if (navigator.clipboard && window.isSecureContext) {
+      if (navigator.clipboard) {
         await navigator.clipboard.writeText(text)
         console.log('✅ Text copied using modern clipboard API')
       } else {
-        // 호환성 fallback (HTTP/IP 환경)
-        const textArea = document.createElement('textarea')
-        textArea.value = text
-        textArea.style.position = 'fixed'
-        textArea.style.left = '-999999px'
-        textArea.style.top = '-999999px'
-        document.body.appendChild(textArea)
-        textArea.focus()
-        textArea.select()
-
-        const successful = document.execCommand('copy')
-        document.body.removeChild(textArea)
-
-        if (!successful) {
-          throw new Error('execCommand copy failed')
-        }
-        console.log('✅ Text copied using fallback method')
+        throw new Error('Clipboard API is not available')
       }
 
       const successMessage =
