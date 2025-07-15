@@ -756,27 +756,12 @@ export default function PublicSessionSummaryPage() {
     const url = window.location.href
     try {
       // 모던 브라우저 (HTTPS 환경)
-      if (navigator.clipboard && window.isSecureContext) {
+      if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
         console.log('✅ Link copied using modern clipboard API')
       } else {
-        // 호환성 fallback (HTTP/IP 환경)
-        const textArea = document.createElement('textarea')
-        textArea.value = url
-        textArea.style.position = 'fixed'
-        textArea.style.left = '-999999px'
-        textArea.style.top = '-999999px'
-        document.body.appendChild(textArea)
-        textArea.focus()
-        textArea.select()
-
-        const successful = document.execCommand('copy')
-        document.body.removeChild(textArea)
-
-        if (!successful) {
-          throw new Error('execCommand copy failed')
-        }
-        console.log('✅ Link copied using fallback method')
+        // Insecure context (non-HTTPS)
+        throw new Error('Clipboard API is unavailable in insecure contexts. Please copy the link manually.')
       }
 
       const successMessage =
