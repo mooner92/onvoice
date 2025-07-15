@@ -46,40 +46,7 @@ const GEMINI_LANGUAGE_NAMES: Record<string, string> = {
   'en': 'English'
 }
 
-// GPT 언어 이름 매핑 (더 정확한 번역을 위해)
-const GPT_LANGUAGE_NAMES: Record<string, string> = {
-  'ko': 'Korean',
-  'ja': 'Japanese', 
-  'zh': 'Chinese',
-  'es': 'Spanish',
-  'fr': 'French',
-  'de': 'German',
-  'pt': 'Portuguese',
-  'ru': 'Russian',
-  'it': 'Italian',
-  'pl': 'Polish',
-  'nl': 'Dutch',
-  'da': 'Danish',
-  'sv': 'Swedish',
-  'no': 'Norwegian',
-  'fi': 'Finnish',
-  'cs': 'Czech',
-  'sk': 'Slovak',
-  'sl': 'Slovenian',
-  'et': 'Estonian',
-  'lv': 'Latvian',
-  'lt': 'Lithuanian',
-  'hu': 'Hungarian',
-  'bg': 'Bulgarian',
-  'ro': 'Romanian',
-  'el': 'Greek',
-  'tr': 'Turkish',
-  'ar': 'Arabic',
-  'id': 'Indonesian',
-  'uk': 'Ukrainian',
-  'hi': 'Hindi',
-  'en': 'English'
-}
+
 
 // 🆕 Gemini 2.5 Flash 번역 (최고 품질 + 최적 비용)
 async function translateWithGemini(text: string, targetLanguage: string): Promise<{ text: string; quality: number } | null> {
@@ -307,77 +274,7 @@ ${JSON.stringify(Object.fromEntries(supportedLanguages.map(lang => [lang, `trans
   }
 }
 
-// GPT-4 번역 (폴백)
-async function translateWithGPT(text: string, targetLanguage: string): Promise<{ text: string; quality: number } | null> {
-  try {
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    if (!openaiApiKey) {
-      console.log('OpenAI API key not found, skipping GPT translation')
-      return null
-    }
 
-    const targetLangName = GPT_LANGUAGE_NAMES[targetLanguage]
-    if (!targetLangName) {
-      console.log(`Unsupported language for GPT: ${targetLanguage}`)
-      return null
-    }
-
-    // 컨텍스트에 맞는 프롬프트 작성
-    const prompt = `You are a professional translator specializing in live lecture and presentation content. 
-
-Please translate the following text to ${targetLangName}. This is from a live speech/lecture, so:
-- Maintain the speaker's tone and intent
-- Fix any obvious speech recognition errors naturally
-- Use appropriate formal/informal register for academic context
-- Keep technical terms accurate
-- Make it sound natural in the target language
-
-Text to translate: "${text}"
-
-Provide ONLY the translation without any explanation.`
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // 더 저렴하고 빠른 모델
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: Math.min(Math.ceil(text.length * 3), 500), // 적응적 토큰 수
-        temperature: 0.3, // 일관성을 위해 낮은 temperature
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('GPT API error:', response.status, errorText)
-      return null
-    }
-
-    const data = await response.json()
-    
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      const translatedText = data.choices[0].message.content.trim()
-      console.log('✅ GPT translation successful')
-      return {
-        text: translatedText,
-        quality: 0.95 // GPT는 높은 품질 점수
-      }
-    }
-
-    return null
-  } catch (error) {
-    console.error('GPT translation error:', error)
-    return null
-  }
-}
 
 // Google Translate 번역 (폴백)
 async function translateWithGoogle(text: string, targetLanguage: string): Promise<{ text: string; quality: number } | null> {
@@ -463,17 +360,7 @@ async function performTranslation(text: string, targetLanguage: string): Promise
     }
   }
 
-  // 2단계: GPT-4 시도 (최고 품질)
-  const gptResult = await translateWithGPT(text, targetLanguage)
-  if (gptResult) {
-    return {
-      text: gptResult.text,
-      engine: 'gpt',
-      quality: gptResult.quality
-    }
-  }
-
-  // 3단계: Google Translate 시도  
+  // 2단계: Google Translate 시도  
   const googleResult = await translateWithGoogle(text, targetLanguage)
   if (googleResult) {
     return {
@@ -483,7 +370,7 @@ async function performTranslation(text: string, targetLanguage: string): Promise
     }
   }
 
-  // 4단계: 로컬 번역
+  // 3단계: 로컬 번역
   const localResult = getLocalTranslation(text, targetLanguage)
   return {
     text: localResult.text,
