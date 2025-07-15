@@ -1,5 +1,5 @@
 import type { TranslationJob } from "./types"
-import { saveTranslationToCache, PRIORITY_LANGUAGES } from "./translation-cache"
+import { saveTranslationToCache, ALL_SUPPORTED_LANGUAGES } from "./translation-cache"
 
 // Google Translate 언어 코드 매핑
 const GOOGLE_LANGUAGE_MAP: Record<string, string> = {
@@ -820,8 +820,8 @@ export function addTranslationJob(
 function calculatePriority(targetLanguage: string, sessionId?: string): number {
   let priority = 5
   
-  if (PRIORITY_LANGUAGES.includes(targetLanguage)) {
-    priority += (PRIORITY_LANGUAGES.length - PRIORITY_LANGUAGES.indexOf(targetLanguage)) * 2
+  if (ALL_SUPPORTED_LANGUAGES.includes(targetLanguage)) {
+    priority += (ALL_SUPPORTED_LANGUAGES.length - ALL_SUPPORTED_LANGUAGES.indexOf(targetLanguage)) * 2
   }
   
   if (sessionId) {

@@ -37,9 +37,10 @@ export default function SessionPage() {
 
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "ja", name: "Japanese", flag: "🇯🇵" },
+    { code: "en", name: "English", flag: "🇺🇸" },
     { code: "zh", name: "Chinese", flag: "🇨🇳" },
     { code: "hi", name: "Hindi", flag: "🇮🇳" },
+    { code: "ja", name: "Japanese", flag: "🇯🇵" },
     { code: "es", name: "Spanish", flag: "🇪🇸" },
     { code: "fr", name: "French", flag: "🇫🇷" },
     { code: "de", name: "German", flag: "🇩🇪" },

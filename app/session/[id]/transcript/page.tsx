@@ -51,12 +51,12 @@ export default function SessionTranscriptPage() {
   const [translatedSummary, setTranslatedSummary] = useState<string>('')
   const [summaryTranslating, setSummaryTranslating] = useState(false)
 
-  // 🚀 사용량이 많은 3개 언어만 제공 (자동 번역 지원)
+  // 🚀 모든 지원 언어 제공 (자동 번역 지원)
   const languages = [
     { code: "ko", name: "Korean", flag: "🇰🇷" },
+    { code: "en", name: "English", flag: "🇺🇸" },
     { code: "zh", name: "Chinese", flag: "🇨🇳" },
     { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "en", name: "English", flag: "🇺🇸" }, // 원문 표시용
   ]
 
   // Load session and transcript data
