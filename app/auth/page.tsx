@@ -1,8 +1,8 @@
-'use client'
-
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { ArrowLeftIcon } from 'lucide-react'
 import SignInWithGoogle from '@/components/auth/SignInWithGoogle'
+import SignInWithGoogleSkeleton from '@/components/auth/SignInWithGoogle.skeleton'
 
 export default function OauthSignIn() {
   return (
@@ -15,7 +15,9 @@ export default function OauthSignIn() {
         <h2 className='text-2xl font-bold'>Welcome to OnVoice</h2>
         <p className='text-muted-foreground text-sm'>Sign in to your account to continue</p>
       </div>
-      <SignInWithGoogle size='lg' />
+      <Suspense fallback={<SignInWithGoogleSkeleton size='lg' />}>
+        <SignInWithGoogle size='lg' />
+      </Suspense>
       <p className='text-muted-foreground text-xs'>
         By continuing, you agree to our{' '}
         <Link className='text-blue-500 hover:underline' href='/terms'>
