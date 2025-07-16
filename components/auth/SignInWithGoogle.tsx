@@ -42,21 +42,19 @@ export default function SignInWithGoogle({
   const signInWith = async (strategy: OAuthStrategy) => {
     setErrors(undefined)
     setIsPending(true)
-    return (
-      signIn
-        .authenticateWithRedirect({
-          strategy,
-          redirectUrl: '/auth/sso-callback',
-          redirectUrlComplete,
-        })
-        .then((res) => {
-          console.log(res)
-        })
-        .catch((err: unknown) => {
-          setIsPending(false)
-          setErrors((err as { errors: ClerkAPIError[] }).errors)
-        })
-    )
+    return signIn
+      .authenticateWithRedirect({
+        strategy,
+        redirectUrl: '/auth/sso-callback',
+        redirectUrlComplete,
+      })
+      .then((res) => {
+        console.log(res)
+      })
+      .catch((err: unknown) => {
+        setIsPending(false)
+        setErrors((err as { errors: ClerkAPIError[] }).errors)
+      })
   }
 
   return (
