@@ -5,7 +5,7 @@ import { ClerkAPIError, OAuthStrategy } from '@clerk/types'
 import { useSignIn, useUser } from '@clerk/nextjs'
 import { useState } from 'react'
 import { redirect } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import SignInWithGoogleSkeleton from './SignInWithGoogle.skeleton'
 
 export default function SignInWithGoogle({
   size = 'default',
@@ -20,17 +20,9 @@ export default function SignInWithGoogle({
   const { isLoaded: isLoadedSignIn, signIn } = useSignIn()
   const { isLoaded: isLoadedUser, user } = useUser()
 
-  if (!isLoadedSignIn || !isLoadedUser)
-    return (
-      <Button size={size} className='font-roboto font-medium' disabled>
-        <Loader2 className='fh-4 w-4 animate-spin' />
-        Loading...
-      </Button>
-    )
+  if (!isLoadedSignIn || !isLoadedUser) return <SignInWithGoogleSkeleton size={size} />
 
-  if (user) {
-    redirect(redirectUrlComplete)
-  }
+  if (user) redirect(redirectUrlComplete)
 
   if (!signIn)
     return (

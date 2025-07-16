@@ -1,16 +1,12 @@
-'use client'
-
 import Link from 'next/link'
 import { ArrowLeftIcon } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
 import SignInWithGoogle from '@/components/auth/SignInWithGoogle'
+import { Suspense } from 'react'
+import SignInWithGoogleSkeleton from '@/components/auth/SignInWithGoogle.skeleton'
 
-export default function OauthSignIn() {
-  const searchParams = useSearchParams()
-  const redirectUrlComplete = searchParams.get('redirect_url') || '/'
+export default async function OauthSignIn({ searchParams }: { searchParams: Promise<{ redirect_url: string }> }) {
+  const redirectUrlComplete = (await searchParams).redirect_url || '/'
 
-  // Render a button for each supported OAuth provider
-  // you want to add to your app. This example uses only Google.
   return (
     <main className='flex h-screen w-full flex-col items-center justify-center gap-6 bg-gradient-to-br from-blue-50 to-indigo-100'>
       {/** Back button */}
@@ -22,7 +18,9 @@ export default function OauthSignIn() {
         <h2 className='text-2xl font-bold'>Welcome to OnVoice</h2>
         <p className='text-muted-foreground text-sm'>Sign in to your account to continue</p>
       </div>
-      <SignInWithGoogle size='lg' redirectUrlComplete={redirectUrlComplete} />
+      <Suspense fallback={<SignInWithGoogleSkeleton size='lg' />}>
+        <SignInWithGoogle size='lg' redirectUrlComplete={redirectUrlComplete} />
+      </Suspense>
       <p className='text-muted-foreground text-xs'>
         By continuing, you agree to our{' '}
         <Link className='text-blue-500 hover:underline' href='/terms'>
