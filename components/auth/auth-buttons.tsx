@@ -3,8 +3,8 @@ import { ClerkLoaded, ClerkLoading, SignOutButton as ClerkSignOutButton } from '
 import Link from 'next/link'
 
 const urls = {
-  signIn: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/auth/sign-in',
-  signUp: process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL || '/auth/sign-up',
+  signIn: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/auth',
+  signUp: '/auth',
 }
 
 export function SignInButton({

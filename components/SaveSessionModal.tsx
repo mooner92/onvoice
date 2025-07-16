@@ -39,7 +39,7 @@ export function SaveSessionModal({ isOpen, onClose, sessionId, sessionTitle }: S
       console.log('🎯 Target return path:', currentSummaryPath)
 
       // Redirect to Google login with specific return path
-      router.push(`/auth/sign-in?redirect_url=${encodeURIComponent(window.location.origin + currentSummaryPath)}`)
+      router.push(`/auth?redirect_url=${encodeURIComponent(window.location.origin + currentSummaryPath)}`)
 
       // Modal will close after successful login via useEffect in parent
     } catch (error) {
