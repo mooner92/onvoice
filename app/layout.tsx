@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
+import { Roboto } from 'next/font/google'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 
@@ -17,6 +18,12 @@ const AdvercaseFont = localFont({
     },
   ],
   variable: '--font-advercase-sans',
+})
+
+const RobotoFont = Roboto({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-roboto',
 })
 
 export const metadata: Metadata = {
@@ -40,7 +47,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang='en'>
-        <body className={`${AdvercaseFont.variable} antialiased`}>{children}</body>
+        <body className={`${AdvercaseFont.variable} ${RobotoFont.variable} antialiased`}>{children}</body>
       </html>
     </ClerkProvider>
   )
