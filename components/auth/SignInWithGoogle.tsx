@@ -45,7 +45,7 @@ export default function SignInWithGoogle({
     return signIn
       .authenticateWithRedirect({
         strategy,
-        redirectUrl: '/auth/sign-in/sso-callback',
+        redirectUrl: '/auth/sso-callback',
         redirectUrlComplete,
       })
       .then((res) => {
