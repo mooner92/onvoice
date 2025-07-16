@@ -9,10 +9,10 @@ export default function SSOCallbackPage() {
         <div className='flex flex-col items-center gap-2'>
           <h2 className='text-2xl font-bold'>Verifying your account...</h2>
           <p className='text-muted-foreground text-sm'>Please wait while we verify your account...</p>
+          <div id='clerk-captcha'></div>
         </div>
       </div>
       <AuthenticateWithRedirectCallback />
-      <div id='clerk-captcha'></div>
     </main>
   )
 }
