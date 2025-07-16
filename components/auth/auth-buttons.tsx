@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 const urls = {
   signIn: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/auth/sign-in',
-  signUp: process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL || '/auth/sign-up',
+  signUp: '/auth/sign-in',
 }
 
 export function SignInButton({
