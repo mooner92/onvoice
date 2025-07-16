@@ -1,30 +1,47 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { AuthProvider } from "@/components/auth/AuthProvider";
+import type { Metadata, Viewport } from 'next'
+import localFont from 'next/font/local'
+import './globals.css'
+import { ClerkProvider } from '@clerk/nextjs'
+
+const AdvercaseFont = localFont({
+  src: [
+    {
+      path: '../public/fonts/AdvercaseFont-Demo-Regular.otf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/AdvercaseFont-Demo-Bold.otf',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-advercase-sans',
+})
 
 export const metadata: Metadata = {
-  title: "LiveTranscribe - Real-Time Lecture Transcription & Translation",
-  description: "Make your lectures accessible to everyone with instant transcription and translation. No app installation required - just scan a QR code and start following along in real-time.",
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
-};
+  title: 'LiveTranscribe - Real-Time Lecture Transcription & Translation',
+  description:
+    'Make your lectures accessible to everyone with instant transcription and translation. No app installation required - just scan a QR code and start following along in real-time.',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <AuthProvider>
-        {children}
-        </AuthProvider>
-      </body>
-    </html>
-  );
+    <ClerkProvider>
+      <html lang='en'>
+        <body className={`${AdvercaseFont.variable} antialiased`}>{children}</body>
+      </html>
+    </ClerkProvider>
+  )
 }

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 
 export interface Transcript {
   id: string
@@ -8,9 +8,9 @@ export interface Transcript {
   user_id: string | null
 }
 
-export async function loadSessionTranscripts(sessionId: string) {
-  const supabase = createClient()
-  
+export async function loadSessionTranscripts(sessionId: string, token: Promise<string | null>) {
+  const supabase = createClient(token)
+
   const { data: transcripts, error: transcriptError } = await supabase
     .from('transcripts')
     .select('*')
@@ -25,7 +25,7 @@ export async function loadSessionTranscripts(sessionId: string) {
   console.log('📝 Transcript loading result:', {
     sessionId,
     transcripts: transcripts?.length || 0,
-    sampleData: transcripts?.slice(0, 2)
+    sampleData: transcripts?.slice(0, 2),
   })
 
   return transcripts || []

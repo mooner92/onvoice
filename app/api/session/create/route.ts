@@ -1,21 +1,28 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { auth } from '@clerk/nextjs/server'
 
 export async function POST(req: NextRequest) {
   try {
     const { title, description, category, hostId, hostName, primaryLanguage } = await req.json()
 
     if (!title || !hostId || !hostName || !primaryLanguage) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Verify user authentication with Clerk
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify that the requesting user matches the hostId
+    if (userId !== hostId) {
+      return NextResponse.json({ error: 'Forbidden: Cannot create session for another user' }, { status: 403 })
+    }
+
+    // Use safe server-side Supabase client
+    const supabase = createServerSupabaseClient()
 
     // Create session
     const { data: session, error } = await supabase
@@ -35,10 +42,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Database error:', error)
-      return NextResponse.json(
-        { error: "Failed to create session" },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
     // Generate session URLs
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest) {
       .from('sessions')
       .update({
         session_url: authUrl,
-        qr_code_url: publicUrl
+        qr_code_url: publicUrl,
       })
       .eq('id', session.id)
 
@@ -60,15 +64,11 @@ export async function POST(req: NextRequest) {
         ...session,
         session_url: authUrl,
         qr_code_url: publicUrl,
-        public_url: publicUrl
-      }
+        public_url: publicUrl,
+      },
     })
-
   } catch (error) {
     console.error('Session creation error:', error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-} 
+}

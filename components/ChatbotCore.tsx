@@ -1,18 +1,18 @@
-import { useRef, useEffect, ReactNode } from 'react';
-import { useChat, Message } from 'ai/react';
+import { useRef, useEffect, ReactNode } from 'react'
+import { useChat, Message } from 'ai/react'
 
 interface ChatbotCoreProps {
-  transcript: string;
-  sessionId: string;
+  transcript: string
+  sessionId: string
   children: (props: {
-    messages: Message[];
-    input: string;
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
-    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-    isLoading: boolean;
-    error: Error | undefined;
-    messagesEndRef: React.RefObject<HTMLDivElement | null>;
-  }) => ReactNode;
+    messages: Message[]
+    input: string
+    handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void
+    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+    isLoading: boolean
+    error: Error | undefined
+    messagesEndRef: React.RefObject<HTMLDivElement | null>
+  }) => ReactNode
 }
 
 export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProps) {
@@ -21,20 +21,20 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
     body: {
       transcript,
     },
-  });
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  })
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   // Add a ref to always have the latest transcript
-  const transcriptRef = useRef(transcript);
+  const transcriptRef = useRef(transcript)
   useEffect(() => {
-    transcriptRef.current = transcript;
-  }, [transcript]);
+    transcriptRef.current = transcript
+  }, [transcript])
 
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages]);
+  }, [messages])
 
   // const handleSend = async () => {
   //   if (!input.trim()) return;
@@ -80,5 +80,5 @@ export function ChatbotCore({ transcript, sessionId, children }: ChatbotCoreProp
     isLoading,
     error,
     messagesEndRef,
-  });
-} 
+  })
+}

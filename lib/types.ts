@@ -5,7 +5,17 @@ export interface Session {
   host_id: string
   host_name: string
   primary_language: string
-  category: 'general' | 'sports' | 'economics' | 'technology' | 'education' | 'business' | 'medical' | 'legal' | 'entertainment' | 'science'
+  category:
+    | 'general'
+    | 'sports'
+    | 'economics'
+    | 'technology'
+    | 'education'
+    | 'business'
+    | 'medical'
+    | 'legal'
+    | 'entertainment'
+    | 'science'
   status: 'active' | 'ended'
   summary?: string
   created_at: string
@@ -113,4 +123,4 @@ export interface TranscriptLine {
   isTranslating?: boolean
   translationQuality?: number
   translatedLanguage?: string // 번역된 언어 추적
-} 
+}
