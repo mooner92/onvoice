@@ -259,6 +259,8 @@ export async function POST(req: NextRequest) {
             )
 
             // 1. transcripts 테이블에 검수된 텍스트 저장
+            console.log(`💾 Updating transcript ${transcriptId} with reviewed text: "${reviewResult.reviewedText.substring(0, 30)}..."`)
+            
             const { error: updateError } = await supabase
               .from('transcripts')
               .update({
@@ -269,8 +271,10 @@ export async function POST(req: NextRequest) {
               .eq('id', transcriptId)
 
             if (updateError) {
-              console.error('Error updating transcript:', updateError)
+              console.error('❌ Error updating transcript with reviewed text:', updateError)
               throw new Error('Failed to update transcript')
+            } else {
+              console.log(`✅ Successfully updated transcript ${transcriptId} with reviewed text`)
             }
 
             // 2. 번역 결과를 translation_cache에 저장하고 ID 수집
