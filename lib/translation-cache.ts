@@ -261,7 +261,7 @@ export function generateSmartMockTranslation(text: string, targetLanguage: strin
   }
 
   // 긴 텍스트는 번역 중 표시
-  return `[AI 번역 중...] ${text}`
+      return `[AI Translating...] ${text}`
 }
 
 // 번역 엔진 품질 평가

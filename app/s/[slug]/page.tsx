@@ -364,7 +364,7 @@ export default function PublicSessionPage() {
               setTranscript((prev) => {
                 const updated = prev.map((line) => {
                   // transcript ID로 매칭 (실제 DB ID 사용)
-                  if (transcriptIds.includes(line.id) && (line.isTranslating || line.translated.includes('[번역 중...]'))) {
+                  if (transcriptIds.includes(line.id) && (line.isTranslating || line.translated.includes('[Translating...]'))) {
                     console.log(`✅ Updating line via cache ID: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
                 return {
                   ...line,
@@ -411,7 +411,7 @@ export default function PublicSessionPage() {
                   const updated = prev.map((line) => {
                     // 원본 텍스트로 매칭
                     if (line.original.includes(cache.original_text.substring(0, 30)) && 
-                        (line.isTranslating || line.translated.includes('[번역 중...]'))) {
+                        (line.isTranslating || line.translated.includes('[Translating...]'))) {
                       console.log(`✅ Updating line by text match: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
                       return {
                         ...line,
@@ -493,7 +493,7 @@ export default function PublicSessionPage() {
                 const updated = prev.map((line) => {
                   // transcript ID로 매칭
                   if (line.id === transcript.id && 
-                      (line.isTranslating || line.translated.includes('[번역 중...]'))) {
+                      (line.isTranslating || line.translated.includes('[Translating...]'))) {
                     console.log(`✅ Updating line via transcript update: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
                     return {
                       ...line,
@@ -634,7 +634,7 @@ export default function PublicSessionPage() {
                     translatedText = cache.translated_text
                     console.log(`✅ Loaded cached translation for "${originalText.substring(0, 30)}..."`)
                   } else {
-                    translatedText = `[번역 중...] ${originalText}`
+                    translatedText = `[Translating...] ${originalText}`
                     console.log(`⏳ Translation not yet cached for "${originalText.substring(0, 30)}..." (cache ID: ${cacheId})`)
                   }
                 } else {
@@ -650,7 +650,7 @@ export default function PublicSessionPage() {
                     translatedText = cache.translated_text
                     console.log(`✅ Loaded cached translation (fallback) for "${originalText.substring(0, 30)}..."`)
                   } else {
-                    translatedText = `[번역 중...] ${originalText}`
+                    translatedText = `[Translating...] ${originalText}`
                     console.log(`⏳ Translation not yet cached (fallback) for "${originalText.substring(0, 30)}..."`)
                   }
                 }
@@ -884,17 +884,17 @@ export default function PublicSessionPage() {
                       translatedText = cache.translated_text
                       console.log(`✅ Found cached translation via ID: "${originalText.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
                     } else {
-                      translatedText = `[번역 중...] ${originalText}`
+                      translatedText = `[Translating...] ${originalText}`
                       isTranslating = true
                       console.log(`⏳ Cache ID exists but translation not found: ${cacheId}`)
                     }
                   } else {
-                    translatedText = `[번역 중...] ${originalText}`
+                    translatedText = `[Translating...] ${originalText}`
                     isTranslating = true
                     console.log(`⏳ No cache ID for language ${selectedLanguage}: "${originalText.substring(0, 30)}..."`)
                   }
                 } else {
-                  translatedText = `[번역 중...] ${originalText}`
+                  translatedText = `[Translating...] ${originalText}`
                   isTranslating = true
                   console.log(`⏳ No translation_cache_ids found: "${originalText.substring(0, 30)}..."`)
                 }
@@ -1093,7 +1093,7 @@ export default function PublicSessionPage() {
               line.id === newId
                 ? {
                     ...line,
-                    translated: `[번역 중...] ${newText.trim()}`,
+                    translated: `[Translating...] ${newText.trim()}`,
                     isTranslating: true,
                   }
                 : line,
@@ -1383,7 +1383,7 @@ export default function PublicSessionPage() {
             // 세션 종료 알림
             addToast({
               type: 'success',
-              title: '세션이 종료되었습니다',
+              title: 'session ended',
               duration: 3000,
             })
 
@@ -1440,7 +1440,7 @@ export default function PublicSessionPage() {
       // 다른 언어인 경우 번역 중 상태로 설정
       return prev.map((line) => ({
         ...line,
-        translated: `[번역 중...] ${line.original}`,
+        translated: `[Translating...] ${line.original}`,
         translatedLanguage: selectedLanguage,
         isTranslating: true,
       }))

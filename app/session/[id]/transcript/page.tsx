@@ -493,8 +493,8 @@ export default function SessionTranscriptPage() {
       if (transcript.length === 0) {
         addToast({
           type: 'warning',
-          title: '복사할 내용이 없습니다',
-          message: '트랜스크립트가 아직 없습니다.',
+          title: 'No content to copy',
+          message: 'No transcript available yet.',
           duration: 2000,
         })
         return
@@ -535,8 +535,8 @@ export default function SessionTranscriptPage() {
         // 성공 Toast 알림
         addToast({
           type: 'success',
-          title: '복사 완료!',
-          message: `${type === 'original' ? '원문' : '번역문'} ${transcript.length}개 항목이 클립보드에 복사되었습니다.`,
+          title: 'Copy completed!',
+          message: `${type === 'original' ? 'Original' : 'Translation'} ${transcript.length} items copied to clipboard.`,
           duration: 3000,
         })
       } catch (err) {
@@ -545,8 +545,8 @@ export default function SessionTranscriptPage() {
         // 실패 Toast 알림
         addToast({
           type: 'error',
-          title: '복사 실패',
-          message: '클립보드 접근이 실패했습니다. 브라우저 설정을 확인해주세요.',
+          title: 'Copy failed',
+          message: 'Failed to access clipboard. Please check your browser settings.',
           duration: 5000,
         })
       }
@@ -698,7 +698,7 @@ export default function SessionTranscriptPage() {
                     className='rounded'
                   />
                   <Label htmlFor='textOnlyMode' className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    텍스트만 보기 (복사 편의)
+                    Text Only Mode (Copy Friendly)
                   </Label>
                 </div>
               </div>
@@ -707,11 +707,11 @@ export default function SessionTranscriptPage() {
               {transcript.length > 0 && (
                 <div className='space-y-2'>
                   <Label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    텍스트 복사
+                    Text Copy
                   </Label>
                   <div className='flex space-x-2'>
                     <Button variant='outline' size='sm' onClick={(e) => copyTextOnly('original', e)} className='flex-1'>
-                      📋 원문 복사
+                      📋 Copy Original
                     </Button>
                     {showTranslation && (
                       <Button
@@ -720,13 +720,13 @@ export default function SessionTranscriptPage() {
                         onClick={(e) => copyTextOnly('translation', e)}
                         className='flex-1'
                       >
-                        🌍 번역문 복사
+                        🌍 Copy Translation
                       </Button>
                     )}
                   </div>
                   {textOnlyMode && (
                     <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      💡 텍스트만 보기 모드: 번호와 타임스탬프 없이 순수 텍스트만 복사됩니다.
+                      💡 Text Only Mode: Copy pure text without numbers and timestamps.
                     </p>
                   )}
                 </div>
@@ -890,8 +890,8 @@ export default function SessionTranscriptPage() {
                             navigator.clipboard.writeText(summaryToCopy)
                             addToast({
                               type: 'success',
-                              title: '요약 복사 완료!',
-                              message: `${showTranslation && selectedLanguage !== 'en' ? '번역된 ' : ''}요약이 클립보드에 복사되었습니다.`,
+                                                          title: 'Summary copy completed!',
+                            message: `${showTranslation && selectedLanguage !== 'en' ? 'Translated ' : ''}summary copied to clipboard.`,
                               duration: 2000,
                             })
                           }}
@@ -979,7 +979,7 @@ export default function SessionTranscriptPage() {
                         <>
                           <span>•</span>
                           <Loader2 className='h-3 w-3 animate-spin' />
-                          <span>번역 중...</span>
+                          <span>Translating...</span>
                         </>
                       )}
                     </div>
@@ -1002,7 +1002,7 @@ export default function SessionTranscriptPage() {
                       style={{ fontSize: `${fontSize[0] - 1}px` }}
                     >
                       {translatingIds.has(line.id) ? (
-                        <span className='text-gray-400'>[AI 번역 중...]</span>
+                        <span className='text-gray-400'>[AI Translating...]</span>
                       ) : (
                         translatedTexts[line.id] || `[${selectedLang?.name}] ${line.original_text}`
                       )}

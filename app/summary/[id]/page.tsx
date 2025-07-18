@@ -630,7 +630,7 @@ export default function PublicSessionSummaryPage() {
                 }, 500)
               } catch (saveError) {
                 console.error('❌ Session save failed:', saveError)
-                alert('세션 저장에 실패했습니다: ' + (saveError instanceof Error ? saveError.message : 'Unknown error'))
+                alert('Failed to save session: ' + (saveError instanceof Error ? saveError.message : 'Unknown error'))
               }
             } else {
               console.log('⚠️ Session ID mismatch, not processing save')
@@ -638,7 +638,7 @@ export default function PublicSessionSummaryPage() {
           } catch (error) {
             console.error('Error processing pending session save:', error)
             // 에러 알림
-            alert('세션 저장 중 오류가 발생했습니다: ' + (error instanceof Error ? error.message : 'Unknown error'))
+            alert('Error occurred while saving session: ' + (error instanceof Error ? error.message : 'Unknown error'))
           }
         } else {
           console.log('📦 No pending session save found')
@@ -932,21 +932,21 @@ export default function PublicSessionSummaryPage() {
                   className='flex items-center space-x-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
                 >
                   <BookOpen className='h-4 w-4' />
-                  <span>세션 저장</span>
+                  <span>Save Session</span>
                 </Button>
               )}
               {/* 호스트 표시 */}
               {user && session?.host_id === user.id && (
                 <div className='flex items-center space-x-2 text-sm text-blue-600'>
                   <Mic className='h-4 w-4' />
-                  <span>호스트</span>
+                  <span>Host</span>
                 </div>
               )}
 
               {sessionSaved && (
                 <div className='flex items-center space-x-2 text-sm text-green-600'>
                   <BookOpen className='h-4 w-4' />
-                  <span>저장됨</span>
+                  <span>Saved</span>
                 </div>
               )}
               <Button
@@ -1222,7 +1222,7 @@ export default function PublicSessionSummaryPage() {
                               {translatingIds.has(item.id) ? (
                                 <span className='flex items-center text-gray-400'>
                                   <div className='mr-2 h-3 w-3 animate-spin rounded-full border border-gray-400 border-t-transparent'></div>
-                                  [AI 번역 중...]
+                                  [AI Translating...]
                                 </span>
                               ) : (
                                 translatedTexts[item.id] ||
