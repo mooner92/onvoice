@@ -6,14 +6,14 @@ LiveTranscribe is a real-time lecture transcription and translation service. Spe
 
 ### 🎤 Speaker (Host)
 
-- **High-Quality Speech Recognition**: Server-based STT using OpenAI Whisper API (high accuracy)
+- **Real-Time Speech Recognition**: Browser-based STT using Web Speech API (instant transcription)
 - **Session Management**: Lecture title, description, language settings
 - **Automatic QR Code Generation**: Real-time QR codes for easy participant access
 - **Session Persistence**: Automatic session recovery after browser restart
-- **Real-Time Caption Display**: 3-second audio processing for text conversion
+- **Real-Time Caption Display**: Instant audio processing for text conversion
 - **Live Participant Monitoring**: Real-time display of connected participants
 - **Lifetime Storage**: Unlimited storage for speaker sessions
-- **5-Minute Auto-Timeout**: Automatic session termination after 5 minutes to prevent cost overruns
+- **Auto-Restart**: Automatic restart every 4.5 minutes to prevent Web Speech API timeout
 
 ### 👥 Audience (Participants)
 
@@ -36,7 +36,7 @@ LiveTranscribe is a real-time lecture transcription and translation service. Spe
 - **Authentication**: Supabase Auth (Google OAuth)
 - **Database**: Supabase PostgreSQL
 - **Real-time Communication**: Supabase Realtime
-- **Speech Recognition**: OpenAI Whisper API (server-based STT)
+- **Speech Recognition**: Web Speech API (browser-based STT)
 - **QR Code**: react-qr-code, qrcode
 - **Audio Processing**: MediaRecorder API (WebRTC)
 - **Translation**: Google Translate API / Azure Translator
@@ -72,8 +72,11 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 # Google OAuth
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 
-# OpenAI (Whisper API)
+# OpenAI (Optional - for future STT fallback)
 OPENAI_API_KEY=your_openai_api_key
+
+# Gemini (Required - for STT review and translation)
+GEMINI_API_KEY=your_gemini_api_key
 
 # Google Translate (Optional - for translation features)
 GOOGLE_TRANSLATE_API_KEY=your_google_translate_api_key
@@ -95,12 +98,17 @@ NEXTAUTH_URL=http://localhost:3000
    - Create OAuth 2.0 Client ID for Web application
    - Add your domain to authorized domains
 
-3. **OpenAI API Key**:
+3. **OpenAI API Key** (Optional):
    - OpenAI Platform → API Keys
    - Create new secret key
-   - Note: Paid OpenAI account required for Whisper API
+   - Note: Currently used for fallback STT functionality
 
-4. **Google Translate API Key** (Optional):
+4. **Gemini API Key** (Required):
+   - Google AI Studio → API Keys
+   - Create new API key
+   - Note: Used for STT review and translation
+
+5. **Google Translate API Key** (Optional):
    - Google Cloud Console → APIs & Services → Library
    - Enable Cloud Translation API
    - Create API key
@@ -115,6 +123,7 @@ Execute the SQL files in the `sqls/` directory in Supabase SQL Editor in the fol
 4. **Summary Cache**: `create-session-summary-cache.sql` - Creates summary translation cache
 5. **Fix Schema**: `fix-db-schema.sql` - Fixes translation cache structure
 6. **Fix Summary Cache**: `fix-session-summary-cache.sql` - Fixes summary cache structure
+7. **Add Reviewed Text**: `add-reviewed-text-column.sql` - Adds reviewed_text column for Gemini review
 
 **Important**: Execute these SQL files in order to ensure proper database structure.
 
@@ -172,10 +181,10 @@ onvoice/
 
 ### Real-Time STT System
 
-- **OpenAI Whisper Integration**: High-accuracy speech recognition
-- **3-Second Chunks**: Optimal balance between latency and accuracy
-- **Automatic Fallback**: Mock STT when API keys are not configured
-- **Cost Optimization**: 5-minute auto-timeout to prevent excessive costs
+- **Web Speech API Integration**: Real-time browser-based speech recognition
+- **Instant Processing**: Zero-latency transcription with immediate results
+- **Auto-Restart**: Automatic restart every 4.5 minutes to prevent API timeout
+- **Cost-Free**: No external API costs for speech recognition
 
 ### Translation System
 
@@ -227,7 +236,7 @@ After deployment, verify these environment variables are correctly set:
 
 ### STT Costs
 
-- **OpenAI Whisper**: $0.006/minute (host only, regardless of participants)
+- **Web Speech API**: Free (browser-based, no server costs)
 - **Deepgram**: $0.0043/minute (requires Growth plan for WebSocket streaming)
 
 ### Translation Costs
@@ -240,7 +249,7 @@ After deployment, verify these environment variables are correctly set:
 
 ### Common Issues
 
-1. **STT Not Working**: Check OpenAI API key configuration
+1. **STT Not Working**: Check browser compatibility and microphone permissions
 2. **QR Code Not Generating**: Verify network connectivity and IP detection
 3. **Translation Failing**: Ensure Google Translate API key is set
 4. **Session Not Saving**: Check Supabase connection and permissions

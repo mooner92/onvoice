@@ -21,6 +21,9 @@ interface TranscriptLine {
   text: string
   confidence: number
   isPartial?: boolean
+  isReviewing?: boolean // 검수 중 상태
+  reviewedText?: string // 검수된 텍스트
+  detectedLanguage?: string // 감지된 언어
 }
 
 export default function HostDashboard() {
@@ -216,6 +219,79 @@ export default function HostDashboard() {
     }
   }, [sessionId, supabase])
 
+  // Subscribe to transcript updates (검수 완료된 결과)
+  useEffect(() => {
+    if (!sessionId) return
+
+    const channel = supabase
+      .channel(`transcripts-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'transcripts',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const updatedTranscript = payload.new as {
+            id: string
+            original_text: string
+            reviewed_text: string
+            review_status: string
+            detected_language: string
+            timestamp: string
+          }
+          
+          if (updatedTranscript.review_status === 'completed' && updatedTranscript.reviewed_text) {
+            console.log('✅ Received reviewed transcript:', updatedTranscript.reviewed_text)
+            
+            // 임시 항목을 검수 완료된 항목으로 교체 (중복 방지)
+            setTranscript((prev) => {
+              // 이미 존재하는지 확인 (ID 또는 텍스트로)
+              const existingIndex = prev.findIndex(line => 
+                line.id === updatedTranscript.id || 
+                line.text === updatedTranscript.original_text ||
+                line.reviewedText === updatedTranscript.reviewed_text
+              )
+              
+              if (existingIndex !== -1) {
+                // 기존 항목 업데이트
+                const updated = [...prev]
+                updated[existingIndex] = {
+                  ...updated[existingIndex],
+                  id: updatedTranscript.id, // 실제 DB ID로 업데이트
+                  text: updatedTranscript.reviewed_text, // 검수된 텍스트 사용
+                  confidence: 0.95,
+                  isReviewing: false,
+                  reviewedText: updatedTranscript.reviewed_text,
+                  detectedLanguage: updatedTranscript.detected_language,
+                }
+                return updated
+              } else {
+                // 새 항목 추가 (임시 항목 제거 후)
+                const filtered = prev.filter(line => !line.id.startsWith('temp-'))
+                return [...filtered, {
+                  id: updatedTranscript.id,
+                  timestamp: updatedTranscript.timestamp,
+                  text: updatedTranscript.reviewed_text, // 검수된 텍스트 사용
+                  confidence: 0.95,
+                  isReviewing: false,
+                  reviewedText: updatedTranscript.reviewed_text,
+                  detectedLanguage: updatedTranscript.detected_language,
+                }]
+              }
+            })
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId, supabase])
+
   // Session duration timer
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -319,8 +395,11 @@ export default function HostDashboard() {
         const formattedTranscripts: TranscriptLine[] = transcripts.map((t) => ({
           id: t.id,
           timestamp: new Date(t.created_at).toLocaleTimeString(),
-          text: t.original_text,
+          text: t.reviewed_text || t.original_text, // 검수된 텍스트가 있으면 사용, 없으면 원본
           confidence: 0.9,
+          isReviewing: t.review_status === 'processing',
+          reviewedText: t.reviewed_text,
+          detectedLanguage: t.detected_language,
         }))
 
         setTranscript(formattedTranscripts)
@@ -339,12 +418,13 @@ export default function HostDashboard() {
       // Update partial text display
       setCurrentPartialText(text)
     } else {
-      // Add final transcript to list
+      // Add final transcript to list (원본 텍스트, 검수 중 상태)
       const newLine: TranscriptLine = {
-        id: Date.now().toString(),
+        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toLocaleTimeString(),
         text: text.trim(),
         confidence: 0.9,
+        isReviewing: true, // 검수 중 상태
       }
 
       setTranscript((prev) => [...prev, newLine])
@@ -677,7 +757,7 @@ export default function HostDashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className='text-sm text-gray-500'>카테고리를 선택하면 해당 분야에 맞는 번역 및 요약을 제공합니다.</p>
+                <p className='text-sm text-gray-500'>When you select a category, you will receive translations and summaries tailored to that field.</p>
               </div>
 
               <div className='space-y-2'>
@@ -783,10 +863,30 @@ export default function HostDashboard() {
                   )}
 
                   {/* Final transcripts */}
-                  {transcript.map((line) => (
-                    <div key={line.id} className='rounded-lg bg-gray-50 p-3'>
-                      <div className='mb-1 text-xs text-gray-500'>{line.timestamp}</div>
-                      <div className='text-gray-900'>{line.text}</div>
+                  {transcript.map((line, index) => (
+                    <div key={`${line.id}-${index}-${line.timestamp}`} className={`rounded-lg p-3 ${line.isReviewing ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
+                      <div className='mb-1 flex items-center justify-between text-xs text-gray-500'>
+                        <span>{line.timestamp}</span>
+                        {line.isReviewing && (
+                          <span className='flex items-center text-yellow-600'>
+                            <div className='mr-1 h-2 w-2 animate-pulse rounded-full bg-yellow-500'></div>
+                            Reviewing with AI...
+                          </span>
+                        )}
+                        {line.detectedLanguage && !line.isReviewing && (
+                          <span className='text-blue-600'>
+                            {line.detectedLanguage.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`${line.isReviewing ? 'text-yellow-800' : 'text-gray-900'}`}>
+                        {line.reviewedText || line.text}
+                      </div>
+                      {line.reviewedText && line.reviewedText !== line.text && (
+                        <div className='mt-2 text-xs text-gray-500'>
+                          <span className='font-medium'>Original:</span> {line.text}
+                        </div>
+                      )}
                     </div>
                   ))}
 

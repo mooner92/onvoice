@@ -352,12 +352,49 @@ export default function PublicSessionSummaryPage() {
     }
   }
 
-  // 🆕 Transcript 번역 함수 (기존 translation_cache 사용)
+  // 🆕 Transcript 번역 함수 (translation_cache_ids 사용)
   const translateText = async (text: string, targetLang: string): Promise<string> => {
     try {
       console.log(`🌍 Loading translation: "${text.substring(0, 30)}..." → ${targetLang}`)
 
-      // translation_cache에서 기존 번역 찾기
+      // 먼저 transcript에서 translation_cache_ids 찾기
+      const { data: transcriptData, error: transcriptError } = await supabase
+        .from('transcripts')
+        .select('translation_cache_ids')
+        .eq('session_id', sessionId)
+        .ilike('original_text', `%${text.substring(0, 50)}%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (transcriptError) {
+        console.error('Transcript lookup error:', transcriptError)
+      }
+
+      if (transcriptData?.translation_cache_ids && transcriptData.translation_cache_ids[targetLang]) {
+        const cacheId = transcriptData.translation_cache_ids[targetLang]
+        console.log(`🔍 Found cache ID: ${cacheId} for language: ${targetLang}`)
+        
+        // translation_cache에서 번역 가져오기
+        const { data: cachedTranslation, error: cacheError } = await supabase
+          .from('translation_cache')
+          .select('translated_text')
+          .eq('id', cacheId)
+          .single()
+
+        if (cacheError) {
+          console.error('Translation cache error:', cacheError)
+          return `[번역 실패] ${text}`
+        }
+
+        if (cachedTranslation) {
+          console.log(`✅ Found cached translation via ID`)
+          return cachedTranslation.translated_text
+        }
+      }
+
+      // Fallback: 기존 방식으로 찾기
+      console.log(`⚠️ No cache ID found, trying fallback method`)
       const { data: cachedTranslation, error } = await supabase
         .from('translation_cache')
         .select('translated_text')
@@ -371,7 +408,7 @@ export default function PublicSessionSummaryPage() {
       }
 
       if (cachedTranslation) {
-        console.log(`✅ Found cached translation`)
+        console.log(`✅ Found cached translation (fallback)`)
         return cachedTranslation.translated_text
       } else {
         console.log(`⚠️ No cached translation found`)
