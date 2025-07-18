@@ -2,6 +2,139 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { performBatchTranslation, saveBatchTranslationsToCache } from '@/lib/translation-queue'
 import { getTargetLanguages, detectLanguage } from '@/lib/translation-cache'
+import { saveTranslationToCache } from '@/lib/translation-cache'
+
+// Gemini 검수 + 번역 함수 (직접 호출)
+async function reviewAndTranslateWithGemini(
+  originalText: string,
+  detectedLanguage: string
+): Promise<{
+  reviewedText: string
+  translations: Record<string, string>
+  quality: number
+}> {
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  if (!geminiApiKey) {
+    throw new Error('Gemini API key not found')
+  }
+
+  // 입력 언어를 제외한 나머지 3개 언어
+  const allLanguages = ['ko', 'zh', 'hi', 'en']
+  const targetLanguages = allLanguages.filter(lang => lang !== detectedLanguage)
+
+  // 언어별 이름 매핑
+  const languageNames: Record<string, string> = {
+    ko: 'Korean',
+    zh: 'Chinese',
+    hi: 'Hindi',
+    en: 'English'
+  }
+
+  // 검수 및 번역 프롬프트 구성
+  let prompt = ''
+  
+  if (detectedLanguage === 'en') {
+    prompt = `Here is the raw text straight from STT, fix the grammar and remove noise errors like ah, emmm and add the punctuation to make it clear and easy to read.
+
+Also translate the corrected text to ${targetLanguages.map(lang => languageNames[lang]).join(', ')}.
+
+Original text: "${originalText}"
+
+Please return a JSON response with this exact format:
+{
+  "reviewedText": "corrected English text here",
+  "translations": {
+    "ko": "Korean translation here",
+    "zh": "Chinese translation here", 
+    "hi": "Hindi translation here"
+  },
+  "quality": 0.95
+}`
+  } else {
+    const inputLanguageName = languageNames[detectedLanguage]
+    prompt = `Here is the raw text straight from STT in ${inputLanguageName}, fix the grammar and remove noise errors and add the punctuation to make it clear and easy to read.
+
+Also translate the corrected text to ${targetLanguages.map(lang => languageNames[lang]).join(', ')}.
+
+Original text: "${originalText}"
+
+Please return a JSON response with this exact format:
+{
+  "reviewedText": "corrected ${inputLanguageName} text here",
+  "translations": {
+    ${targetLanguages.map(lang => `"${lang}": "${languageNames[lang]} translation here"`).join(',\n    ')}
+  },
+  "quality": 0.95
+}`
+  }
+
+  console.log(`🤖 Gemini review + translation for: "${originalText.substring(0, 50)}..." (${detectedLanguage} → ${targetLanguages.join(', ')})`)
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: Math.max(Math.ceil(originalText.length * 6), 1000),
+        },
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Gemini API error:', response.status, errorText)
+    throw new Error('Gemini API request failed')
+  }
+
+  const data = await response.json()
+
+  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+    const candidate = data.candidates[0]
+
+    if (candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
+      let content = candidate.content.parts[0].text.trim()
+
+      // JSON 파싱 (마크다운 코드 블록 제거)
+      if (content.startsWith('```json')) {
+        content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+      } else if (content.startsWith('```')) {
+        content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
+      }
+
+      try {
+        const result = JSON.parse(content)
+        
+        console.log(`✅ Gemini review + translation completed`)
+        
+        return {
+          reviewedText: result.reviewedText || originalText,
+          translations: result.translations || {},
+          quality: result.quality || 0.9
+        }
+      } catch (parseError) {
+        console.error('JSON parsing error:', parseError)
+        throw new Error('Failed to parse Gemini response')
+      }
+    }
+  }
+
+  throw new Error('Invalid Gemini response structure')
+}
 
 // In-memory session storage for quick access
 interface SessionData {
@@ -82,6 +215,7 @@ export async function POST(req: NextRequest) {
                 original_text: cleanedTranscript,
                 created_at: new Date().toISOString(),
                 is_final: true,
+                review_status: 'pending', // 검수 대기 상태로 설정
                 translation_status: 'pending', // 번역 대기 상태로 설정
               },
             ])
@@ -97,68 +231,126 @@ export async function POST(req: NextRequest) {
           console.log(`✅ Transcript saved (id): ${data?.[0]?.id} - DB insert: ${dbInsertTime}ms`)
           const transcriptId = data?.[0]?.id
 
-          // 🚀 즉시 번역 실행 (큐 시스템 제거)
-          console.log('🌍 Starting immediate translation...')
+          // 🚀 Gemini 검수 + 번역 실행 (백그라운드)
+          console.log('🌍 Starting Gemini review + translation...')
 
-          // 번역 상태를 'processing'으로 업데이트
+          // 검수 및 번역 상태를 'processing'으로 업데이트
           const statusUpdateStart = Date.now()
-          await supabase.from('transcripts').update({ translation_status: 'processing' }).eq('id', transcriptId)
+          await supabase.from('transcripts').update({ 
+            review_status: 'processing',
+            translation_status: 'processing' 
+          }).eq('id', transcriptId)
           const statusUpdateTime = Date.now() - statusUpdateStart
 
-          console.log(`🔄 Translation status updated to 'processing' (${statusUpdateTime}ms)`)
-
-          // 🆕 입력 언어 감지 후 해당 언어를 제외한 나머지 3개 언어로 번역
-          const inputLanguage = detectLanguage(cleanedTranscript)
-          const targetLanguages = getTargetLanguages(inputLanguage)
-
-          console.log(`🌍 Detected input language: ${inputLanguage}, translating to: [${targetLanguages.join(', ')}]`)
+          console.log(`🔄 Review & translation status updated to 'processing' (${statusUpdateTime}ms)`)
 
           try {
-            // 즉시 배치 번역 실행
-            const translationStart = Date.now()
-            const batchResults = await performBatchTranslation(cleanedTranscript, targetLanguages)
-            const translationTime = Date.now() - translationStart
+            // 언어 감지
+            const detectedLanguage = detectLanguage(cleanedTranscript)
+            console.log(`🌍 Detected language: ${detectedLanguage}`)
+
+            // Gemini 검수 + 번역 직접 호출
+            const reviewStart = Date.now()
+            const reviewResult = await reviewAndTranslateWithGemini(cleanedTranscript, detectedLanguage)
+            const reviewTime = Date.now() - reviewStart
 
             console.log(
-              `🚀 Batch translation completed in ${translationTime}ms for ${Object.keys(batchResults).length} languages`,
+              `🚀 Gemini review + translation completed in ${reviewTime}ms for "${cleanedTranscript.substring(0, 30)}..."`,
             )
 
-            // 번역 결과를 캐시에 즉시 저장
-            const cacheStart = Date.now()
-            const cacheIds = await saveBatchTranslationsToCache(cleanedTranscript, batchResults)
-            const cacheTime = Date.now() - cacheStart
+            // 1. transcripts 테이블에 검수된 텍스트 저장
+            const { error: updateError } = await supabase
+              .from('transcripts')
+              .update({
+                reviewed_text: reviewResult.reviewedText,
+                detected_language: detectedLanguage,
+                review_status: 'completed'
+              })
+              .eq('id', transcriptId)
 
-            console.log(`💾 Translation cache saved in ${cacheTime}ms for ${Object.keys(cacheIds).length} languages`)
+            if (updateError) {
+              console.error('Error updating transcript:', updateError)
+              throw new Error('Failed to update transcript')
+            }
 
-            // 번역 완료 상태로 업데이트
-            await supabase.from('transcripts').update({ translation_status: 'completed' }).eq('id', transcriptId)
+            // 2. 번역 결과를 translation_cache에 저장하고 ID 수집
+            const cacheIds: Record<string, string> = {}
+            const cachePromises = Object.entries(reviewResult.translations).map(async ([targetLang, translatedText]) => {
+              if (translatedText && translatedText.trim()) {
+                try {
+                  const cacheId = await saveTranslationToCache(
+                    reviewResult.reviewedText, // 검수된 텍스트를 원본으로 사용
+                    targetLang,
+                    translatedText,
+                    'gemini-review',
+                    reviewResult.quality
+                  )
+                  
+                  if (cacheId) {
+                    cacheIds[targetLang] = cacheId
+                    console.log(`✅ Cached translation: ${targetLang} (ID: ${cacheId})`)
+                  }
+                } catch (cacheError) {
+                  console.error(`❌ Cache error for ${targetLang}:`, cacheError)
+                }
+              }
+            })
 
-            console.log(
-              `✅ Immediate translation completed for "${cleanedTranscript.substring(0, 30)}..." (${Object.keys(batchResults).length} languages)`,
-            )
+            await Promise.all(cachePromises)
+
+            // 3. transcripts 테이블에 translation_cache_ids 업데이트
+            if (Object.keys(cacheIds).length > 0) {
+              console.log(`💾 Updating transcript ${transcriptId} with cache IDs:`, cacheIds)
+              
+              const { error: updateError } = await supabase
+                .from('transcripts')
+                .update({ 
+                  translation_cache_ids: cacheIds,
+                  translation_status: 'completed' 
+                })
+                .eq('id', transcriptId)
+
+              if (updateError) {
+                console.error('❌ Error updating translation_cache_ids:', updateError)
+              } else {
+                console.log(`✅ Successfully updated transcript ${transcriptId} with ${Object.keys(cacheIds).length} cache IDs`)
+              }
+            } else {
+              console.log(`⚠️ No cache IDs to update for transcript ${transcriptId}`)
+              // 번역 완료 상태로 업데이트
+              await supabase.from('transcripts').update({ translation_status: 'completed' }).eq('id', transcriptId)
+            }
 
             return NextResponse.json({
               success: true,
               transcriptId: transcriptId,
+              originalText: cleanedTranscript,
+              reviewedText: reviewResult.reviewedText,
+              detectedLanguage: detectedLanguage,
+              reviewCompleted: true,
               translationCompleted: true,
-              translatedLanguages: Object.keys(batchResults),
-              translationTime: translationTime,
-              cacheTime: cacheTime,
+              translatedLanguages: Object.keys(reviewResult.translations || {}),
+              reviewTime: reviewTime,
               totalTime: Date.now() - dbInsertStart,
             })
-          } catch (translationError) {
-            console.error('❌ Immediate translation failed:', translationError)
+          } catch (reviewError) {
+            console.error('❌ Gemini review + translation failed:', reviewError)
 
-            // 번역 실패 시 상태를 pending으로 되돌림
-            await supabase.from('transcripts').update({ translation_status: 'pending' }).eq('id', transcriptId)
+            // 검수 및 번역 실패 시 상태를 pending으로 되돌림
+            await supabase.from('transcripts').update({ 
+              review_status: 'failed',
+              translation_status: 'failed' 
+            }).eq('id', transcriptId)
 
-            // 번역 실패해도 transcript 저장은 성공으로 처리
+            // 검수 및 번역 실패해도 transcript 저장은 성공으로 처리
             return NextResponse.json({
               success: true,
               transcriptId: transcriptId,
+              originalText: cleanedTranscript,
+              reviewCompleted: false,
               translationCompleted: false,
-              translationError: translationError instanceof Error ? translationError.message : 'Unknown error',
-              note: 'Transcript saved but translation failed',
+              reviewError: reviewError instanceof Error ? reviewError.message : 'Unknown error',
+              note: 'Transcript saved but review + translation failed',
             })
           }
         }

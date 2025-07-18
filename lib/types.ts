@@ -53,10 +53,13 @@ export interface Transcript {
   session_id: string
   timestamp: string
   original_text: string
+  reviewed_text?: string // Gemini로 검수된 텍스트
+  detected_language?: string // 감지된 입력 언어
   translated_text?: string
   target_language?: string
   speaker_id?: string
   created_at: string
+  review_status?: 'pending' | 'processing' | 'completed' | 'failed'
   translation_cache_ids?: Record<string, string> // { "ko": "uuid1", "ja": "uuid2" }
 }
 
@@ -118,9 +121,28 @@ export interface TranscriptLine {
   id: string
   timestamp: string
   original: string
+  reviewed?: string // 검수된 텍스트
   translated: string
   speaker?: string
+  isReviewing?: boolean // 검수 중 상태
   isTranslating?: boolean
   translationQuality?: number
   translatedLanguage?: string // 번역된 언어 추적
+  detectedLanguage?: string // 감지된 입력 언어
+  translation_cache_ids?: Record<string, string> // { "ko": "uuid1", "zh": "uuid2", "hi": "uuid3" }
+}
+
+// STT 검수 관련 타입들
+export interface STTReviewRequest {
+  originalText: string
+  sessionId: string
+  transcriptId: string
+}
+
+export interface STTReviewResponse {
+  success: boolean
+  reviewedText: string
+  detectedLanguage: string
+  translations: Record<string, string>
+  quality: number
 }

@@ -309,13 +309,7 @@ export default function PublicSessionPage() {
   const translationCache = useRef<Map<string, TranslationResponse>>(new Map())
   const pendingTranslations = useRef<Set<string>>(new Set())
 
-  // 번역 캐시 관리
-  const selectedLanguageRef = useRef(selectedLanguage)
 
-  // selectedLanguage 변경 시 ref 업데이트
-  useEffect(() => {
-    selectedLanguageRef.current = selectedLanguage
-  }, [selectedLanguage])
 
   // Supabase Realtime으로 번역 캐시 업데이트 구독
   useEffect(() => {
@@ -332,45 +326,72 @@ export default function PublicSessionPage() {
           schema: 'public',
           table: 'translation_cache',
         },
-        (payload) => {
+        async (payload) => {
           const cache = payload.new as {
+            id: string
             original_text: string
             target_language: string
             translated_text: string
             quality_score: number
           }
           console.log('🎉 New translation cached:', {
-            text: cache.original_text,
+            id: cache.id,
+            text: cache.original_text.substring(0, 50),
             language: cache.target_language,
-            translated: cache.translated_text,
-            currentLanguage: selectedLanguageRef.current,
+            translated: cache.translated_text.substring(0, 50),
+            currentLanguage: selectedLanguage,
           })
 
           // 현재 선택된 언어의 번역이면 UI 업데이트
-          if (cache.target_language === selectedLanguageRef.current) {
+          if (cache.target_language === selectedLanguage) {
             console.log('📝 Updating UI with cached translation')
-            setTranscript((prev) => {
-              const updated = prev.map((line) => {
-                if (
-                  line.original === cache.original_text &&
-                  (line.isTranslating || line.translated.includes('[번역 중...]'))
-                ) {
-                  console.log(`✅ Updating line: "${line.original}" → "${cache.translated_text}"`)
-                  return {
-                    ...line,
-                    translated: cache.translated_text,
-                    translatedLanguage: cache.target_language,
-                    isTranslating: false,
-                    translationQuality: cache.quality_score,
+            
+            // 이 번역 캐시 ID를 사용하는 transcript를 찾아서 업데이트
+            const { data: transcripts } = await supabase
+              .from('transcripts')
+              .select('id, original_text, translation_cache_ids')
+              .eq('session_id', sessionId)
+              .contains('translation_cache_ids', { [selectedLanguage]: cache.id })
+
+            if (transcripts && transcripts.length > 0) {
+              const transcriptIds = transcripts.map(t => t.id)
+              console.log(`✅ Found ${transcripts.length} transcripts using this cache ID: ${cache.id}`)
+              
+              setTranscript((prev) => {
+                const updated = prev.map((line) => {
+                  // transcript ID로 매칭 (실제 DB ID 사용)
+                  if (transcriptIds.includes(line.id) && (line.isTranslating || line.translated.includes('[번역 중...]'))) {
+                    console.log(`✅ Updating line via cache ID: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
+                    return {
+                      ...line,
+                      translated: cache.translated_text,
+                      translatedLanguage: cache.target_language,
+                      isTranslating: false,
+                      translationQuality: cache.quality_score,
+                    }
                   }
+                  return line
+                })
+                
+                // 실제로 업데이트된 항목이 있는지 확인
+                const hasUpdates = updated.some((line, index) => 
+                  line.translated !== prev[index]?.translated
+                )
+                
+                if (hasUpdates) {
+                  console.log('✅ Transcript updated with new translation')
+                } else {
+                  console.log('⚠️ No matching transcript lines found for update')
                 }
-                return line
+                
+                return updated
               })
-              return updated
-            })
+            } else {
+              console.log(`⚠️ No transcripts found using cache ID: ${cache.id}`)
+            }
           } else {
             console.log(
-              `⏭️ Skipping update: language mismatch (${cache.target_language} !== ${selectedLanguageRef.current})`,
+              `⏭️ Skipping update: language mismatch (${cache.target_language} !== ${selectedLanguage})`,
             )
           }
         },
@@ -386,7 +407,7 @@ export default function PublicSessionPage() {
       console.log('🧹 Cleaning up translation cache subscription')
       supabase.removeChannel(channel)
     }
-  }, [sessionId, supabase]) // sessionId와 supabase만 필요, selectedLanguage는 이벤트 핸들러 내부에서 처리
+  }, [sessionId, selectedLanguage, supabase]) // selectedLanguage 의존성 추가
 
   // Load session data using slug or session ID
   useEffect(() => {
@@ -444,36 +465,74 @@ export default function PublicSessionPage() {
           const formattedTranscripts: TranscriptLine[] = []
 
           for (const t of transcripts) {
+            let originalText = t.original_text
             let translatedText = t.original_text
+
+            // 🆕 검수된 원문 텍스트 가져오기 (translation_cache에서)
+            try {
+              // translation_cache_ids가 있으면 해당 ID로 검수된 텍스트 가져오기
+              if (t.translation_cache_ids && t.translation_cache_ids.en) {
+                const { data: reviewedCache } = await supabase
+                  .from('translation_cache')
+                  .select('original_text')
+                  .eq('id', t.translation_cache_ids.en)
+                  .maybeSingle()
+                
+                if (reviewedCache) {
+                  originalText = reviewedCache.original_text
+                  console.log(`✅ Loaded reviewed text: "${originalText.substring(0, 30)}..."`)
+                }
+              }
+            } catch (err) {
+              console.error(`❌ Failed to load reviewed text for "${t.original_text.substring(0, 30)}..."`, err)
+              // 실패 시 원본 텍스트 사용
+            }
 
             // 번역이 활성화된 경우에만 번역 로드
             if (translationEnabled && selectedLanguage !== 'en') {
               try {
-                // 캐시 테이블에서 직접 확인
-                const { data: cache } = await supabase
-                  .from('translation_cache')
-                  .select('*')
-                  .eq('original_text', t.original_text)
-                  .eq('target_language', selectedLanguage)
-                  .maybeSingle()
+                // translation_cache_ids가 있으면 해당 ID로 번역 가져오기
+                if (t.translation_cache_ids && t.translation_cache_ids[selectedLanguage]) {
+                  const { data: cache } = await supabase
+                    .from('translation_cache')
+                    .select('translated_text')
+                    .eq('id', t.translation_cache_ids[selectedLanguage])
+                    .maybeSingle()
 
-                if (cache) {
-                  translatedText = cache.translated_text
-                  console.log(`✅ Loaded cached translation for "${t.original_text.substring(0, 30)}..."`)
+                  if (cache) {
+                    translatedText = cache.translated_text
+                    console.log(`✅ Loaded cached translation for "${originalText.substring(0, 30)}..."`)
+                  } else {
+                    translatedText = `[번역 중...] ${originalText}`
+                    console.log(`⏳ Translation not yet cached for "${originalText.substring(0, 30)}..."`)
+                  }
                 } else {
-                  translatedText = `[번역 중...] ${t.original_text}`
-                  console.log(`⏳ Translation not yet cached for "${t.original_text.substring(0, 30)}..."`)
+                  // 기존 방식으로 fallback
+                  const { data: cache } = await supabase
+                    .from('translation_cache')
+                    .select('*')
+                    .eq('original_text', originalText)
+                    .eq('target_language', selectedLanguage)
+                    .maybeSingle()
+
+                  if (cache) {
+                    translatedText = cache.translated_text
+                    console.log(`✅ Loaded cached translation (fallback) for "${originalText.substring(0, 30)}..."`)
+                  } else {
+                    translatedText = `[번역 중...] ${originalText}`
+                    console.log(`⏳ Translation not yet cached (fallback) for "${originalText.substring(0, 30)}..."`)
+                  }
                 }
               } catch (err) {
-                console.error(`❌ Failed to load translation for "${t.original_text.substring(0, 30)}..."`, err)
-                translatedText = t.original_text // 실패 시 원문 표시
+                console.error(`❌ Failed to load translation for "${originalText.substring(0, 30)}..."`, err)
+                translatedText = originalText // 실패 시 검수된 원문 표시
               }
             }
 
             formattedTranscripts.push({
               id: t.id,
               timestamp: new Date(t.created_at).toLocaleTimeString(),
-              original: t.original_text,
+              original: originalText,
               translated: translatedText,
               translatedLanguage: selectedLanguage,
               speaker: sessionData.host_name,
@@ -628,37 +687,73 @@ export default function PublicSessionPage() {
           const formattedTranscripts: TranscriptLine[] = []
 
           for (const t of transcripts) {
+            let originalText = t.original_text
             let translatedText = t.original_text
             let isTranslating = false
 
-            if (selectedLanguage !== 'en') {
-              // 캐시 테이블에서 직접 확인
-              try {
-                const { data: cache } = await supabase
+            // 🆕 검수된 원문 텍스트 가져오기 (translation_cache에서)
+            try {
+              // translation_cache_ids가 있으면 해당 ID로 검수된 텍스트 가져오기
+              if (t.translation_cache_ids && t.translation_cache_ids.en) {
+                const { data: reviewedCache } = await supabase
                   .from('translation_cache')
-                  .select('*')
-                  .eq('original_text', t.original_text)
-                  .eq('target_language', selectedLanguage)
+                  .select('original_text')
+                  .eq('id', t.translation_cache_ids.en)
                   .maybeSingle()
+                
+                if (reviewedCache) {
+                  originalText = reviewedCache.original_text
+                  console.log(`✅ Loaded reviewed text: "${originalText.substring(0, 30)}..."`)
+                }
+              }
+            } catch (err) {
+              console.error(`❌ Failed to load reviewed text for "${t.original_text.substring(0, 30)}..."`, err)
+              // 실패 시 원본 텍스트 사용
+            }
 
-                if (cache) {
-                  translatedText = cache.translated_text
-                  console.log(`✅ Found cached translation`)
+            if (selectedLanguage !== 'en') {
+              // translation_cache_ids를 사용해서 번역 가져오기
+              try {
+                if (t.translation_cache_ids && typeof t.translation_cache_ids === 'object') {
+                  const cacheId = (t.translation_cache_ids as any)[selectedLanguage]
+                  
+                  if (cacheId) {
+                    console.log(`🔍 Looking up translation cache ID: ${cacheId} for language: ${selectedLanguage}`)
+                    
+                    const { data: cache } = await supabase
+                      .from('translation_cache')
+                      .select('*')
+                      .eq('id', cacheId)
+                      .single()
+
+                    if (cache) {
+                      translatedText = cache.translated_text
+                      console.log(`✅ Found cached translation via ID: "${originalText.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
+                    } else {
+                      translatedText = `[번역 중...] ${originalText}`
+                      isTranslating = true
+                      console.log(`⏳ Cache ID exists but translation not found: ${cacheId}`)
+                    }
+                  } else {
+                    translatedText = `[번역 중...] ${originalText}`
+                    isTranslating = true
+                    console.log(`⏳ No cache ID for language ${selectedLanguage}: "${originalText.substring(0, 30)}..."`)
+                  }
                 } else {
-                  translatedText = `[번역 중...] ${t.original_text}`
+                  translatedText = `[번역 중...] ${originalText}`
                   isTranslating = true
-                  console.log(`⏳ Translation not yet cached`)
+                  console.log(`⏳ No translation_cache_ids found: "${originalText.substring(0, 30)}..."`)
                 }
               } catch (error) {
-                console.error(`Cache check failed:`, error)
-                translatedText = t.original_text
+                console.error(`Cache lookup failed:`, error)
+                translatedText = originalText
               }
             }
 
             formattedTranscripts.push({
               id: t.id,
               timestamp: new Date(t.created_at).toLocaleTimeString(),
-              original: t.original_text,
+              original: originalText,
               translated: translatedText,
               translatedLanguage: selectedLanguage,
               speaker: session.host_name,
@@ -737,27 +832,52 @@ export default function PublicSessionPage() {
           // 캐시 확인 (백그라운드에서 실행)
           setTimeout(async () => {
             try {
-              const { data: cache } = await supabase
-                .from('translation_cache')
-                .select('*')
+              console.log(`🔍 Checking cache for new transcript: "${newText.trim().substring(0, 30)}..."`)
+              
+              // 새로운 transcript의 translation_cache_ids를 확인
+              const { data: transcriptData } = await supabase
+                .from('transcripts')
+                .select('translation_cache_ids')
                 .eq('original_text', newText.trim())
-                .eq('target_language', selectedLanguage)
-                .maybeSingle()
+                .eq('session_id', sessionId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
 
-              if (cache) {
-                console.log(`✅ Found cached translation for new transcript`)
-                setTranscript((prev) =>
-                  prev.map((line) =>
-                    line.id === newId
-                      ? {
-                          ...line,
-                          translated: cache.translated_text,
-                          isTranslating: false,
-                          translationQuality: cache.quality_score,
-                        }
-                      : line,
-                  ),
-                )
+              if (transcriptData?.translation_cache_ids && typeof transcriptData.translation_cache_ids === 'object') {
+                const cacheId = (transcriptData.translation_cache_ids as any)[selectedLanguage]
+                
+                if (cacheId) {
+                  console.log(`🔍 Looking up translation cache ID: ${cacheId} for new transcript`)
+                  
+                  const { data: cache } = await supabase
+                    .from('translation_cache')
+                    .select('*')
+                    .eq('id', cacheId)
+                    .single()
+
+                  if (cache) {
+                    console.log(`✅ Found cached translation for new transcript: "${cache.translated_text.substring(0, 30)}..."`)
+                    setTranscript((prev) =>
+                      prev.map((line) =>
+                        line.id === newId
+                          ? {
+                              ...line,
+                              translated: cache.translated_text,
+                              isTranslating: false,
+                              translationQuality: cache.quality_score,
+                            }
+                          : line,
+                      ),
+                    )
+                  } else {
+                    console.log(`⏳ Cache ID exists but translation not found: ${cacheId}`)
+                  }
+                } else {
+                  console.log(`⏳ No cache ID for language ${selectedLanguage} in new transcript`)
+                }
+              } else {
+                console.log(`⏳ No translation_cache_ids found for new transcript`)
               }
               // 캐시에 없으면 Realtime 구독이 처리할 것임
             } catch (error) {
@@ -940,44 +1060,75 @@ export default function PublicSessionPage() {
       }))
     })
 
-    // 캐시에서 번역 확인
+    // 캐시에서 번역 확인 (개선된 버전)
     if (selectedLanguage !== 'en') {
       setTimeout(async () => {
-        const currentTranscripts = await new Promise<TranscriptLine[]>((resolve) => {
-          setTranscript((prev) => {
-            resolve([...prev])
-            return prev
+        try {
+          const currentTranscripts = await new Promise<TranscriptLine[]>((resolve) => {
+            setTranscript((prev) => {
+              resolve([...prev])
+              return prev
+            })
           })
-        })
 
-        for (const line of currentTranscripts) {
-          if (!line || !line.original || typeof line.original !== 'string') continue
+          console.log(`🔍 Checking cache for ${currentTranscripts.length} transcripts in ${selectedLanguage}`)
+          
+          let foundCount = 0
+          let notFoundCount = 0
 
-          try {
-            const { data: cache } = await supabase
-              .from('translation_cache')
-              .select('*')
-              .eq('original_text', line.original.trim())
-              .eq('target_language', selectedLanguage)
-              .maybeSingle()
+          for (const line of currentTranscripts) {
+            if (!line || !line.original || typeof line.original !== 'string') continue
 
-            if (cache) {
-              setTranscript((prev) =>
-                prev.map((l) =>
-                  l.id === line.id
-                    ? {
-                        ...l,
-                        translated: cache.translated_text,
-                        isTranslating: false,
-                        translationQuality: cache.quality_score,
-                      }
-                    : l,
-                ),
-              )
+            try {
+              // translation_cache_ids를 사용해서 번역 가져오기
+              if (line.translation_cache_ids && typeof line.translation_cache_ids === 'object') {
+                const cacheId = (line.translation_cache_ids as any)[selectedLanguage]
+                
+                if (cacheId) {
+                  console.log(`🔍 Looking up translation cache ID: ${cacheId} for language: ${selectedLanguage}`)
+                  
+                  const { data: cache } = await supabase
+                    .from('translation_cache')
+                    .select('*')
+                    .eq('id', cacheId)
+                    .single()
+
+                  if (cache) {
+                    foundCount++
+                    console.log(`✅ Found cached translation via ID: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
+                    setTranscript((prev) =>
+                      prev.map((l) =>
+                        l.id === line.id
+                          ? {
+                              ...l,
+                              translated: cache.translated_text,
+                              isTranslating: false,
+                              translationQuality: cache.quality_score,
+                            }
+                          : l,
+                      ),
+                    )
+                  } else {
+                    notFoundCount++
+                    console.log(`⏳ Cache ID exists but translation not found: ${cacheId}`)
+                  }
+                } else {
+                  notFoundCount++
+                  console.log(`⏳ No cache ID for language ${selectedLanguage}: "${line.original.substring(0, 30)}..."`)
+                }
+              } else {
+                notFoundCount++
+                console.log(`⏳ No translation_cache_ids found: "${line.original.substring(0, 30)}..."`)
+              }
+            } catch (error) {
+              console.error('Cache check error:', error)
+              notFoundCount++
             }
-          } catch (error) {
-            console.error('Cache check error:', error)
           }
+          
+          console.log(`📊 Cache check complete: ${foundCount} found, ${notFoundCount} not found`)
+        } catch (error) {
+          console.error('Error during cache check:', error)
         }
       }, 500)
     }
