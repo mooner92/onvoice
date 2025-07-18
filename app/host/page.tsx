@@ -234,7 +234,14 @@ export default function HostDashboard() {
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          const updatedTranscript = payload.new as any
+          const updatedTranscript = payload.new as {
+            id: string
+            original_text: string
+            reviewed_text: string
+            review_status: string
+            detected_language: string
+            timestamp: string
+          }
           
           if (updatedTranscript.review_status === 'completed' && updatedTranscript.reviewed_text) {
             console.log('✅ Received reviewed transcript:', updatedTranscript.reviewed_text)

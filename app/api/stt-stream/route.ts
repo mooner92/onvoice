@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { performBatchTranslation, saveBatchTranslationsToCache } from '@/lib/translation-queue'
-import { getTargetLanguages, detectLanguage } from '@/lib/translation-cache'
+import { detectLanguage } from '@/lib/translation-cache'
 import { saveTranslationToCache } from '@/lib/translation-cache'
 
 // Gemini 검수 + 번역 함수 (직접 호출)

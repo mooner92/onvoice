@@ -366,16 +366,16 @@ export default function PublicSessionPage() {
                   // transcript ID로 매칭 (실제 DB ID 사용)
                   if (transcriptIds.includes(line.id) && (line.isTranslating || line.translated.includes('[번역 중...]'))) {
                     console.log(`✅ Updating line via cache ID: "${line.original.substring(0, 30)}..." → "${cache.translated_text.substring(0, 30)}..."`)
-                    return {
-                      ...line,
+                return {
+                  ...line,
                       translated: cache.translated_text,
                       translatedLanguage: cache.target_language,
-                      isTranslating: false,
+                  isTranslating: false,
                       translationQuality: cache.quality_score,
-                    }
-                  }
-                  return line
-                })
+                }
+              }
+              return line
+            })
                 
                 // 실제로 업데이트된 항목이 있는지 확인
                 const hasUpdates = updated.some((line, index) => 
@@ -455,7 +455,7 @@ export default function PublicSessionPage() {
           const transcript = payload.new as {
             id: string
             original_text: string
-            translation_cache_ids: any
+            translation_cache_ids: Record<string, string> | null
             translation_status: string
           }
           
@@ -865,7 +865,7 @@ export default function PublicSessionPage() {
               // translation_cache_ids를 사용해서 번역 가져오기
               try {
                 if (t.translation_cache_ids && typeof t.translation_cache_ids === 'object') {
-                  const cacheId = (t.translation_cache_ids as any)[selectedLanguage]
+                  const cacheId = (t.translation_cache_ids as Record<string, string>)[selectedLanguage]
                   
                   if (cacheId) {
                     console.log(`🔍 Looking up translation cache ID: ${cacheId} for language: ${selectedLanguage}`)
@@ -956,7 +956,7 @@ export default function PublicSessionPage() {
 
         if (transcriptData?.translation_cache_ids && typeof transcriptData.translation_cache_ids === 'object') {
           // translation_cache_ids에서 영어 검수 버전 찾기
-          const enCacheId = (transcriptData.translation_cache_ids as any)['en']
+          const enCacheId = (transcriptData.translation_cache_ids as Record<string, string>)['en']
           
           if (enCacheId) {
             console.log(`🔍 Looking up reviewed text with cache ID: ${enCacheId}`)
@@ -1034,7 +1034,7 @@ export default function PublicSessionPage() {
               .maybeSingle()
 
             if (retryTranscriptData?.translation_cache_ids && typeof retryTranscriptData.translation_cache_ids === 'object') {
-              const enCacheId = (retryTranscriptData.translation_cache_ids as any)['en']
+              const enCacheId = (retryTranscriptData.translation_cache_ids as Record<string, string>)['en']
               
               if (enCacheId) {
                 const { data: retryReviewedCache } = await supabase
@@ -1120,7 +1120,7 @@ export default function PublicSessionPage() {
               }
 
               if (transcriptData?.translation_cache_ids && typeof transcriptData.translation_cache_ids === 'object') {
-                const cacheId = (transcriptData.translation_cache_ids as any)[selectedLanguage]
+                const cacheId = (transcriptData.translation_cache_ids as Record<string, string>)[selectedLanguage]
                 
                 if (cacheId) {
                   console.log(`🔍 Looking up translation cache ID: ${cacheId} for new transcript`)
@@ -1173,7 +1173,7 @@ export default function PublicSessionPage() {
                         .maybeSingle()
 
                       if (retryData?.translation_cache_ids && typeof retryData.translation_cache_ids === 'object') {
-                        const retryCacheId = (retryData.translation_cache_ids as any)[selectedLanguage]
+                        const retryCacheId = (retryData.translation_cache_ids as Record<string, string>)[selectedLanguage]
                         if (retryCacheId) {
                           console.log(`🔄 Retry: Looking up translation cache ID: ${retryCacheId}`)
                           
@@ -1240,7 +1240,7 @@ export default function PublicSessionPage() {
         (payload) => {
           console.log('📨 New transcript received:', payload.new)
           const newTranscript = payload.new as { original_text: string }
-
+          
           handleTranscriptUpdate(newTranscript.original_text, false)
         },
       )
@@ -1257,7 +1257,7 @@ export default function PublicSessionPage() {
           const updatedTranscript = payload.new as { 
             id: string
             original_text: string
-            translation_cache_ids: any
+            translation_cache_ids: Record<string, string> | null
           }
 
           // 🆕 translation_cache_ids가 업데이트되었을 때 검수된 텍스트로 업데이트
@@ -1269,36 +1269,36 @@ export default function PublicSessionPage() {
               
               try {
                 const { data: reviewedCache, error: reviewedError } = await supabase
-                  .from('translation_cache')
+                .from('translation_cache')
                   .select('translated_text')
                   .eq('id', enCacheId)
-                  .maybeSingle()
-
+                .maybeSingle()
+              
                 if (reviewedError) {
                   console.error(`❌ Error loading reviewed text for update:`, reviewedError)
                 }
 
-                if (reviewedCache) {
+              if (reviewedCache) {
                   console.log(`✅ Updating transcript with reviewed text: "${reviewedCache.translated_text.substring(0, 30)}..."`)
                   
-                  setTranscript((prev) =>
-                    prev.map((line) => {
+                setTranscript((prev) => 
+                  prev.map((line) => {
                       // 원본 텍스트와 매칭되는 라인 찾기
                       if (line.original === updatedTranscript.original_text || 
                           line.original.includes(updatedTranscript.original_text.substring(0, 20)) ||
                           updatedTranscript.original_text.includes(line.original.substring(0, 20))) {
-                        return {
-                          ...line,
+                      return {
+                        ...line,
                           original: reviewedCache.translated_text,
-                        }
                       }
-                      return line
+                    }
+                    return line
                     }),
-                  )
-                }
-              } catch (error) {
-                console.error('Error updating transcript with reviewed text:', error)
+                )
               }
+            } catch (error) {
+                console.error('Error updating transcript with reviewed text:', error)
+            }
             }
           }
         },
@@ -1468,7 +1468,7 @@ export default function PublicSessionPage() {
             try {
               // translation_cache_ids를 사용해서 번역 가져오기
               if (line.translation_cache_ids && typeof line.translation_cache_ids === 'object') {
-                const cacheId = (line.translation_cache_ids as any)[selectedLanguage]
+                const cacheId = (line.translation_cache_ids as Record<string, string>)[selectedLanguage]
                 
                 if (cacheId) {
                   console.log(`🔍 Looking up translation cache ID: ${cacheId} for language: ${selectedLanguage}`)
