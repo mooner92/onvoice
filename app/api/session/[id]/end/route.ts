@@ -1,14 +1,12 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { generateSessionSummary } from "@/lib/summary-generator"
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { generateSessionSummary } from '@/lib/summary-generator'
+import { auth } from '@clerk/nextjs/server'
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     let hostId: string | undefined
-    
+
     // Try to parse JSON body, but it's optional
     try {
       const body = await req.json()
@@ -17,24 +15,30 @@ export async function POST(
       // Body might be empty or not JSON, which is okay
       console.log('No JSON body provided, proceeding without hostId')
     }
-    
+
     const resolvedParams = await params
     const sessionId = resolvedParams.id
 
     if (!sessionId) {
-      return NextResponse.json(
-        { error: "Missing session ID" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing session ID' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Use service role key for API routes
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
     // If hostId is provided, verify host ownership
     if (hostId) {
+      // Verify user authentication with Clerk
+      const { userId: authenticatedUserId } = await auth()
+      if (!authenticatedUserId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Verify that the requesting user matches the hostId
+      if (authenticatedUserId !== hostId) {
+        return NextResponse.json({ error: 'Forbidden: Cannot end session for another user' }, { status: 403 })
+      }
+
       const { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('*')
@@ -43,10 +47,7 @@ export async function POST(
         .single()
 
       if (sessionError || !session) {
-        return NextResponse.json(
-          { error: "Session not found or unauthorized" },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Session not found or unauthorized' }, { status: 404 })
       }
     }
 
@@ -55,16 +56,13 @@ export async function POST(
       .from('sessions')
       .update({
         status: 'ended',
-        ended_at: new Date().toISOString()
+        ended_at: new Date().toISOString(),
       })
       .eq('id', sessionId)
 
     if (updateError) {
       console.error('Error ending session:', updateError)
-      return NextResponse.json(
-        { error: "Failed to end session" },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to end session' }, { status: 500 })
     }
 
     // Get session statistics
@@ -83,10 +81,10 @@ export async function POST(
     if (transcriptCount && transcriptCount > 0) {
       try {
         console.log(`🤖 Generating summary for session ${sessionId} with ${transcriptCount} transcripts`)
-        
+
         // Call summary generation function directly
         const summaryData = await generateSessionSummary({ sessionId })
-        
+
         if (summaryData) {
           console.log(`✅ Summary generated: ${summaryData.summary?.substring(0, 50)}...`)
           summaryGenerated = true
@@ -99,20 +97,16 @@ export async function POST(
     }
 
     return NextResponse.json({
-      message: "Session ended successfully",
+      message: 'Session ended successfully',
       statistics: {
         transcript_count: transcriptCount || 0,
         participant_count: participantCount || 0,
         duration: 0,
-        summary_generated: summaryGenerated
-      }
+        summary_generated: summaryGenerated,
+      },
     })
-
   } catch (error) {
     console.error('Session end error:', error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-} 
+}

@@ -1,16 +1,16 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
-import { Label } from "@/components/ui/label"
-import { ArrowLeft, FileText, Languages, Share2, Loader2, Clock, BookOpen, Mic } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Slider } from '@/components/ui/slider'
+import { Label } from '@/components/ui/label'
+import { ArrowLeft, FileText, Languages, Share2, Loader2, Clock, BookOpen, Mic } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Chatbot from '@/components/Chatbot'
 import { SaveSessionModal } from '@/components/SaveSessionModal'
-import { useAuth } from '@/components/auth/AuthProvider'
+import { useSession, useUser } from '@clerk/nextjs'
 import { loadSessionTranscripts, type Transcript } from '@/lib/transcript-loader'
 
 interface Session {
@@ -31,10 +31,11 @@ interface Session {
 export default function PublicSessionSummaryPage() {
   const params = useParams()
   const router = useRouter()
-  const supabase = createClient()
+  const { session: clerkSession } = useSession()
+  const supabase = createClient(clerkSession?.getToken() ?? Promise.resolve(null))
   const sessionId = params.id as string
-  const { user } = useAuth()
-  
+  const { user } = useUser()
+
   // 페이지 로드 시 디버깅 정보 및 URL 정리
   useEffect(() => {
     console.log('📄 Summary page loaded:', {
@@ -42,25 +43,25 @@ export default function PublicSessionSummaryPage() {
       hasUser: !!user,
       userId: user?.id,
       currentUrl: window.location.href,
-      pendingSession: localStorage.getItem('pendingSessionSave') || sessionStorage.getItem('pendingSessionSave')
+      pendingSession: localStorage.getItem('pendingSessionSave') || sessionStorage.getItem('pendingSessionSave'),
     })
-    
+
     // URL에서 OAuth 관련 파라미터 제거
     const url = new URL(window.location.href)
     let needsCleanup = false
-    
+
     if (url.searchParams.has('code')) {
       console.log('🧹 Removing code parameter from URL')
       url.searchParams.delete('code')
       needsCleanup = true
     }
-    
+
     if (url.searchParams.has('login_success')) {
       console.log('🎉 Login success detected, will trigger session save')
       url.searchParams.delete('login_success')
       needsCleanup = true
     }
-    
+
     if (needsCleanup) {
       window.history.replaceState({}, '', url.toString())
     }
@@ -73,22 +74,22 @@ export default function PublicSessionSummaryPage() {
   const [fontSize, setFontSize] = useState([16])
   const [darkMode, setDarkMode] = useState(false)
   const [showFullTranscript, setShowFullTranscript] = useState(false)
-  
+
   // 다국어 요약 관련 상태
   const [summary, setSummary] = useState<string>('')
   const [userLanguage, setUserLanguage] = useState('en')
   const [summaryLoading, setSummaryLoading] = useState(false)
-  
+
   // 번역 기능 상태
   const [showTranslation, setShowTranslation] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState('ko')
   const [translatedSummary, setTranslatedSummary] = useState<string>('')
   const [summaryTranslating, setSummaryTranslating] = useState(false)
-  
+
   // 🆕 Transcript 번역 상태
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({})
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set())
-  
+
   // 🆕 세션 저장 모달 상태
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [sessionSaved, setSessionSaved] = useState(false)
@@ -105,24 +106,24 @@ export default function PublicSessionSummaryPage() {
       legal: '⚖️',
       entertainment: '🎬',
       science: '🔬',
-      general: '📋'
+      general: '📋',
     }
     return icons[category] || '📋'
   }
 
   // 지원 언어 목록
   const languages = [
-    { code: "ko", name: "Korean", flag: "🇰🇷" },
-    { code: "zh", name: "Chinese", flag: "🇨🇳" },
-    { code: "hi", name: "Hindi", flag: "🇮🇳" },
-    { code: "en", name: "English", flag: "🇺🇸" },
+    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
   ]
 
   const getCategoryName = (category: string) => {
     const names: Record<string, Record<string, string>> = {
       en: {
         sports: 'Sports',
-        economics: 'Economics', 
+        economics: 'Economics',
         technology: 'Technology',
         education: 'Education',
         business: 'Business',
@@ -130,7 +131,7 @@ export default function PublicSessionSummaryPage() {
         legal: 'Legal',
         entertainment: 'Entertainment',
         science: 'Science',
-        general: 'General'
+        general: 'General',
       },
       ko: {
         sports: '스포츠',
@@ -142,7 +143,7 @@ export default function PublicSessionSummaryPage() {
         legal: '법률',
         entertainment: '엔터테인먼트',
         science: '과학',
-        general: '일반'
+        general: '일반',
       },
       zh: {
         sports: '体育',
@@ -154,7 +155,7 @@ export default function PublicSessionSummaryPage() {
         legal: '法律',
         entertainment: '娱乐',
         science: '科学',
-        general: '一般'
+        general: '一般',
       },
       hi: {
         sports: 'खेल',
@@ -166,8 +167,8 @@ export default function PublicSessionSummaryPage() {
         legal: 'कानूनी',
         entertainment: 'मनोरंजन',
         science: 'विज्ञान',
-        general: 'सामान्य'
-      }
+        general: 'सामान्य',
+      },
     }
     return names[userLanguage]?.[category] || names['en'][category] || 'General'
   }
@@ -204,7 +205,7 @@ export default function PublicSessionSummaryPage() {
         goHome: 'Go Home',
         items: 'items',
         words: 'words',
-        minutes: 'minutes'
+        minutes: 'minutes',
       },
       ko: {
         sessionSummary: '세션 요약',
@@ -235,7 +236,7 @@ export default function PublicSessionSummaryPage() {
         goHome: '홈으로 돌아가기',
         items: '개',
         words: '개',
-        minutes: '분'
+        minutes: '분',
       },
       zh: {
         sessionSummary: '会话摘要',
@@ -266,7 +267,7 @@ export default function PublicSessionSummaryPage() {
         goHome: '回到首页',
         items: '个',
         words: '个',
-        minutes: '分钟'
+        minutes: '分钟',
       },
       hi: {
         sessionSummary: 'सत्र सारांश',
@@ -297,8 +298,8 @@ export default function PublicSessionSummaryPage() {
         goHome: 'होम पर जाएं',
         items: '',
         words: '',
-        minutes: 'मिनट'
-      }
+        minutes: 'मिनट',
+      },
     }
     return texts[userLanguage]?.[key] || texts['en'][key] || key
   }
@@ -323,7 +324,7 @@ export default function PublicSessionSummaryPage() {
     }
 
     setSummaryTranslating(true)
-    
+
     try {
       // session_summary_cache에서 번역된 요약 찾기
       const { data: cachedSummary, error } = await supabase
@@ -351,12 +352,49 @@ export default function PublicSessionSummaryPage() {
     }
   }
 
-  // 🆕 Transcript 번역 함수 (기존 translation_cache 사용)
+  // 🆕 Transcript 번역 함수 (translation_cache_ids 사용)
   const translateText = async (text: string, targetLang: string): Promise<string> => {
     try {
       console.log(`🌍 Loading translation: "${text.substring(0, 30)}..." → ${targetLang}`)
-      
-      // translation_cache에서 기존 번역 찾기
+
+      // 먼저 transcript에서 translation_cache_ids 찾기
+      const { data: transcriptData, error: transcriptError } = await supabase
+        .from('transcripts')
+        .select('translation_cache_ids')
+        .eq('session_id', sessionId)
+        .ilike('original_text', `%${text.substring(0, 50)}%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (transcriptError) {
+        console.error('Transcript lookup error:', transcriptError)
+      }
+
+      if (transcriptData?.translation_cache_ids && transcriptData.translation_cache_ids[targetLang]) {
+        const cacheId = transcriptData.translation_cache_ids[targetLang]
+        console.log(`🔍 Found cache ID: ${cacheId} for language: ${targetLang}`)
+        
+        // translation_cache에서 번역 가져오기
+        const { data: cachedTranslation, error: cacheError } = await supabase
+          .from('translation_cache')
+          .select('translated_text')
+          .eq('id', cacheId)
+          .single()
+
+        if (cacheError) {
+          console.error('Translation cache error:', cacheError)
+          return `[번역 실패] ${text}`
+        }
+
+        if (cachedTranslation) {
+          console.log(`✅ Found cached translation via ID`)
+          return cachedTranslation.translated_text
+        }
+      }
+
+      // Fallback: 기존 방식으로 찾기
+      console.log(`⚠️ No cache ID found, trying fallback method`)
       const { data: cachedTranslation, error } = await supabase
         .from('translation_cache')
         .select('translated_text')
@@ -370,13 +408,12 @@ export default function PublicSessionSummaryPage() {
       }
 
       if (cachedTranslation) {
-        console.log(`✅ Found cached translation`)
+        console.log(`✅ Found cached translation (fallback)`)
         return cachedTranslation.translated_text
       } else {
         console.log(`⚠️ No cached translation found`)
         return `[${targetLang}] ${text}` // 번역이 없으면 원문 표시
       }
-      
     } catch (error) {
       console.error('Translation error:', error)
       return `[번역 실패] ${text}`
@@ -391,7 +428,7 @@ export default function PublicSessionSummaryPage() {
     }
 
     setSummaryLoading(true)
-    
+
     try {
       // session_summary_cache에서 번역된 요약 찾기
       const { data: cachedSummary, error } = await supabase
@@ -446,24 +483,24 @@ export default function PublicSessionSummaryPage() {
 
         // transcript 로드 (모듈화된 함수 사용)
         try {
-          const transcripts = await loadSessionTranscripts(sessionId)
+          const transcripts = await loadSessionTranscripts(sessionId, clerkSession?.getToken() ?? Promise.resolve(null))
           setTranscript(transcripts)
           console.log('✅ Transcript loaded successfully:', {
             count: transcripts.length,
             sessionId,
             sessionStatus: sessionData.status,
-            samples: transcripts.slice(0, 2).map(t => ({
+            samples: transcripts.slice(0, 2).map((t) => ({
               id: t.id,
               textPreview: t.original_text.substring(0, 50) + '...',
-              createdAt: t.created_at
-            }))
+              createdAt: t.created_at,
+            })),
           })
         } catch (transcriptError) {
           console.error('❌ Transcript loading failed:', {
             error: transcriptError,
             sessionId,
             sessionStatus: sessionData.status,
-            errorMessage: transcriptError instanceof Error ? transcriptError.message : 'Unknown error'
+            errorMessage: transcriptError instanceof Error ? transcriptError.message : 'Unknown error',
           })
           // transcript 에러는 무시하고 계속 진행
           setTranscript([])
@@ -471,7 +508,6 @@ export default function PublicSessionSummaryPage() {
 
         // 요약 번역 로드
         await loadSummaryTranslation(sessionData.summary, userLanguage)
-
       } catch (error) {
         console.error('Error loading session data:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
@@ -495,12 +531,12 @@ export default function PublicSessionSummaryPage() {
     console.log('🔍 Transcript state changed:', {
       length: transcript.length,
       sessionId,
-      sampleItems: transcript.slice(0, 2).map(t => ({ id: t.id, text: t.original_text.substring(0, 50) }))
+      sampleItems: transcript.slice(0, 2).map((t) => ({ id: t.id, text: t.original_text.substring(0, 50) })),
     })
   }, [transcript, sessionId])
 
   // 🆕 자동 모달 표시 제거 - 사용자가 버튼 클릭 시에만 표시
-  
+
   // 🆕 호스트인 경우 저장 모달 자동 닫기
   useEffect(() => {
     if (user && session?.host_id === user.id) {
@@ -512,48 +548,49 @@ export default function PublicSessionSummaryPage() {
   // 🆕 로그인 후 세션 저장 처리
   useEffect(() => {
     const handlePostLoginSave = async () => {
-      console.log('🔄 Post-login check:', { 
-        hasUser: !!user, 
-        sessionSaved, 
+      console.log('🔄 Post-login check:', {
+        hasUser: !!user,
+        sessionSaved,
         currentSessionId: sessionId,
         currentUrl: window.location.href,
-        hasLoginSuccess: window.location.href.includes('login_success=true')
+        hasLoginSuccess: window.location.href.includes('login_success=true'),
       })
-      
+
       // 로그인 성공 플래그가 있거나 사용자가 로그인된 상태에서 세션 저장 처리
       if (user && !sessionSaved) {
         // localStorage와 sessionStorage에서 저장 대기 중인 세션 정보 확인
-        const pendingSession = localStorage.getItem('pendingSessionSave') || sessionStorage.getItem('pendingSessionSave')
+        const pendingSession =
+          localStorage.getItem('pendingSessionSave') || sessionStorage.getItem('pendingSessionSave')
         console.log('📦 Pending session data (localStorage):', localStorage.getItem('pendingSessionSave'))
         console.log('📦 Pending session data (sessionStorage):', sessionStorage.getItem('pendingSessionSave'))
-        
+
         if (pendingSession) {
           try {
             const { sessionId: pendingSessionId, returnUrl } = JSON.parse(pendingSession)
-            
-            console.log('🔄 Post-login processing:', { 
-              pendingSessionId, 
+
+            console.log('🔄 Post-login processing:', {
+              pendingSessionId,
               currentSessionId: sessionId,
               returnUrl,
               currentUrl: window.location.href,
-              matches: pendingSessionId === sessionId
+              matches: pendingSessionId === sessionId,
             })
-            
+
             if (pendingSessionId === sessionId) {
               console.log('🔄 Processing pending session save after login')
-              
+
               try {
                 await saveSessionForUser(user.id, sessionId)
-                
+
                 // 두 저장소 모두 정리
                 localStorage.removeItem('pendingSessionSave')
                 sessionStorage.removeItem('pendingSessionSave')
-                
+
                 setSessionSaved(true)
                 setShowSaveModal(false)
-                
+
                 console.log('✅ Session save completed successfully')
-                
+
                 // 성공 알림을 더 나은 UI로 표시
                 setTimeout(() => {
                   const toast = document.createElement('div')
@@ -575,7 +612,7 @@ export default function PublicSessionSummaryPage() {
                       ✅ 세션이 성공적으로 저장되었습니다!
                     </div>
                   `
-                  
+
                   const style = document.createElement('style')
                   style.textContent = `
                     @keyframes slideIn {
@@ -585,16 +622,15 @@ export default function PublicSessionSummaryPage() {
                   `
                   document.head.appendChild(style)
                   document.body.appendChild(toast)
-                  
+
                   setTimeout(() => {
                     toast.remove()
                     style.remove()
                   }, 4000)
                 }, 500)
-                
               } catch (saveError) {
                 console.error('❌ Session save failed:', saveError)
-                alert('세션 저장에 실패했습니다: ' + (saveError instanceof Error ? saveError.message : 'Unknown error'))
+                alert('Failed to save session: ' + (saveError instanceof Error ? saveError.message : 'Unknown error'))
               }
             } else {
               console.log('⚠️ Session ID mismatch, not processing save')
@@ -602,7 +638,7 @@ export default function PublicSessionSummaryPage() {
           } catch (error) {
             console.error('Error processing pending session save:', error)
             // 에러 알림
-            alert('세션 저장 중 오류가 발생했습니다: ' + (error instanceof Error ? error.message : 'Unknown error'))
+            alert('Error occurred while saving session: ' + (error instanceof Error ? error.message : 'Unknown error'))
           }
         } else {
           console.log('📦 No pending session save found')
@@ -621,9 +657,9 @@ export default function PublicSessionSummaryPage() {
       // 호스트인지 확인
       const isHost = session?.host_id === userId
       const role = isHost ? 'host' : 'audience'
-      
+
       console.log(`💾 Saving session for user ${userId} as ${role}`)
-      
+
       const response = await fetch(`/api/session/${sessionId}/save`, {
         method: 'POST',
         headers: {
@@ -631,7 +667,7 @@ export default function PublicSessionSummaryPage() {
         },
         body: JSON.stringify({
           userId,
-          role
+          role,
         }),
       })
 
@@ -669,42 +705,47 @@ export default function PublicSessionSummaryPage() {
 
     const translateAllTexts = async () => {
       console.log(`🔄 Starting batch translation for ${transcript.length} items`)
-      setTranslatingIds(new Set(transcript.map(t => t.id)))
-      
+      setTranslatingIds(new Set(transcript.map((t) => t.id)))
+
       const newTranslatedTexts: Record<string, string> = {}
-      
+
       // 병렬로 번역 (최대 3개씩)
       for (let i = 0; i < transcript.length; i += 3) {
         const batch = transcript.slice(i, i + 3)
-        
-        await Promise.all(batch.map(async (item) => {
-          try {
-            const translated = await translateText(item.original_text, selectedLanguage)
-            newTranslatedTexts[item.id] = translated
-            
-            // 개별 완료시마다 UI 업데이트
-            setTranslatedTexts(prev => ({ ...prev, [item.id]: translated }))
-            setTranslatingIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(item.id)
-              return newSet
-            })
-          } catch (error) {
-            console.error(`Translation failed for ${item.id}:`, error)
-            setTranslatingIds(prev => {
-              const newSet = new Set(prev)
-              newSet.delete(item.id)
-              return newSet
-            })
-          }
-        }))
-        
+
+        await Promise.all(
+          batch.map(async (item) => {
+            try {
+              const translated = await translateText(item.original_text, selectedLanguage)
+              newTranslatedTexts[item.id] = translated
+
+              // 개별 완료시마다 UI 업데이트
+              setTranslatedTexts((prev) => ({
+                ...prev,
+                [item.id]: translated,
+              }))
+              setTranslatingIds((prev) => {
+                const newSet = new Set(prev)
+                newSet.delete(item.id)
+                return newSet
+              })
+            } catch (error) {
+              console.error(`Translation failed for ${item.id}:`, error)
+              setTranslatingIds((prev) => {
+                const newSet = new Set(prev)
+                newSet.delete(item.id)
+                return newSet
+              })
+            }
+          }),
+        )
+
         // 배치 간 짧은 딜레이
         if (i + 3 < transcript.length) {
-          await new Promise(resolve => setTimeout(resolve, 200))
+          await new Promise((resolve) => setTimeout(resolve, 200))
         }
       }
-      
+
       console.log(`✅ Batch translation completed`)
     }
 
@@ -716,18 +757,33 @@ export default function PublicSessionSummaryPage() {
   // 텍스트 복사 기능
   const copyText = async (text: string, type: string) => {
     try {
-      await navigator.clipboard.writeText(text)
-      const successMessage = userLanguage === 'ko' ? `${type}이(가) 클립보드에 복사되었습니다.` :
-                            userLanguage === 'zh' ? `${type}已复制到剪贴板` :
-                            userLanguage === 'hi' ? `${type} क्लिपबोर्ड में कॉपी किया गया` :
-                            `${type} copied to clipboard`
+      // 모던 브라우저 (HTTPS 환경)
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+        console.log('✅ Text copied using modern clipboard API')
+      } else {
+        throw new Error('Clipboard API is not available')
+      }
+
+      const successMessage =
+        userLanguage === 'ko'
+          ? `${type}이(가) 클립보드에 복사되었습니다.`
+          : userLanguage === 'zh'
+            ? `${type}已复制到剪贴板`
+            : userLanguage === 'hi'
+              ? `${type} क्लिपबोर्ड में कॉपी किया गया`
+              : `${type} copied to clipboard`
       alert(successMessage)
     } catch (error) {
       console.error('Copy failed:', error)
-      const errorMessage = userLanguage === 'ko' ? '복사에 실패했습니다.' :
-                          userLanguage === 'zh' ? '复制失败' :
-                          userLanguage === 'hi' ? 'कॉपी करने में विफल' :
-                          'Copy failed'
+      const errorMessage =
+        userLanguage === 'ko'
+          ? '복사에 실패했습니다.'
+          : userLanguage === 'zh'
+            ? '复制失败'
+            : userLanguage === 'hi'
+              ? 'कॉपी करने में विफल'
+              : 'Copy failed'
       alert(errorMessage)
     }
   }
@@ -736,12 +792,24 @@ export default function PublicSessionSummaryPage() {
   const copyLink = async () => {
     const url = window.location.href
     try {
-      await navigator.clipboard.writeText(url)
-      const successMessage = userLanguage === 'ko' ? '링크가 클립보드에 복사되었습니다!' :
-                            userLanguage === 'zh' ? '链接已复制到剪贴板！' :
-                            userLanguage === 'hi' ? 'लिंक क्लिपबोर्ड में कॉपी किया गया!' :
-                            'Link copied to clipboard!'
-      
+      // 모던 브라우저 (HTTPS 환경)
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        console.log('✅ Link copied using modern clipboard API')
+      } else {
+        // Insecure context (non-HTTPS)
+        throw new Error('Clipboard API is unavailable in insecure contexts. Please copy the link manually.')
+      }
+
+      const successMessage =
+        userLanguage === 'ko'
+          ? '링크가 클립보드에 복사되었습니다!'
+          : userLanguage === 'zh'
+            ? '链接已复制到剪贴板！'
+            : userLanguage === 'hi'
+              ? 'लिंक क्लिपबोर्ड में कॉपी किया गया!'
+              : 'Link copied to clipboard!'
+
       // Toast 알림 (간단한 브라우저 알림으로 대체)
       if (typeof window !== 'undefined') {
         // 간단한 toast 스타일 알림
@@ -760,7 +828,7 @@ export default function PublicSessionSummaryPage() {
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
           animation: slideIn 0.3s ease-out;
         `
-        
+
         // CSS 애니메이션 추가
         const style = document.createElement('style')
         style.textContent = `
@@ -771,7 +839,7 @@ export default function PublicSessionSummaryPage() {
         `
         document.head.appendChild(style)
         document.body.appendChild(toast)
-        
+
         // 3초 후 제거
         setTimeout(() => {
           toast.remove()
@@ -780,20 +848,24 @@ export default function PublicSessionSummaryPage() {
       }
     } catch (error) {
       console.error('Copy failed:', error)
-      const errorMessage = userLanguage === 'ko' ? '복사에 실패했습니다.' :
-                          userLanguage === 'zh' ? '复制失败' :
-                          userLanguage === 'hi' ? 'कॉपी करने में विफल' :
-                          'Copy failed'
+      const errorMessage =
+        userLanguage === 'ko'
+          ? '복사에 실패했습니다.'
+          : userLanguage === 'zh'
+            ? '复制失败'
+            : userLanguage === 'hi'
+              ? 'कॉपी करने में विफल'
+              : 'Copy failed'
       alert(errorMessage)
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">{t('loadingSession')}</p>
+      <div className='flex min-h-screen items-center justify-center bg-gray-50'>
+        <div className='flex flex-col items-center space-y-4'>
+          <Loader2 className='h-8 w-8 animate-spin text-blue-600' />
+          <p className='text-gray-600'>{t('loadingSession')}</p>
         </div>
       </div>
     )
@@ -801,12 +873,12 @@ export default function PublicSessionSummaryPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <FileText className="h-8 w-8 text-red-600" />
-          <p className="text-gray-900 font-medium">{t('sessionNotFound')}</p>
-          <p className="text-gray-600 text-sm text-center">{error}</p>
-          <Button onClick={() => router.push('/')} variant="outline">
+      <div className='flex min-h-screen items-center justify-center bg-gray-50'>
+        <div className='flex flex-col items-center space-y-4'>
+          <FileText className='h-8 w-8 text-red-600' />
+          <p className='font-medium text-gray-900'>{t('sessionNotFound')}</p>
+          <p className='text-center text-sm text-gray-600'>{error}</p>
+          <Button onClick={() => router.push('/')} variant='outline'>
             {t('goHome')}
           </Button>
         </div>
@@ -816,8 +888,8 @@ export default function PublicSessionSummaryPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">{t('sessionNotFound')}</p>
+      <div className='flex min-h-screen items-center justify-center bg-gray-50'>
+        <p className='text-gray-600'>{t('sessionNotFound')}</p>
       </div>
     )
   }
@@ -833,86 +905,82 @@ export default function PublicSessionSummaryPage() {
   return (
     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header */}
-      <header className={`border-b sticky top-0 z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-                             <Button variant="ghost" size="sm" onClick={() => router.back()} className="pl-0 pr-2 -ml-2">
-                 <ArrowLeft className="h-4 w-4 mr-2" />
-                 {t('back')}
-               </Button>
-               <div>
-                 <h1 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                   {session.title}
-                 </h1>
-                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                   {t('sessionSummary')} • {session.host_name}
-                 </p>
-               </div>
-             </div>
-             <div className="flex items-center space-x-2">
-               {/* 🆕 세션 저장 버튼 (호스트가 아닌 모든 사용자에게 표시) */}
-               {!sessionSaved && (!user || session?.host_id !== user.id) && (
-                 <Button
-                   onClick={() => setShowSaveModal(true)}
-                   variant="outline"
-                   size="sm"
-                   className="flex items-center space-x-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                 >
-                   <BookOpen className="h-4 w-4" />
-                   <span>세션 저장</span>
-                 </Button>
-               )}
-               {/* 호스트 표시 */}
-               {user && session?.host_id === user.id && (
-                 <div className="flex items-center space-x-2 text-blue-600 text-sm">
-                   <Mic className="h-4 w-4" />
-                   <span>호스트</span>
-                 </div>
-               )}
-               
-               {sessionSaved && (
-                 <div className="flex items-center space-x-2 text-green-600 text-sm">
-                   <BookOpen className="h-4 w-4" />
-                   <span>저장됨</span>
-                 </div>
-               )}
-               <Button 
-                 variant="outline" 
-                 size="sm"
-                 onClick={() => setShowTranslation(!showTranslation)}
-                 className="flex items-center space-x-2"
-               >
-                 <Languages className="h-4 w-4" />
-                 <span>{showTranslation ? 'Hide' : 'Show'} Translation</span>
-               </Button>
-               <Button variant="outline" size="sm" onClick={copyLink}>
-                 <Share2 className="h-4 w-4 mr-2" />
-                 Copy Link
-               </Button>
+      <header className={`sticky top-0 z-40 border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'}`}>
+        <div className='container mx-auto px-4 py-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center space-x-4'>
+              <Button variant='ghost' size='sm' onClick={() => router.back()} className='-ml-2 pr-2 pl-0'>
+                <ArrowLeft className='mr-2 h-4 w-4' />
+                {t('back')}
+              </Button>
+              <div>
+                <h1 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {session.title}
+                </h1>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {t('sessionSummary')} • {session.host_name}
+                </p>
+              </div>
+            </div>
+            <div className='flex items-center space-x-2'>
+              {/* 🆕 세션 저장 버튼 (호스트가 아닌 모든 사용자에게 표시) */}
+              {!sessionSaved && (!user || session?.host_id !== user.id) && (
+                <Button
+                  onClick={() => setShowSaveModal(true)}
+                  variant='outline'
+                  size='sm'
+                  className='flex items-center space-x-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                >
+                  <BookOpen className='h-4 w-4' />
+                  <span>Save Session</span>
+                </Button>
+              )}
+              {/* 호스트 표시 */}
+              {user && session?.host_id === user.id && (
+                <div className='flex items-center space-x-2 text-sm text-blue-600'>
+                  <Mic className='h-4 w-4' />
+                  <span>Host</span>
+                </div>
+              )}
+
+              {sessionSaved && (
+                <div className='flex items-center space-x-2 text-sm text-green-600'>
+                  <BookOpen className='h-4 w-4' />
+                  <span>Saved</span>
+                </div>
+              )}
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setShowTranslation(!showTranslation)}
+                className='flex items-center space-x-2'
+              >
+                <Languages className='h-4 w-4' />
+                <span>{showTranslation ? 'Hide' : 'Show'} Translation</span>
+              </Button>
+              <Button variant='outline' size='sm' onClick={copyLink}>
+                <Share2 className='mr-2 h-4 w-4' />
+                Copy Link
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Settings */}
-      <div className={`border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} p-4`}>
-        <div className="container mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
+      <div className={`border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'bg-white'} p-4`}>
+        <div className='container mx-auto'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center space-x-6'>
               {/* Translation Settings */}
               {showTranslation && (
-                <div className="flex items-center space-x-2">
-                  <Label className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Language:
-                  </Label>
+                <div className='flex items-center space-x-2'>
+                  <Label className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Language:</Label>
                   <select
                     value={selectedLanguage}
                     onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className={`px-2 py-1 rounded border text-sm ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
+                    className={`rounded border px-2 py-1 text-sm ${
+                      darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'
                     }`}
                   >
                     {languages.map((lang) => (
@@ -923,30 +991,23 @@ export default function PublicSessionSummaryPage() {
                   </select>
                 </div>
               )}
-              <div className="flex items-center space-x-2">
-                                 <Label className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                   {t('fontSize')}: {fontSize[0]}px
-                 </Label>
-                <Slider
-                  value={fontSize}
-                  onValueChange={setFontSize}
-                  max={24}
-                  min={12}
-                  step={2}
-                  className="w-24"
-                />
+              <div className='flex items-center space-x-2'>
+                <Label className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {t('fontSize')}: {fontSize[0]}px
+                </Label>
+                <Slider value={fontSize} onValueChange={setFontSize} max={24} min={12} step={2} className='w-24' />
               </div>
-              <div className="flex items-center space-x-2">
+              <div className='flex items-center space-x-2'>
                 <input
-                  type="checkbox"
-                  id="darkMode"
+                  type='checkbox'
+                  id='darkMode'
                   checked={darkMode}
                   onChange={(e) => setDarkMode(e.target.checked)}
-                  className="rounded"
+                  className='rounded'
                 />
-                                 <Label htmlFor="darkMode" className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                   {t('darkMode')}
-                 </Label>
+                <Label htmlFor='darkMode' className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {t('darkMode')}
+                </Label>
               </div>
             </div>
           </div>
@@ -954,36 +1015,38 @@ export default function PublicSessionSummaryPage() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          
+      <div className='container mx-auto px-4 py-6'>
+        <div className='mx-auto max-w-4xl space-y-6'>
           {/* Session Info */}
-          <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
+          <Card className={darkMode ? 'border-gray-700 bg-gray-800' : ''}>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${
-                    darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
-                  }`}>
-                    <span className="text-lg">{getCategoryIcon(session.category)}</span>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center space-x-3'>
+                  <div
+                    className={`flex aspect-square size-11 items-center justify-center rounded-full p-2 ${
+                      darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                    }`}
+                  >
+                    <span className='text-lg'>{getCategoryIcon(session.category)}</span>
                   </div>
                   <div>
-                    <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>
-                      {session.title}
-                    </CardTitle>
+                    <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>{session.title}</CardTitle>
                     <CardDescription className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
                       {getCategoryName(session.category)} • {session.host_name}
                     </CardDescription>
                   </div>
                 </div>
-                                 <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   {session.status === 'ended' ? t('completedSession') : t('inProgress')}
-                 </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {session.status === 'ended' ? t('completedSession') : t('inProgress')}
+                </div>
               </div>
             </CardHeader>
             {session.description && (
               <CardContent>
-                <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`} style={{ fontSize: `${fontSize[0]}px` }}>
+                <p
+                  className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}
+                  style={{ fontSize: `${fontSize[0]}px` }}
+                >
                   {session.description}
                 </p>
               </CardContent>
@@ -991,31 +1054,31 @@ export default function PublicSessionSummaryPage() {
           </Card>
 
           {/* Session Stats */}
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardContent className="p-4 text-center">
-                <Clock className={`h-6 w-6 mx-auto mb-2 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+          <div className='grid gap-4 md:grid-cols-3'>
+            <Card className={darkMode ? 'border-gray-700 bg-gray-800' : ''}>
+              <CardContent className='p-4 text-center'>
+                <Clock className={`mx-auto mb-2 h-6 w-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t('sessionTime')}</p>
-                <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {formatDuration()}
-                </p>
+                <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDuration()}</p>
               </CardContent>
             </Card>
-            <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardContent className="p-4 text-center">
-                <FileText className={`h-6 w-6 mx-auto mb-2 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
+            <Card className={darkMode ? 'border-gray-700 bg-gray-800' : ''}>
+              <CardContent className='p-4 text-center'>
+                <FileText className={`mx-auto mb-2 h-6 w-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t('transcriptCount')}</p>
                 <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {transcript.length}{t('items')}
+                  {transcript.length}
+                  {t('items')}
                 </p>
               </CardContent>
             </Card>
-            <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardContent className="p-4 text-center">
-                <Languages className={`h-6 w-6 mx-auto mb-2 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+            <Card className={darkMode ? 'border-gray-700 bg-gray-800' : ''}>
+              <CardContent className='p-4 text-center'>
+                <Languages className={`mx-auto mb-2 h-6 w-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t('wordCount')}</p>
                 <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {transcript.reduce((total, t) => total + t.original_text.split(' ').length, 0)}{t('words')}
+                  {transcript.reduce((total, t) => total + t.original_text.split(' ').length, 0)}
+                  {t('words')}
                 </p>
               </CardContent>
             </Card>
@@ -1023,12 +1086,14 @@ export default function PublicSessionSummaryPage() {
 
           {/* Summary Section */}
           {(session.summary || summary) && (
-            <Card className={`${darkMode ? 'bg-gray-800 border-gray-700' : ''} border-2 border-dashed ${
-              darkMode ? 'border-blue-600' : 'border-blue-200'
-            }`}>
+            <Card
+              className={`${darkMode ? 'border-gray-700 bg-gray-800' : ''} border-2 border-dashed ${
+                darkMode ? 'border-blue-600' : 'border-blue-200'
+              }`}
+            >
               <CardHeader>
                 <CardTitle className={`flex items-center space-x-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  <FileText className="h-5 w-5" />
+                  <FileText className='h-5 w-5' />
                   <span>{t('aiSummary')}</span>
                 </CardTitle>
                 <CardDescription className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
@@ -1036,61 +1101,76 @@ export default function PublicSessionSummaryPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                                 {summaryLoading ? (
-                   <div className="flex items-center justify-center py-8">
-                     <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
-                     <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
-                       Loading {userLanguage} translation...
-                     </span>
-                   </div>
-                 ) : (
-                   <>
-                     {summaryTranslating && (
-                       <div className="flex items-center space-x-2 mb-2">
-                         <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                         <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                           Translating summary to {languages.find(l => l.code === selectedLanguage)?.name}...
-                         </span>
-                       </div>
-                     )}
-                     <div 
-                       className={`leading-relaxed mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
-                       style={{ fontSize: `${fontSize[0]}px` }}
-                     >
-                       {(() => {
-                         if (showTranslation && selectedLanguage !== 'en') {
-                           return <span dangerouslySetInnerHTML={{ __html: translatedSummary || session.summary || '' }} />
-                         }
-                         return <span dangerouslySetInnerHTML={{ __html: summary || session.summary || '' }} />
-                       })()}
-                     </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
-                                             <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                         {t('generatedBy')} • {(() => {
-                           if (showTranslation && selectedLanguage !== 'en') {
-                             return (translatedSummary || session.summary || '').length
-                           }
-                           return (summary || session.summary || '').length
-                         })()} {t('characters')}
-                         {showTranslation && selectedLanguage !== 'en' && translatedSummary && (
-                           <span> • Translated to {languages.find(l => l.code === selectedLanguage)?.name}</span>
-                         )}
-                       </div>
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           const summaryToCopy = (() => {
-                             if (showTranslation && selectedLanguage !== 'en') {
-                               return translatedSummary || session.summary || ''
-                             }
-                             return summary || session.summary || ''
-                           })()
-                           copyText(summaryToCopy, t('copySummary'))
-                         }}
-                       >
-                         📋 {t('copySummary')}
-                       </Button>
+                {summaryLoading ? (
+                  <div className='flex items-center justify-center py-8'>
+                    <Loader2 className='mr-2 h-6 w-6 animate-spin text-blue-600' />
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                      Loading {userLanguage} translation...
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {summaryTranslating && (
+                      <div className='mb-2 flex items-center space-x-2'>
+                        <Loader2 className='h-4 w-4 animate-spin text-blue-600' />
+                        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Translating summary to {languages.find((l) => l.code === selectedLanguage)?.name}
+                          ...
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`mb-4 leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
+                      style={{ fontSize: `${fontSize[0]}px` }}
+                    >
+                      {(() => {
+                        if (showTranslation && selectedLanguage !== 'en') {
+                          return (
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: translatedSummary || session.summary || '',
+                              }}
+                            />
+                          )
+                        }
+                        return (
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: summary || session.summary || '',
+                            }}
+                          />
+                        )
+                      })()}
+                    </div>
+                    <div className='flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-600'>
+                      <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {t('generatedBy')} •{' '}
+                        {(() => {
+                          if (showTranslation && selectedLanguage !== 'en') {
+                            return (translatedSummary || session.summary || '').length
+                          }
+                          return (summary || session.summary || '').length
+                        })()}{' '}
+                        {t('characters')}
+                        {showTranslation && selectedLanguage !== 'en' && translatedSummary && (
+                          <span> • Translated to {languages.find((l) => l.code === selectedLanguage)?.name}</span>
+                        )}
+                      </div>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => {
+                          const summaryToCopy = (() => {
+                            if (showTranslation && selectedLanguage !== 'en') {
+                              return translatedSummary || session.summary || ''
+                            }
+                            return summary || session.summary || ''
+                          })()
+                          copyText(summaryToCopy, t('copySummary'))
+                        }}
+                      >
+                        📋 {t('copySummary')}
+                      </Button>
                     </div>
                   </>
                 )}
@@ -1098,63 +1178,55 @@ export default function PublicSessionSummaryPage() {
             </Card>
           )}
 
-                    {/* Transcript Section */}
-          <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
+          {/* Transcript Section */}
+          <Card className={darkMode ? 'border-gray-700 bg-gray-800' : ''}>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>
-                  {t('fullTranscript')}
-                </CardTitle>
+              <div className='flex items-center justify-between'>
+                <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>{t('fullTranscript')}</CardTitle>
                 {transcript.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowFullTranscript(!showFullTranscript)}
-                  >
+                  <Button variant='outline' size='sm' onClick={() => setShowFullTranscript(!showFullTranscript)}>
                     {showFullTranscript ? t('collapse') : t('expand')}
                   </Button>
                 )}
               </div>
               <CardDescription className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-                {transcript.length}{t('items')} • {t('realTimeResults')}
+                {transcript.length}
+                {t('items')} • {t('realTimeResults')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {transcript.length > 0 ? (
                 <>
                   {showFullTranscript && (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                    <div className='max-h-96 space-y-3 overflow-y-auto'>
                       {transcript.map((item, index) => (
-                        <div key={item.id} className={`p-3 rounded-lg ${
-                          darkMode ? 'bg-gray-700' : 'bg-gray-50'
-                        }`}>
-                          <div className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <div key={item.id} className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                          <div className={`mb-1 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             #{index + 1} • {new Date(item.created_at).toLocaleTimeString()}
                           </div>
-                          <div 
+                          <div
                             className={`${darkMode ? 'text-gray-100' : 'text-gray-900'}`}
                             style={{ fontSize: `${fontSize[0]}px` }}
                           >
                             {item.original_text}
                           </div>
-                          
+
                           {/* 🆕 Translation Display */}
                           {showTranslation && (
-                            <div 
-                              className={`mt-2 leading-relaxed italic pl-4 border-l-2 ${
-                                darkMode 
-                                  ? 'text-gray-300 border-gray-600' 
-                                  : 'text-gray-700 border-gray-300'
+                            <div
+                              className={`mt-2 border-l-2 pl-4 leading-relaxed italic ${
+                                darkMode ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-700'
                               }`}
                               style={{ fontSize: `${fontSize[0] - 1}px` }}
                             >
                               {translatingIds.has(item.id) ? (
-                                <span className="text-gray-400 flex items-center">
-                                  <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                  [AI 번역 중...]
+                                <span className='flex items-center text-gray-400'>
+                                  <div className='mr-2 h-3 w-3 animate-spin rounded-full border border-gray-400 border-t-transparent'></div>
+                                  [AI Translating...]
                                 </span>
                               ) : (
-                                translatedTexts[item.id] || `[${languages.find(l => l.code === selectedLanguage)?.name}] ${item.original_text}`
+                                translatedTexts[item.id] ||
+                                `[${languages.find((l) => l.code === selectedLanguage)?.name}] ${item.original_text}`
                               )}
                             </div>
                           )}
@@ -1163,14 +1235,16 @@ export default function PublicSessionSummaryPage() {
                     </div>
                   )}
                   {transcript.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <div className='mt-4 border-t border-gray-200 pt-4 dark:border-gray-600'>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyText(
-                          transcript.map((t, i) => `${i + 1}. ${t.original_text}`).join('\n\n'),
-                          t('copyAllTranscript')
-                        )}
+                        variant='outline'
+                        size='sm'
+                        onClick={() =>
+                          copyText(
+                            transcript.map((t, i) => `${i + 1}. ${t.original_text}`).join('\n\n'),
+                            t('copyAllTranscript'),
+                          )
+                        }
                       >
                         📋 {t('copyAllTranscript')}
                       </Button>
@@ -1178,20 +1252,23 @@ export default function PublicSessionSummaryPage() {
                   )}
                 </>
               ) : (
-                <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">
+                <div className={`py-8 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <FileText className='mx-auto mb-4 h-12 w-12 opacity-50' />
+                  <p className='mb-2 text-lg font-medium'>
                     {session?.status === 'ended' ? 'Transcript not available' : 'No transcript yet'}
                   </p>
-                  <p className="text-sm mb-4">
-                    {session?.status === 'ended' 
+                  <p className='mb-4 text-sm'>
+                    {session?.status === 'ended'
                       ? 'The transcript for this session may not be accessible due to database permissions.'
-                      : 'Transcript will appear here as the session progresses.'
-                    }
+                      : 'Transcript will appear here as the session progresses.'}
                   </p>
                   {session?.status === 'ended' && (
-                    <div className={`text-xs p-3 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
-                      <p className="font-medium mb-1">🔍 Troubleshooting:</p>
+                    <div
+                      className={`rounded-lg p-3 text-xs ${
+                        darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <p className='mb-1 font-medium'>🔍 Troubleshooting:</p>
                       <p>• Check if you have permission to view this session&apos;s transcript</p>
                       <p>• Database access policies may prevent viewing transcripts from ended sessions</p>
                       <p>• Contact the session host if you believe you should have access</p>
@@ -1203,16 +1280,12 @@ export default function PublicSessionSummaryPage() {
           </Card>
 
           {/* Chatbot for past session */}
-          <Chatbot transcript={transcript.map(line => line.original_text).join('\n')} sessionId={sessionId} />
+          <Chatbot transcript={transcript.map((line) => line.original_text).join('\n')} sessionId={sessionId} />
 
           {/* Footer */}
-          <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            <p className="text-sm">
-              {t('publicAccess')}
-            </p>
-            <p className="text-xs mt-2">
-              {t('poweredBy')}
-            </p>
+          <div className={`py-8 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className='text-sm'>{t('publicAccess')}</p>
+            <p className='mt-2 text-xs'>{t('poweredBy')}</p>
           </div>
         </div>
       </div>
@@ -1232,4 +1305,4 @@ export default function PublicSessionSummaryPage() {
       )}
     </div>
   )
-} 
+}

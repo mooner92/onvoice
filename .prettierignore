@@ -1,0 +1,11 @@
+.prettierrc
+components.json
+*.md
+eslint.config.mjs
+next.config.ts
+package.json
+package-lock.json
+pnpm-lock.yaml
+postcss.config.mjs
+tsconfig.json
+sqls/*
