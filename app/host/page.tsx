@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { QRCodeDisplay } from '@/components/ui/qr-code'
 import { RealtimeSTT } from '@/components/RealtimeSTT'
+import { WhisperSTT } from '@/components/WhisperSTT'
 import type { Session } from '@/lib/types'
 import { useSession, useUser } from '@clerk/nextjs'
 
@@ -815,7 +816,7 @@ export default function HostDashboard() {
                 {/* Real-time STT Status */}
                 {sessionId && (
                   <div className='mt-2'>
-                    <RealtimeSTT
+                    <WhisperSTT
                       sessionId={sessionId}
                       isRecording={isRecording}
                       onTranscriptUpdate={handleTranscriptUpdate}
@@ -825,15 +826,15 @@ export default function HostDashboard() {
                   </div>
                 )}
 
-                {/* Web Speech API Info */}
+                {/* Whisper STT Info */}
                 {isRecording && (
-                  <div className='mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3'>
-                    <div className='flex items-center space-x-2 text-blue-800'>
-                      <div className='h-2 w-2 animate-pulse rounded-full bg-blue-500'></div>
-                      <span className='text-sm font-medium'>Live Speech Recognition Active</span>
+                  <div className='mt-2 rounded-lg border border-purple-200 bg-purple-50 p-3'>
+                    <div className='flex items-center space-x-2 text-purple-800'>
+                      <div className='h-2 w-2 animate-pulse rounded-full bg-purple-500'></div>
+                      <span className='text-sm font-medium'>Whisper STT Active</span>
                     </div>
-                    <p className='mt-1 text-xs text-blue-700'>
-                      🔄 Automatically restarts every 4 minutes to prevent timeout
+                    <p className='mt-1 text-xs text-purple-700'>
+                      🔇 Noise filtering • 🎯 Smart chunking • 🌍 High accuracy
                     </p>
                   </div>
                 )}

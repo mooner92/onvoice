@@ -127,7 +127,7 @@ async function translateWithGemini(
     const prompt = `Translate to ${targetLangName}: "${text}"`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -752,10 +752,10 @@ class TranslationQueueManager {
     const languageCount = textGroup.languages.size
     const basePriority = textGroup.priority
 
-    // 우선순위 세션은 500ms, 일반은 1000ms 기본 + 언어당 200ms 추가 대기
+    // 우선순위 세션은 500ms, 일반은 1초 기본 + 언어당 300ms 추가 대기 (더 빠른 실시간성)
     const isHighPriority = basePriority > 15 // 세션 우선순위 (10) + 언어 우선순위 (5+)
     const baseDelay = isHighPriority ? 500 : 1000
-    const extraDelay = Math.min(languageCount * 200, 2000) // 최대 2초 추가
+    const extraDelay = Math.min(languageCount * 300, 1500) // 최대 1.5초 추가
     const delay = baseDelay + extraDelay
 
     console.log(
@@ -797,6 +797,9 @@ class TranslationQueueManager {
           )
         }
 
+        // 배치 번역 결과를 transcript에 저장
+        await saveBatchTranslationsToCache(textGroup.text, batchResults)
+
         console.log(
           `🎉 Completed batch translation for "${textGroup.text.substring(0, 30)}..." (${Object.keys(batchResults).length} languages)`,
         )
@@ -809,11 +812,14 @@ class TranslationQueueManager {
         // 실패시 개별 처리로 폴백
         console.log(`🔄 Falling back to individual translations for ${languageArray.length} languages`)
 
+        const individualResults: Record<string, { text: string; engine: string; quality: number }> = {}
+        
         for (const language of languageArray) {
           try {
             const result = await performTranslation(textGroup.text, language)
 
             await saveTranslationToCache(textGroup.text, language, result.text, result.engine, result.quality)
+            individualResults[language] = result
 
             console.log(
               `✅ Individual translated "${textGroup.text.substring(0, 30)}..." → ${language} using ${result.engine}`,
@@ -821,6 +827,11 @@ class TranslationQueueManager {
           } catch (individualError) {
             console.error(`❌ Individual translation failed for ${language}:`, individualError)
           }
+        }
+
+        // 개별 번역 결과도 transcript에 저장
+        if (Object.keys(individualResults).length > 0) {
+          await saveBatchTranslationsToCache(textGroup.text, individualResults)
         }
 
         // fallback 번역 완료 시에도 transcript 상태 업데이트
@@ -847,20 +858,78 @@ class TranslationQueueManager {
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-      // 해당 transcript들의 상태를 'completed'로 업데이트
-      const { error } = await supabase
-        .from('transcripts')
-        .update({ translation_status: 'completed' })
-        .in('id', transcriptIds)
+      // 각 transcript에 대해 translation_cache_ids 업데이트
+      for (const transcriptId of transcriptIds) {
+        // 해당 transcript의 원본 텍스트 가져오기
+        const { data: transcript, error: fetchError } = await supabase
+          .from('transcripts')
+          .select('original_text')
+          .eq('id', transcriptId)
+          .single()
 
-      if (error) {
-        console.error('❌ Failed to update transcript status:', error)
-      } else {
-        console.log(`✅ Updated ${transcriptIds.length} transcript(s) status to completed`)
+        if (fetchError || !transcript) {
+          console.error(`❌ Failed to fetch transcript ${transcriptId}:`, fetchError)
+          continue
+        }
+
+        // 해당 텍스트의 번역 캐시 ID들 가져오기
+        const { data: cacheEntries, error: cacheError } = await supabase
+          .from('translation_cache')
+          .select('id, target_language')
+          .eq('original_text', transcript.original_text)
+
+        if (cacheError) {
+          console.error(`❌ Failed to fetch cache entries for transcript ${transcriptId}:`, cacheError)
+          continue
+        }
+
+        if (cacheEntries && cacheEntries.length > 0) {
+          // translation_cache_ids 객체 생성
+          const cacheIds: Record<string, string> = {}
+          for (const entry of cacheEntries) {
+            cacheIds[entry.target_language] = entry.id
+          }
+
+          // transcript 업데이트
+          const { error: updateError } = await supabase
+            .from('transcripts')
+            .update({
+              translation_status: 'completed',
+              translation_cache_ids: cacheIds,
+            })
+            .eq('id', transcriptId)
+
+          if (updateError) {
+            console.error(`❌ Failed to update transcript ${transcriptId} with cache IDs:`, updateError)
+          } else {
+            console.log(`✅ Updated transcript ${transcriptId} with cache IDs:`, cacheIds)
+          }
+        } else {
+          console.log(`⚠️ No cache entries found for transcript ${transcriptId}`)
+        }
       }
+
+      console.log(`✅ Updated ${transcriptIds.length} transcript(s) status to completed`)
     } catch (error) {
       console.error('❌ Error updating transcript status:', error)
     }
+  }
+
+  // 큐 초기화 (모든 작업과 타이머 제거)
+  clear(): void {
+    console.log('🧹 Clearing translation queue...')
+    
+    // 모든 타이머 취소
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer)
+    }
+    
+    // 모든 상태 초기화
+    this.textQueues.clear()
+    this.processing.clear()
+    this.timers.clear()
+    
+    console.log('✅ Translation queue cleared')
   }
 
   // 큐 상태 조회

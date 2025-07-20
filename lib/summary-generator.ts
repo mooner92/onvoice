@@ -93,60 +93,38 @@ export async function generateSessionSummary(options: SummaryGenerationOptions):
 
   // Generate English summary using Gemini
   const summaryPrompt = `
-**C – Context:**  
-You are a large language model tasked with summarizing spoken content that has been transcribed using the WebSpeech API. The source may be lectures, discussions, or events with a few speakers and many listeners. These transcripts often contain transcription errors (e.g., "My Combinator" instead of "Y Combinator") that must be corrected using contextual understanding.
+You are an AI assistant helping turn long transcripts into clear summaries for a productivity app. 
 
-**O – Objective:**  
-Your goal is to produce an accurate and concise summary by:  
-1. Correcting transcription errors based on context.  
-2. Following a specific HTML-based structure for clarity and usability.  
-3. Including five relevant tags at the end.
+The input will be a raw, unstructured transcript from a live talk or meeting. Your goal is to extract key content and summarise it into clear, structured bullet points, grouped by topic or timeline.
 
-**S – Style:**  
-Concise, clear, and professional. Avoid repetition or filler.
-
-**T – Tone:**  
-Neutral, informative, and user-friendly.
-
-**A – Audience:**  
-Users who want a brief but accurate overview of the spoken content. Including, but not limited to, students, professionals, and event attendees.
-
-**R – Response:**  
-Use the following structure:
+✅ Instructions:
+•⁠  ⁠Do *not* include any speaker names or timestamps in the output.
+•⁠  ⁠Only output *content* (no explanation, no meta-comments).
+•⁠  ⁠Group information under *concise section headings*.
+•⁠  ⁠Use *bullet points* to make the summary readable.
+•⁠  ⁠Remove any repetition or filler words.
+•⁠  ⁠Focus on *clarity, accuracy, and readability*.
 
 ${categoryPrompt}
-Here is the transcript which may contain transcription errors:
+
+Here is the transcript:
+
 ${truncatedTranscript}
 
-Please follow these instructions:
-1. Carefully analyze the transcript and fix any transcription errors using context clues.
-2. Organize the summary into 2-4 key sections, each with a clear heading using HTML <b> tags (e.g., <b>Section Title</b>).
-3. Under each heading, list 1-3 concise bullet points with the most important facts, insights, or conclusions.
-4. Use <br/> for line breaks between sections and bullet points.
-5. Be clear and detailed, grouping related information together.
-6. Use professional, easy-to-understand language.
-7. Do not exceed 500 characters total.
-8. End the summary with 5 relevant tags in the following format:
-<b>Important tags</b><br/>
-- tag 1<br/>
-- tag 2<br/>
-- tag 3<br/>
-- tag 4<br/>
-- tag 5<br/>
-9. Example format:
+Please create a clear, structured summary following this exact format:
 
-<b>1. Section Title</b><br/>
-- Key point one<br/>
-- Key point two<br/><br/>
-<b>2. Next Section</b><br/>
-- Key point one<br/>
-- Key point two<br/><br/>
+<b>1. Main Points</b><br/>
+- [Key point 1]<br/>
+- [Key point 2]<br/><br/>
+<b>2. Key Insights</b><br/>
+- [Insight 1]<br/>
+- [Insight 2]<br/><br/>
 <b>Important tags</b><br/>
-- topic<br/>
-- keyword<br/>
-- theme<br/>
-- event<br/>
-- takeaway<br/>
+- [tag 1]<br/>
+- [tag 2]<br/>
+- [tag 3]<br/>
+- [tag 4]<br/>
+- [tag 5]<br/>
 `
 
   console.log(`🤖 Generating English summary for session ${sessionId} (category: ${session.category})`)
