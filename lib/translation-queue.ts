@@ -127,7 +127,7 @@ async function translateWithGemini(
     const prompt = `Translate to ${targetLangName}: "${text}"`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+              `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -226,6 +226,10 @@ async function translateWithGeminiBatch(
     console.log(`🔑 Gemini API key found (${geminiApiKey.substring(0, 10)}...)`)
 
     // 지원되는 언어만 필터링
+    console.log(`🔍 Debug - targetLanguages:`, targetLanguages)
+    console.log(`🔍 Debug - targetLanguages type:`, typeof targetLanguages)
+    console.log(`🔍 Debug - targetLanguages is array:`, Array.isArray(targetLanguages))
+    
     const supportedLanguages = targetLanguages.filter((lang) => GEMINI_LANGUAGE_NAMES[lang])
     console.log(
       `🌍 Supported languages for Gemini: ${supportedLanguages.join(', ')} (from ${targetLanguages.join(', ')})`,
@@ -249,7 +253,7 @@ ${JSON.stringify(Object.fromEntries(supportedLanguages.map((lang) => [lang, `tra
     console.log(`📝 Gemini batch prompt prepared (${prompt.length} chars)`)
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -714,6 +718,17 @@ class TranslationQueueManager {
   // 번역 작업 추가 - 텍스트별로 그룹화
   addJob(job: TranslationJob): void {
     const textKey = job.text
+    
+    console.log(`🔍 Debug - Adding job: text="${job.text.substring(0, 30)}...", targetLanguage="${job.targetLanguage}"`)
+
+    // 🚫 중복 작업 체크 (같은 텍스트 + 같은 언어)
+    if (this.textQueues.has(textKey)) {
+      const textGroup = this.textQueues.get(textKey)!
+      if (textGroup.languages.has(job.targetLanguage)) {
+        console.log(`🚫 Duplicate translation job detected, skipping: "${job.text.substring(0, 30)}..." → ${job.targetLanguage}`)
+        return
+      }
+    }
 
     if (!this.textQueues.has(textKey)) {
       this.textQueues.set(textKey, {
@@ -780,6 +795,8 @@ class TranslationQueueManager {
       if (!textGroup || textGroup.languages.size === 0) return
 
       const languageArray = Array.from(textGroup.languages)
+      console.log(`🔍 Debug - textGroup.languages:`, textGroup.languages)
+      console.log(`🔍 Debug - languageArray:`, languageArray)
       console.log(
         `🚀 Processing batch translation for "${textGroup.text.substring(0, 50)}..." → [${languageArray.join(', ')}]`,
       )
@@ -965,6 +982,8 @@ export function addTranslationJob(
 ): string {
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
+  console.log(`🔍 Debug - addTranslationJob called: text="${text.substring(0, 30)}...", targetLanguage="${targetLanguage}"`)
+
   const job: TranslationJob = {
     id: jobId,
     text,
@@ -977,6 +996,7 @@ export function addTranslationJob(
   }
 
   translationQueue.addJob(job)
+  console.log('✅ Translation job added')
   return jobId
 }
 

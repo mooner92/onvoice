@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { translationQueue } from '@/lib/translation-queue'
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     console.log('🧹 Clearing translation queue...')
     

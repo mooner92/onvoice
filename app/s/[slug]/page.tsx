@@ -1290,6 +1290,7 @@ export default function PublicSessionPage() {
                       return {
                         ...line,
                           original: reviewedCache.translated_text,
+                          isTranslating: false, // 🎯 번역 완료 상태로 변경
                       }
                     }
                     return line
@@ -1300,6 +1301,41 @@ export default function PublicSessionPage() {
                 console.error('Error updating transcript with reviewed text:', error)
             }
             }
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'translation_cache',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async (payload) => {
+          console.log('📨 Translation cache inserted:', payload.new)
+          const newTranslation = payload.new as {
+            id: string
+            transcript_id: string
+            target_language: string
+            translated_text: string
+          }
+          
+          // 🎯 번역 완료 시 상태 업데이트
+          if (newTranslation.target_language === selectedLanguage) {
+            setTranscript((prev) => 
+              prev.map((line) => {
+                // transcript_id로 매칭되는 라인 찾기
+                if (line.id === newTranslation.transcript_id) {
+                  return {
+                    ...line,
+                    translated: newTranslation.translated_text,
+                    isTranslating: false,
+                  }
+                }
+                return line
+              })
+            )
           }
         },
       )

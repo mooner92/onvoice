@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Get access token for Google Cloud
-      const credentials = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS)
+      // const credentials = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS)
       
       // For now, we'll use a simplified approach
       // In production, you'd need proper OAuth2 token management
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         console.log('🔧 Using Gemini for grammar correction and improvement...')
         
         try {
-          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

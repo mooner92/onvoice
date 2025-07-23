@@ -15,7 +15,7 @@ const CHUNK_INTERVAL = 2000 // 2초마다 청크 생성 (더 안정적인 청킹
 const MAX_CHUNK_DURATION = 8000 // 최대 8초 청크 (문장 완성도 향상)
 const SILENCE_THRESHOLD = 0.015 // 무음 감지 임계값 (조정 가능)
 const SILENCE_DURATION = 1500 // 1.5초 무음 후 청크 처리 (문장 끝 감지)
-const MIN_SPEECH_DURATION = 500 // 최소 0.5초 음성 (노이즈 필터링)
+// const MIN_SPEECH_DURATION = 500 // 최소 0.5초 음성 (노이즈 필터링)
 const OVERLAP_DURATION = 1000 // 1초 오버랩 (문장 연결)
 const BUFFER_MAX_SIZE = 12000 // 12초 버퍼 최대 크기
 

@@ -66,7 +66,6 @@ export default function TestSTTPage() {
           sessionId={sessionId}
           onTranscriptUpdate={handleTranscriptUpdate}
           onError={handleError}
-          lang="en-US"
         />
       </div>
 
@@ -101,11 +100,11 @@ export default function TestSTTPage() {
       <div className="bg-gray-100 rounded-lg p-4">
         <h3 className="font-semibold mb-2">How to Test:</h3>
         <ol className="list-decimal list-inside space-y-1 text-sm">
-          <li>Click "Test Microphone Permission" to allow microphone access</li>
-          <li>Click "Start Realtime STT" to begin recording</li>
+          <li>Click &quot;Test Microphone Permission&quot; to allow microphone access</li>
+          <li>Click &quot;Start Realtime STT&quot; to begin recording</li>
           <li>Speak clearly into your microphone (English recommended)</li>
           <li>Watch the transcript update in real-time</li>
-          <li>Click "Stop Realtime STT" to end recording</li>
+          <li>Click &quot;Stop Realtime STT&quot; to end recording</li>
         </ol>
         
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">

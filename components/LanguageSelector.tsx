@@ -87,7 +87,7 @@ export default function LanguageSelector({
               <SelectValue placeholder="Select emphasis language (optional)" />
             </SelectTrigger>
             <SelectContent>
-                              <SelectItem value="none">None (English Only)</SelectItem>
+              <SelectItem value="none">None (English Only)</SelectItem>
               {LANGUAGES.filter(lang => lang.code !== primaryLanguage).map((language) => (
                 <SelectItem key={language.code} value={language.code}>
                   {getLanguageDisplay(language.code)}
@@ -103,7 +103,7 @@ export default function LanguageSelector({
             <div><strong>Main:</strong> {primaryLanguage ? getLanguageDisplay(primaryLanguage) : 'Not selected'}</div>
             <div><strong>Emphasis:</strong> {secondaryLanguage && secondaryLanguage !== 'none' ? getLanguageDisplay(secondaryLanguage) : 'None'}</div>
             <div className="mt-2 text-xs text-gray-500">
-              <strong>Web Speech API:</strong> {getWebSpeechLanguages()}
+              <strong>MediaRecorder:</strong> {getWebSpeechLanguages()}
             </div>
           </div>
         </div>

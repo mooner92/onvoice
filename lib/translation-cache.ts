@@ -78,7 +78,7 @@ export async function getTranslationFromCache(text: string, targetLanguage: stri
   }
 }
 
-// 캐시에 번역 저장 (개선된 버전)
+// 🚀 고성능 캐시 저장 (중복 방지 강화, 메트릭 수집)
 export async function saveTranslationToCache(
   text: string,
   targetLanguage: string,
@@ -98,32 +98,66 @@ export async function saveTranslationToCache(
     const daysToKeep = engine === 'gpt' ? 30 : engine === 'google' ? 14 : 7
     expiresAt.setDate(expiresAt.getDate() + daysToKeep)
 
-    // 중복 체크 먼저 수행
+    // 🚀 최적화된 중복 체크 (직접 해시 확인)
     const duplicateCheckStart = Date.now()
-    const existing = await getTranslationFromCache(text, targetLanguage)
+    
+    // 먼저 해시로 빠르게 확인
+    const { data: hashCheck, error: hashError } = await supabase
+      .from('translation_cache')
+      .select('id, usage_count')
+      .eq('content_hash', contentHash)
+      .eq('target_language', targetLanguage)
+      .gte('expires_at', new Date().toISOString())
+      .single()
+    
     const duplicateCheckTime = Date.now() - duplicateCheckStart
-
-    if (existing) {
+    metrics.cacheCheckTime.push(duplicateCheckTime)
+    
+    if (hashCheck && !hashError) {
+      // 기존 항목의 사용 횟수 증가 (백그라운드)
+      supabase
+        .from('translation_cache')
+        .update({ usage_count: hashCheck.usage_count + 1 })
+        .eq('id', hashCheck.id)
+        .then(({ error }) => {
+          if (error) {
+            console.warn(`⚠️ Failed to update usage count for ${hashCheck.id}:`, error)
+          }
+        })
+      
       const totalTime = Date.now() - startTime
       console.log(
-        `📋 Translation already cached: "${text.substring(0, 30)}..." → ${targetLanguage} (check: ${duplicateCheckTime}ms, total: ${totalTime}ms)`,
+        `🎯 Cache hit (fast path): "${text.substring(0, 30)}..." → ${targetLanguage} (check: ${duplicateCheckTime}ms, total: ${totalTime}ms)`,
       )
-      return existing.id
+      return hashCheck.id
+    }
+    
+    // 텍스트 품질 검증
+    if (!translatedText || translatedText.trim().length < 1) {
+      console.log(`⚠️ Empty or invalid translation, skipping cache: "${text.substring(0, 30)}..." → ${targetLanguage}`)
+      return null
+    }
+    
+    // 언어별 문자 패턴 검증
+    const isValidTranslation = validateTranslationQuality(text, translatedText, targetLanguage)
+    if (!isValidTranslation) {
+      console.log(`⚠️ Low quality translation detected, skipping cache: "${text.substring(0, 30)}..." → ${targetLanguage}`)
+      return null
     }
 
     const insertStart = Date.now()
-    console.log(`💾 Saving to cache: "${text.substring(0, 30)}..." → ${targetLanguage} (${engine})`)
+    console.log(`💾 Saving to cache: "${text.substring(0, 30)}..." → ${targetLanguage} (${engine}, quality: ${qualityScore})`)
 
     const { data, error } = await supabase
       .from('translation_cache')
       .insert({
         id: id, // 명시적으로 ID 지정
         content_hash: contentHash,
-        original_text: text,
+        original_text: text.substring(0, 2000), // 텍스트 길이 제한
         target_language: targetLanguage,
-        translated_text: translatedText,
+        translated_text: translatedText.substring(0, 2000), // 번역 길이 제한
         translation_engine: engine,
-        quality_score: qualityScore,
+        quality_score: Math.min(Math.max(qualityScore, 0), 1), // 0-1 범위 보장
         usage_count: 1,
         created_at: now, // 명시적으로 생성 시간 지정
         expires_at: expiresAt.toISOString(),
@@ -133,16 +167,37 @@ export async function saveTranslationToCache(
 
     const insertTime = Date.now() - insertStart
     const totalTime = Date.now() - startTime
+    
+    // 성능 메트릭 수집
+    metrics.dbInsertTime.push(insertTime)
+    metrics.totalSaveTime.push(totalTime)
+    
+    // 메트릭 배열 크기 제한 (메모리 관리)
+    if (metrics.dbInsertTime.length > 100) {
+      metrics.dbInsertTime = metrics.dbInsertTime.slice(-50)
+    }
+    if (metrics.cacheCheckTime.length > 100) {
+      metrics.cacheCheckTime = metrics.cacheCheckTime.slice(-50)
+    }
+    if (metrics.totalSaveTime.length > 100) {
+      metrics.totalSaveTime = metrics.totalSaveTime.slice(-50)
+    }
 
     if (error) {
       console.error(`❌ Error saving translation to cache (${totalTime}ms):`, error)
 
       // 중복 키 에러인 경우 기존 캐시 반환
-      if (error.code === '23505') {
-        // unique_violation
-        console.log('🔄 Duplicate cache entry, fetching existing...')
-        const existingCache = await getTranslationFromCache(text, targetLanguage)
-        return existingCache?.id || null
+      if (error.code === '23505' || error.message?.includes('duplicate key')) {
+        console.log('🔄 Duplicate cache entry detected, fetching existing...')
+        try {
+          const existingCache = await getTranslationFromCache(text, targetLanguage)
+          if (existingCache) {
+            console.log(`♻️ Returning existing cache ID: ${existingCache.id}`)
+            return existingCache.id
+          }
+        } catch (fetchError) {
+          console.error('❌ Failed to fetch existing cache:', fetchError)
+        }
       }
 
       return null
@@ -151,6 +206,14 @@ export async function saveTranslationToCache(
     console.log(
       `✅ Successfully cached: "${text.substring(0, 30)}..." → ${targetLanguage} (ID: ${data.id}) - Insert: ${insertTime}ms, Total: ${totalTime}ms`,
     )
+    
+    // 백그라운드에서 스마트 캐시 정리 (비동기)
+    if (Math.random() < 0.01) { // 1% 확률로 정리 실행
+      smartCacheCleanup(100).catch(err => 
+        console.warn('Background cache cleanup failed:', err)
+      )
+    }
+    
     return data.id
   } catch (error) {
     console.error('❌ Error saving translation to cache:', error)
@@ -158,14 +221,18 @@ export async function saveTranslationToCache(
   }
 }
 
-// 여러 언어의 번역을 배치로 저장
+// 🚀 고성능 배치 저장 (병렬 처리)
 export async function saveBatchTranslationsToCache(
   text: string,
   translations: Record<string, { text: string; engine: string; quality: number }>,
 ): Promise<Record<string, string>> {
   const cacheIds: Record<string, string> = {}
+  
+  console.log(`📦 Batch saving ${Object.keys(translations).length} translations for: "${text.substring(0, 30)}..."`)
+  const batchStartTime = Date.now()
 
-  for (const [language, translation] of Object.entries(translations)) {
+  // 병렬 처리로 성능 향상
+  const savePromises = Object.entries(translations).map(async ([language, translation]) => {
     const cacheId = await saveTranslationToCache(
       text,
       language,
@@ -173,13 +240,69 @@ export async function saveBatchTranslationsToCache(
       translation.engine,
       translation.quality,
     )
+    return { language, cacheId }
+  })
 
-    if (cacheId) {
-      cacheIds[language] = cacheId
+  const results = await Promise.allSettled(savePromises)
+  
+  let successCount = 0
+  let errorCount = 0
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled' && result.value.cacheId) {
+      cacheIds[result.value.language] = result.value.cacheId
+      successCount++
+    } else {
+      errorCount++
+      const language = Object.keys(translations)[index]
+      console.warn(`⚠️ Failed to cache translation for ${language}:`, 
+        result.status === 'rejected' ? result.reason : 'No cache ID returned')
     }
-  }
+  })
+  
+  const batchTime = Date.now() - batchStartTime
+  console.log(`📦 Batch save completed: ${successCount} success, ${errorCount} errors (${batchTime}ms)`)
 
   return cacheIds
+}
+
+// 🆕 번역 품질 검증 함수
+function validateTranslationQuality(
+  originalText: string, 
+  translatedText: string, 
+  targetLanguage: string
+): boolean {
+  // 기본 검증
+  if (!translatedText || translatedText.trim().length === 0) {
+    return false
+  }
+  
+  // 원문과 번역문이 동일한 경우 (번역 실패 가능성)
+  if (originalText.trim() === translatedText.trim()) {
+    // 단, 짧은 텍스트나 숫자/기호만 있는 경우는 허용
+    if (originalText.length < 10 || /^[\d\s\p{P}]+$/u.test(originalText)) {
+      return true
+    }
+    return false
+  }
+  
+  // 언어별 문자 패턴 검증
+  switch (targetLanguage) {
+    case 'ko':
+      // 한글이 포함되어 있는지 확인
+      return /[가-힣]/.test(translatedText)
+    case 'zh':
+      // 중국어 문자가 포함되어 있는지 확인
+      return /[\u4e00-\u9fff]/.test(translatedText)
+    case 'hi':
+      // 힌디어 문자가 포함되어 있는지 확인
+      return /[\u0900-\u097f]/.test(translatedText)
+    case 'en':
+      // 영어 알파벳이 포함되어 있는지 확인
+      return /[a-zA-Z]/.test(translatedText)
+    default:
+      return true // 기타 언어는 기본 허용
+  }
 }
 
 // 🆕 모든 지원 언어 (기존의 고정된 3개에서 확장)
@@ -194,54 +317,66 @@ export function getTargetLanguages(inputLanguage: string): string[] {
   return ALL_SUPPORTED_LANGUAGES.filter((lang) => lang !== inputLanguage)
 }
 
-// 🆕 언어 감지 함수 (개선된 휴리스틱 기반)
+// 🎯 향상된 다국어 감지 (정확도 개선)
 export function detectLanguage(text: string): string {
-  // 텍스트 정리
   const cleanText = text.trim()
   if (cleanText.length === 0) return 'en'
 
-  // 언어별 문자 수 계산
+  // 언어별 문자 및 패턴 분석
   const koreanChars = (cleanText.match(/[가-힣]/g) || []).length
-  const chineseChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length
+  const chineseChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length  
   const hindiChars = (cleanText.match(/[\u0900-\u097f]/g) || []).length
   const englishChars = (cleanText.match(/[a-zA-Z]/g) || []).length
-
-  const totalChars = cleanText.length
-  const threshold = 0.1 // 10% 이상이면 해당 언어로 판단
-
-  // 한글이 가장 많으면 한국어
-  if (koreanChars / totalChars > threshold && koreanChars > chineseChars && koreanChars > hindiChars) {
-    return 'ko'
-  }
-
-  // 중국어 문자가 가장 많으면 중국어
-  if (chineseChars / totalChars > threshold && chineseChars > koreanChars && chineseChars > hindiChars) {
-    return 'zh'
-  }
-
-  // 힌디어 문자가 가장 많으면 힌디어
-  if (hindiChars / totalChars > threshold && hindiChars > koreanChars && hindiChars > chineseChars) {
-    return 'hi'
-  }
-
-  // 영어 또는 기타 알파벳 문자가 많으면 영어
-  if (
-    englishChars / totalChars > threshold ||
-    (koreanChars === 0 && chineseChars === 0 && hindiChars === 0 && englishChars > 0)
-  ) {
+  
+  // 특수 문자와 숫자 제외한 실제 텍스트 길이
+  const textOnlyLength = cleanText.replace(/[\s\p{P}\d]/gu, '').length
+  
+  if (textOnlyLength === 0) {
+    console.log(`🔤 No text characters found, defaulting to English`)
     return 'en'
   }
-
-  // 판단이 어려운 경우 영어를 기본값으로
-  console.log(`🤔 Language detection uncertain for: "${cleanText.substring(0, 30)}..." - defaulting to English`)
-  return 'en'
+  
+  // 각 언어별 비율 계산 (개선된 임계값)
+  const koreanRatio = koreanChars / textOnlyLength
+  const chineseRatio = chineseChars / textOnlyLength
+  const hindiRatio = hindiChars / textOnlyLength
+  const englishRatio = englishChars / textOnlyLength
+  
+  console.log(`🔍 Language detection ratios: KO(${koreanRatio.toFixed(2)}) ZH(${chineseRatio.toFixed(2)}) HI(${hindiRatio.toFixed(2)}) EN(${englishRatio.toFixed(2)})`)
+  
+  // 절대적 우선순위 (90% 이상)
+  if (koreanRatio > 0.9) return 'ko'
+  if (chineseRatio > 0.9) return 'zh' 
+  if (hindiRatio > 0.9) return 'hi'
+  if (englishRatio > 0.9) return 'en'
+  
+  // 높은 신뢰도 (50% 이상)
+  if (koreanRatio > 0.5) return 'ko'
+  if (chineseRatio > 0.5) return 'zh'
+  if (hindiRatio > 0.5) return 'hi'
+  if (englishRatio > 0.5) return 'en'
+  
+  // 중간 신뢰도 (20% 이상이면서 다른 언어보다 2배 이상)
+  if (koreanRatio > 0.2 && koreanRatio > chineseRatio * 2 && koreanRatio > hindiRatio * 2) return 'ko'
+  if (chineseRatio > 0.2 && chineseRatio > koreanRatio * 2 && chineseRatio > hindiRatio * 2) return 'zh'
+  if (hindiRatio > 0.2 && hindiRatio > koreanRatio * 2 && hindiRatio > chineseRatio * 2) return 'hi'
+  
+  // 낮은 신뢰도 (10% 이상)
+  if (koreanRatio > 0.1) return 'ko'
+  if (chineseRatio > 0.1) return 'zh'
+  if (hindiRatio > 0.1) return 'hi'
+  
+  // 영어 문자가 있으면 영어, 없으면 기본값 영어
+  const detectedLang = englishChars > 0 ? 'en' : 'en'
+  console.log(`🤔 Low confidence language detection for: "${cleanText.substring(0, 30)}..." - using: ${detectedLang}`)
+  return detectedLang
 }
 
-// 스마트 Mock 번역 생성 (즉시 응답용)
+// 🎯 지능형 즉시 응답 번역 생성 (품질 개선)
 export function generateSmartMockTranslation(text: string, targetLanguage: string): string {
   const languageNames: Record<string, string> = {
     ko: '한국어',
-    ja: '日本語',
+    ja: '日本語', 
     zh: '中文',
     es: 'Español',
     fr: 'Français',
@@ -251,17 +386,28 @@ export function generateSmartMockTranslation(text: string, targetLanguage: strin
     ar: 'العربية',
     pt: 'Português',
     it: 'Italiano',
+    en: 'English'
   }
 
   const langName = languageNames[targetLanguage] || targetLanguage.toUpperCase()
-
-  // 짧은 텍스트는 더 자연스럽게
-  if (text.length < 20) {
+  
+  // 매우 짧은 텍스트 (10자 미만)
+  if (text.length < 10) {
     return `[${langName}] ${text}`
   }
+  
+  // 짧은 텍스트 (30자 미만) - 간단한 패턴 변환
+  if (text.length < 30) {
+    return `[${langName}] ${text}`
+  }
+  
+  // 중간 길이 텍스트 (100자 미만)
+  if (text.length < 100) {
+    return `🔄 [${langName}] ${text.substring(0, 50)}...`
+  }
 
-  // 긴 텍스트는 번역 중 표시
-      return `[AI Translating...] ${text}`
+  // 긴 텍스트 - AI 번역 중 표시
+  return `🤖 [AI ${langName} 번역 중...] ${text.substring(0, 40)}...`
 }
 
 // 번역 엔진 품질 평가

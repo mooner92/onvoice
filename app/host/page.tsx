@@ -12,7 +12,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { QRCodeDisplay } from '@/components/ui/qr-code'
 import { RealtimeSTT } from '@/components/RealtimeSTT'
-import { WhisperSTT } from '@/components/WhisperSTT'
 import type { Session } from '@/lib/types'
 import { useSession, useUser } from '@clerk/nextjs'
 
@@ -36,7 +35,8 @@ export default function HostDashboard() {
   const [sessionTitle, setSessionTitle] = useState('')
   const [sessionDescription, setSessionDescription] = useState('')
   const [sessionCategory, setSessionCategory] = useState('general')
-  const [primaryLanguage, setPrimaryLanguage] = useState('auto')
+  const [primaryLanguage, setPrimaryLanguage] = useState('en-US')
+  const [secondaryLanguage, setSecondaryLanguage] = useState('ko-KR')
   const [isRecording, setIsRecording] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -411,24 +411,68 @@ export default function HostDashboard() {
     [supabase],
   )
 
+  // 🎯 실시간 DB 구독 설정
+  useEffect(() => {
+    if (!sessionId || !supabase) return
+
+    console.log('🔔 Setting up real-time subscription for session:', sessionId)
+
+    const subscription = supabase
+      .channel(`transcript-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transcripts',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          console.log('🆕 New transcript from DB:', payload.new)
+          const newTranscript = payload.new as any
+          
+          // 🎯 새로운 transcript를 UI에 추가
+          const newLine: TranscriptLine = {
+            id: newTranscript.id,
+            timestamp: new Date(newTranscript.created_at).toLocaleTimeString(),
+            text: newTranscript.reviewed_text || newTranscript.original_text,
+            confidence: 0.9,
+            isReviewing: newTranscript.review_status === 'processing',
+            reviewedText: newTranscript.reviewed_text,
+            detectedLanguage: newTranscript.detected_language,
+          }
+
+          setTranscript((prev) => {
+            // 중복 체크
+            const isDuplicate = prev.some(existing => existing.id === newLine.id)
+            if (isDuplicate) {
+              console.log('🚫 Duplicate transcript from DB, skipping:', newLine.id)
+              return prev
+            }
+            
+            console.log('✅ Adding new transcript from DB:', newLine.text)
+            return [...prev, newLine]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('🔔 Cleaning up real-time subscription')
+      subscription.unsubscribe()
+    }
+  }, [sessionId, supabase])
+
   // Handle real-time transcript updates
-  const handleTranscriptUpdate = (text: string, isPartial: boolean) => {
+  const handleTranscriptUpdate = useCallback(async (text: string, isPartial: boolean) => {
     console.log('Transcript update:', { text, isPartial })
 
     if (isPartial) {
-      // Update partial text display
+      // 🎯 실시간 버퍼 업데이트 (Speaker 측에서 보임)
       setCurrentPartialText(text)
     } else {
-      // Add final transcript to list (원본 텍스트, 검수 중 상태)
-      const newLine: TranscriptLine = {
-        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        text: text.trim(),
-        confidence: 0.9,
-        isReviewing: true, // 검수 중 상태
-      }
-
-      setTranscript((prev) => [...prev, newLine])
+      // 🎯 완전한 문장은 DB에서 실시간으로 가져오므로 여기서는 처리하지 않음
+      console.log('✅ Complete sentence - will be loaded from DB via real-time subscription')
       setCurrentPartialText('') // Clear partial text
 
       // Reset inactivity timer when new transcript is received
@@ -444,7 +488,7 @@ export default function HostDashboard() {
         ) // 30 minutes
       }
     }
-  }
+  }, [])
 
   const handleSTTError = (error: string) => {
     console.error('STT Error:', error)
@@ -594,6 +638,19 @@ export default function HostDashboard() {
     if (sessionId) {
       router.push(`/session/${sessionId}`)
     }
+  }
+
+  // 🌍 언어 선택 핸들러
+  const handlePrimaryLanguageChange = (language: string) => {
+    setPrimaryLanguage(language)
+    // 보조 언어가 주 언어와 같으면 제거
+    if (secondaryLanguage === language) {
+      setSecondaryLanguage('none')
+    }
+  }
+
+  const handleSecondaryLanguageChange = (language: string) => {
+    setSecondaryLanguage(language)
   }
 
   const formatDuration = (seconds: number) => {
@@ -761,23 +818,45 @@ export default function HostDashboard() {
                 <p className='text-sm text-gray-500'>When you select a category, you will receive translations and summaries tailored to that field.</p>
               </div>
 
-              <div className='space-y-2'>
-                <Label>Primary Language (Optional)</Label>
-                <Select value={primaryLanguage} onValueChange={setPrimaryLanguage}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sttLanguages.map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className='text-sm text-gray-500'>
-                  Auto-detect provides the best accuracy. Specify only if needed for consistency.
-                </p>
+              <div className='space-y-4'>
+                <div className='space-y-2'>
+                  <Label>Primary Language</Label>
+                  <Select value={primaryLanguage} onValueChange={handlePrimaryLanguageChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sttLanguages.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className='text-sm text-gray-500'>
+                    Main language for speech recognition and transcription.
+                  </p>
+                </div>
+
+                <div className='space-y-2'>
+                  <Label>Secondary Language (Optional)</Label>
+                  <Select value={secondaryLanguage} onValueChange={handleSecondaryLanguageChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {sttLanguages.filter(lang => lang.code !== primaryLanguage).map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className='text-sm text-gray-500'>
+                    Secondary language for mixed-language speech recognition.
+                  </p>
+                </div>
               </div>
 
               <div className='flex justify-center pt-4'>
@@ -816,28 +895,17 @@ export default function HostDashboard() {
                 {/* Real-time STT Status */}
                 {sessionId && (
                   <div className='mt-2'>
-                    <WhisperSTT
+                    <RealtimeSTT
                       sessionId={sessionId}
-                      isRecording={isRecording}
                       onTranscriptUpdate={handleTranscriptUpdate}
                       onError={handleSTTError}
-                      lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
+                      primaryLanguage={primaryLanguage}
+                      secondaryLanguage={secondaryLanguage}
                     />
                   </div>
                 )}
 
-                {/* Whisper STT Info */}
-                {isRecording && (
-                  <div className='mt-2 rounded-lg border border-purple-200 bg-purple-50 p-3'>
-                    <div className='flex items-center space-x-2 text-purple-800'>
-                      <div className='h-2 w-2 animate-pulse rounded-full bg-purple-500'></div>
-                      <span className='text-sm font-medium'>Whisper STT Active</span>
-                    </div>
-                    <p className='mt-1 text-xs text-purple-700'>
-                      🔇 Noise filtering • 🎯 Smart chunking • 🌍 High accuracy
-                    </p>
-                  </div>
-                )}
+
 
                 {/* STT Error Display */}
                 {sttError && (
@@ -857,9 +925,12 @@ export default function HostDashboard() {
                     <div className='rounded-lg border border-blue-200 bg-blue-50 p-3'>
                       <div className='mb-1 flex items-center text-xs text-blue-600'>
                         <div className='mr-2 h-2 w-2 animate-pulse rounded-full bg-blue-500'></div>
-                        Speaking... (live preview)
+                        🎤 Speaking... (live preview)
                       </div>
-                      <div className='text-gray-700 italic'>{currentPartialText}</div>
+                      <div className='text-gray-700 italic font-medium'>{currentPartialText}</div>
+                      <div className='mt-1 text-xs text-blue-500'>
+                        💡 This text will be processed when you finish speaking
+                      </div>
                     </div>
                   )}
 

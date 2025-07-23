@@ -273,7 +273,7 @@ export default function HomePage() {
         <div className='container mx-auto px-4 text-center'>
           <h2 className='mb-6 text-3xl font-bold text-white'>Ready to Make Your Content Accessible?</h2>
           <p className='mx-auto mb-8 max-w-2xl text-xl text-blue-100'>
-            Start your first session today & experience Web Speech API transcription, Gemini 2.0 translation, & smart
+            Start your first session today & experience MediaRecorder transcription, Gemini 2.0 translation, & smart
             AI-powered summaries.
           </p>
           <div className='mx-auto flex max-w-screen-md justify-center'>
@@ -336,7 +336,7 @@ export default function HomePage() {
 
           <div className='text-center text-gray-400'>
             <p>&copy; 2025 OnVoice </p>
-            <p className='mt-2 text-sm'>Powered by Web Speech API • Gemini 2.0 • Real-time Translation</p>
+            <p className='mt-2 text-sm'>Powered by MediaRecorder • Gemini 2.0 • Real-time Translation</p>
           </div>
         </div>
       </footer>
