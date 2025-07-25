@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "dfx": "0.17.0",
+  "canisters": {
+    "onvoice_frontend": {
+      "type": "assets",
+      "source": [".next", "public"],
+      "frontend": {
+        "entrypoint": "index.html"
+      }
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    },
+    "ic": {
+      "type": "persistent"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "",
+      "args": ""
+    }
+  }
+} 
