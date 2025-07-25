@@ -11,7 +11,7 @@ import { Mic, MicOff, Users, Settings, Volume2, VolumeX, AlertCircle, CheckCircl
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { QRCodeDisplay } from '@/components/ui/qr-code'
-import { RealtimeSTT } from '@/components/RealtimeSTT'
+import { WhisperSTT } from '@/components/WhisperSTT'
 import type { Session } from '@/lib/types'
 import { useSession, useUser } from '@clerk/nextjs'
 
@@ -815,12 +815,12 @@ export default function HostDashboard() {
                 {/* Real-time STT Status */}
                 {sessionId && (
                   <div className='mt-2'>
-                    <RealtimeSTT
+                    <WhisperSTT
                       sessionId={sessionId}
                       isRecording={isRecording}
                       onTranscriptUpdate={handleTranscriptUpdate}
                       onError={handleSTTError}
-                      lang={primaryLanguage === 'auto' ? undefined : primaryLanguage}
+                      lang={primaryLanguage === 'auto' ? 'en' : primaryLanguage.split('-')[0]}
                     />
                   </div>
                 )}

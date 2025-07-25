@@ -607,9 +607,9 @@ export default function PublicSessionPage() {
             // 🆕 검수된 원문 텍스트 가져오기 (transcripts 테이블의 reviewed_text 필드 사용)
             if (t.reviewed_text) {
               originalText = t.reviewed_text
-              console.log(`✅ Loaded reviewed text from transcripts: "${originalText.substring(0, 30)}..."`)
+              console.log(`✅ Loaded reviewed text from transcripts: "${originalText.substring(0, 30)}..." (review_status: ${t.review_status})`)
             } else {
-              console.log(`⚠️ No reviewed text found in transcripts for: "${t.original_text.substring(0, 30)}..."`)
+              console.log(`⚠️ No reviewed text found in transcripts for: "${t.original_text.substring(0, 30)}..." (review_status: ${t.review_status})`)
             }
 
             // 번역이 활성화된 경우에만 번역 로드
@@ -856,9 +856,9 @@ export default function PublicSessionPage() {
             // 🆕 검수된 원문 텍스트 가져오기 (transcripts 테이블의 reviewed_text 필드 사용)
             if (t.reviewed_text) {
               originalText = t.reviewed_text
-              console.log(`✅ Loaded reviewed text from transcripts: "${originalText.substring(0, 30)}..."`)
+              console.log(`✅ Loaded reviewed text from transcripts: "${originalText.substring(0, 30)}..." (review_status: ${t.review_status})`)
             } else {
-              console.log(`⚠️ No reviewed text found in transcripts for: "${t.original_text.substring(0, 30)}..."`)
+              console.log(`⚠️ No reviewed text found in transcripts for: "${t.original_text.substring(0, 30)}..." (review_status: ${t.review_status})`)
             }
 
             if (selectedLanguage !== 'en') {

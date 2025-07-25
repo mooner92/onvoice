@@ -33,7 +33,14 @@ async function reviewAndTranslateWithGemini(
   let prompt = ''
   
   if (detectedLanguage === 'en') {
-    prompt = `Here is the raw text straight from STT, fix the grammar and remove noise errors like ah, emmm and add the punctuation to make it clear and easy to read.
+    prompt = `You are a professional transcription editor. Fix the following raw STT text by:
+
+1. Correcting grammar and spelling errors
+2. Removing filler words (um, uh, like, you know, etc.)
+3. Adding proper punctuation
+4. Fixing incomplete words or sentences
+5. Making it clear and readable
+6. Preserving the original meaning
 
 Also translate the corrected text to ${targetLanguages.map(lang => languageNames[lang]).join(', ')}.
 
@@ -51,7 +58,14 @@ Please return a JSON response with this exact format:
 }`
   } else {
     const inputLanguageName = languageNames[detectedLanguage]
-    prompt = `Here is the raw text straight from STT in ${inputLanguageName}, fix the grammar and remove noise errors and add the punctuation to make it clear and easy to read.
+    prompt = `You are a professional transcription editor. Fix the following raw STT text in ${inputLanguageName} by:
+
+1. Correcting grammar and spelling errors
+2. Removing filler words and noise
+3. Adding proper punctuation
+4. Fixing incomplete words or sentences
+5. Making it clear and readable
+6. Preserving the original meaning
 
 Also translate the corrected text to ${targetLanguages.map(lang => languageNames[lang]).join(', ')}.
 

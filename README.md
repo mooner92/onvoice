@@ -6,7 +6,7 @@ LiveTranscribe is a real-time lecture transcription and translation service. Spe
 
 ### 🎤 Speaker (Host)
 
-- **Real-Time Speech Recognition**: Browser-based STT using Web Speech API (instant transcription)
+- **Real-Time Speech Recognition**: Browser-based STT using Web Speech API (instant transcription) + OpenAI Whisper-1 with Voice Activity Detection (VAD)
 - **Session Management**: Lecture title, description, language settings
 - **Automatic QR Code Generation**: Real-time QR codes for easy participant access
 - **Session Persistence**: Automatic session recovery after browser restart
@@ -36,10 +36,68 @@ LiveTranscribe is a real-time lecture transcription and translation service. Spe
 - **Authentication**: Supabase Auth (Google OAuth)
 - **Database**: Supabase PostgreSQL
 - **Real-time Communication**: Supabase Realtime
-- **Speech Recognition**: Web Speech API (browser-based STT)
+- **Speech Recognition**: Web Speech API (browser-based STT) + OpenAI Whisper-1 (with VAD)
 - **QR Code**: react-qr-code, qrcode
 - **Audio Processing**: MediaRecorder API (WebRTC)
 - **Translation**: Google Translate API / Azure Translator
+
+## 🎤 Voice Activity Detection (VAD)
+
+LiveTranscribe now supports Voice Activity Detection (VAD) with OpenAI Whisper-1 for improved accuracy and cost efficiency.
+
+### VAD vs Traditional Processing
+
+| Feature | Traditional (Time-based) | VAD (Speech-based) |
+|---------|-------------------------|-------------------|
+| **Processing** | Fixed 10-second segments | Speech-only segments |
+| **API Calls** | Every 10 seconds | Only when speech detected |
+| **Cost** | Higher (processes silence) | Lower (processes speech only) |
+| **Accuracy** | Good | Better (no silence noise) |
+| **Complexity** | Simple | More complex |
+
+### VAD Configuration
+
+```typescript
+// VAD 활성화 (기본값)
+<WhisperSTT
+  sessionId="session-123"
+  isRecording={true}
+  onTranscriptUpdate={(text, isPartial) => console.log(text)}
+  onError={(error) => console.error(error)}
+  lang="ko"
+  vadConfig={{
+    enabled: true, // VAD 활성화 (기본값)
+    threshold: 0.6, // 음성 감지 임계값 (60% 이상)
+    silenceThreshold: 1.5, // 무음 지속 시간 (1.5초)
+    speechThreshold: 1.0, // 최소 음성 길이 (1초)
+    smoothingWindow: 5, // 스무딩 윈도우 크기
+    minBlobSize: 2000 // 최소 오디오 크기 (2KB)
+  }}
+/>
+
+// VAD 비활성화 (전통적인 시간 기반 처리)
+<WhisperSTT
+  sessionId="session-123"
+  isRecording={true}
+  onTranscriptUpdate={(text, isPartial) => console.log(text)}
+  onError={(error) => console.error(error)}
+  lang="ko"
+  vadConfig={{
+    enabled: false // VAD 비활성화 - 10초마다 고정 처리
+  }}
+/>
+```
+
+### VAD Troubleshooting
+
+**문제**: VAD가 너무 민감하게 작동하여 불필요한 API 호출 발생
+**해결**: VAD를 비활성화하여 전통적인 시간 기반 처리 사용
+
+```typescript
+vadConfig={{
+  enabled: false // 친구처럼 안정적인 시간 기반 처리
+}}
+```
 
 ## 📦 Installation & Setup
 
@@ -169,7 +227,8 @@ onvoice/
 ├── components/            # React components
 │   ├── auth/             # Authentication components
 │   ├── ui/               # UI components
-│   └── RealtimeSTT.tsx   # Real-time STT component
+│   ├── RealtimeSTT.tsx   # Web Speech API STT component (legacy)
+│   └── WhisperSTT.tsx    # OpenAI Whisper-1 STT component (new)
 ├── lib/                  # Utilities and configuration
 │   ├── supabase.ts       # Supabase client
 │   ├── types.ts          # TypeScript type definitions
@@ -181,6 +240,14 @@ onvoice/
 
 ### Real-Time STT System
 
+#### Whisper-1 Based STT (New)
+- **OpenAI Whisper-1 Integration**: High-accuracy server-based speech recognition
+- **Dual Queue System**: Overlapping 5-second segments with 3-second offset for better accuracy
+- **Intelligent Duplicate Removal**: Levenshtein distance and phrase matching for overlap detection
+- **Sentence Boundary Detection**: Automatic sentence completion and DB storage
+- **Cross-Platform Consistency**: Uniform performance across all devices and browsers
+
+#### Web Speech API STT (Legacy)
 - **Web Speech API Integration**: Real-time browser-based speech recognition
 - **Instant Processing**: Zero-latency transcription with immediate results
 - **Auto-Restart**: Automatic restart every 4.5 minutes to prevent API timeout
@@ -236,7 +303,8 @@ After deployment, verify these environment variables are correctly set:
 
 ### STT Costs
 
-- **Web Speech API**: Free (browser-based, no server costs)
+- **OpenAI Whisper-1**: $0.006/minute (high accuracy, cross-platform consistency)
+- **Web Speech API**: Free (browser-based, no server costs, device-dependent performance)
 - **Deepgram**: $0.0043/minute (requires Growth plan for WebSocket streaming)
 
 ### Translation Costs
